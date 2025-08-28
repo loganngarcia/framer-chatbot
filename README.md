@@ -1,4 +1,5 @@
 # Framer Chatbot
+<img width="1026" height="228" alt="45792" src="https://github.com/user-attachments/assets/02647b66-eac1-4f04-a105-42c52130db80" />
 
 A Framer component that brings Google's Gemini AI chatbot to your designs with a beautiful, customizable interface.
 
