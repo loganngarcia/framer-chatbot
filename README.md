@@ -5,7 +5,7 @@ A Framer component that brings Google's Gemini AI chatbot to your designs with a
 ## Features
 
 - **AI-Powered Chat**: Powered by Google's Gemini models with streaming responses
-- **Multimodal Input**: Text chat with image upload support
+- **Multimodal Input**: Text, image, video, audio, and file upload support
 - **Rich Interactions**: Markdown rendering, text-to-speech, and copy functions
 - **Mobile Optimized**: Touch-friendly with gesture controls
 - **Fully Customizable**: Colors, fonts, animations, and layout
@@ -14,7 +14,7 @@ A Framer component that brings Google's Gemini AI chatbot to your designs with a
 ## Quick Start
 
 ### 1. Get API Key
-Visit [Google AI Studio](https://makersuite.google.com/app/apikey) and create an API key.
+Visit [Google AI Studio](https://aistudio.google.com/apikey) and create an API key.
 
 ### 2. Add to Framer
 Copy `gemini.tsx` to your Framer project's components directory.
