@@ -32,14 +32,34 @@ import ChatOverlay from "./gemini"
 
 ## Props
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `geminiApiKey` | string | Your Gemini API key (required) |
-| `model` | string | Gemini model ID (default: "gemini-2.5-flash-lite") |
-| `systemPrompt` | string | AI personality and behavior instructions |
-| `welcomeMessage` | string | Initial greeting message |
-| `placeholder` | string | Input field placeholder |
-| `reasoningEffort` | "none" \| "low" \| "medium" \| "high" | AI thinking depth |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `geminiApiKey` | string | - | Your Gemini API key (required) |
+| `model` | string | "gemini-2.5-flash-lite" | Gemini model ID |
+| `reasoningEffort` | enum | "none" | AI thinking depth: "none", "low", "medium", "high" |
+| `systemPrompt` | string | "You are a helpful assistant." | AI personality and behavior instructions |
+| `welcomeMessage` | string | "Hi, how can I help?" | Initial greeting message |
+| `placeholder` | string | "Ask anything" | Input field placeholder |
+| `enableAiSuggestions` | boolean | true | Generate AI contextual reply suggestions |
+| `suggestedReply1` | string | "Quick facts" | First static suggested reply |
+| `suggestedReply2` | string | "Proven metrics" | Second static suggested reply |
+| `suggestedReply3` | string | "Contact" | Third static suggested reply |
+| `enableScrollReveal` | boolean | true | Scale input bar in from bottom on scroll |
+| `universalBorderRadius` | number | 24 | Corner radius for all elements (0-50px) |
+| `textFont` | font | Inter, 16px | Font family, size, weight, and style |
+| `textColor` | color | rgba(0,0,0,0.95) | Text color for input and messages |
+| `placeholderTextColor` | color | rgba(0,0,0,0.45) | Placeholder text color |
+| `linkColor` | color | #007AFF | Hyperlink color |
+| `iconColor` | color | rgba(0,0,0,0.65) | General icon color |
+| `userMessageBackgroundColor` | color | rgba(0,20,41,0.08) | User message bubble background |
+| `chatAreaBackground` | color | #F5F5F5 | Main chat area background |
+| `inputBarBackground` | color | rgba(255,255,255,0.70) | Collapsed input bar background |
+| `expandedInputAreaBackground` | color | rgba(255,255,255,0.95) | Expanded input area background |
+| `sendBgColor` | color | rgba(0,0,0,0.95) | Send button background color |
+| `sendIconColor` | color | #FFFFFF | Send button icon color |
+| `shadow` | boolean | true | Enable/disable shadows |
+| `sendIconOverrideUrl` | image | - | Custom send button icon |
+| `loadingIconOverrideUrl` | image | - | Custom loading indicator icon |
 
 ## Advanced Usage
 
