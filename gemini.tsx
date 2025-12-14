@@ -3951,6 +3951,12 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 // =========================================================================
 
 addPropertyControls(ChatOverlay, {
+    enableGeminiLive: {
+        type: ControlType.Boolean,
+        title: "Enable Gemini Live",
+        defaultValue: true,
+        description: "Enable Gemini Live voice calling. When off, call button is grayed out.",
+    },
     geminiApiKey: {
         type: ControlType.String,
         title: "Gemini API Key",
@@ -4040,12 +4046,6 @@ addPropertyControls(ChatOverlay, {
         title: "Reply Suggestions",
         defaultValue: true,
         description: "Generate AI contextual follow-up replies.",
-    },
-    enableGeminiLive: {
-        type: ControlType.Boolean,
-        title: "Enable Gemini Live",
-        defaultValue: true,
-        description: "Enable Gemini Live voice calling. When off, call button is grayed out.",
     },
     suggestedReply1: {
         type: ControlType.String,
