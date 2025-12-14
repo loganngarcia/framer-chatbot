@@ -12,6 +12,7 @@ import {
     Fragment,
     useMemo,
 } from "react"
+import { flushSync } from "react-dom"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 import {
     motion,
@@ -713,6 +714,51 @@ export default function ChatOverlay(props: ChatOverlayProps) {
           color: transparent;
           opacity: 0;
       }
+      
+      /* --- VIEW TRANSITIONS API STYLES --- */
+      
+      /* 1. The Container Geometry (Position/Size) */
+      ::view-transition-group(chat-overlay-morph) {
+        /* Faster duration for snappier collapse */
+        animation-duration: 0.2s;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        border-radius: ${universalBorderRadius}px;
+      }
+
+      /* 2. The Content Snapshots (Pill vs Card) */
+      ::view-transition-old(chat-overlay-morph),
+      ::view-transition-new(chat-overlay-morph) {
+        /* 'cover' prevents the stretching/bending */
+        height: 100%;
+        width: 100%;
+        object-fit: cover; 
+        object-position: center; /* Keeps content centered while scaling */
+        overflow: clip;
+      }
+      
+      /* 3. Animation Timing - Overlap them to prevent "empty/clipped" look */
+      
+      /* Old content (Disappearing) */
+      ::view-transition-old(chat-overlay-morph) {
+        /* Fade out faster to match total duration */
+        animation: 0.1s ease-out both fade-out;
+      }
+
+      /* New content (Appearing) */
+      ::view-transition-new(chat-overlay-morph) {
+        /* Start fading in IMMEDIATELY (no delay) to fill the void */
+        animation: 0.2s ease-out both fade-in;
+      }
+
+      @keyframes fade-out { 
+        0% { opacity: 1; }
+        100% { opacity: 0; } 
+      }
+      @keyframes fade-in { 
+        0% { opacity: 0; }
+        100% { opacity: 1; } 
+      }
   `
 
     const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
@@ -1315,19 +1361,36 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     }, [])
 
     const handleCollapse = useCallback(() => {
-        startTransition(() => setExpanded(false))
-        if (typeof window !== "undefined" && window.speechSynthesis) {
-            window.speechSynthesis.cancel()
+        const doCollapse = () => {
+            setExpanded(false)
+            setSpeakingMessageIndex(null)
+            if (typeof window !== "undefined" && window.speechSynthesis) {
+                window.speechSynthesis.cancel()
+            }
+            if (utteranceRef.current) utteranceRef.current = null
+            handleStopGeneration()
+            initialFocusPendingRef.current = true
         }
-        setSpeakingMessageIndex(null)
-        if (utteranceRef.current) {
-            utteranceRef.current = null
+
+        // Check for browser support
+        if (
+            typeof document !== "undefined" &&
+            "startViewTransition" in document
+        ) {
+            ;(document as any).startViewTransition(() => {
+                // FORCE synchronous update so browser captures the new state immediately
+                flushSync(() => {
+                    doCollapse()
+                })
+            })
+        } else {
+            // Fallback for browsers without support
+            startTransition(() => doCollapse())
         }
-        handleStopGeneration()
-        initialFocusPendingRef.current = true
     }, [handleStopGeneration])
 
     const handleExpand = useCallback(() => {
+        // Calculate offset logic...
         if (inputBarRef.current && typeof window !== "undefined") {
             const rect = inputBarRef.current.getBoundingClientRect()
             const distanceFromViewportBottom = window.innerHeight - rect.bottom
@@ -1337,7 +1400,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         } else {
             setExpandedViewBottomOffset(DEFAULT_EXPANDED_BOTTOM_OFFSET)
         }
-        startTransition(() => setExpanded(true))
+
+        if (
+            typeof document !== "undefined" &&
+            "startViewTransition" in document
+        ) {
+            ;(document as any).startViewTransition(() => {
+                flushSync(() => {
+                    setExpanded(true)
+                })
+            })
+        } else {
+            startTransition(() => setExpanded(true))
+        }
     }, [handleStopGeneration])
 
     useEffect(() => {
@@ -2283,6 +2358,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     else if (alpha <= 0.84) backdropBlurValue = "24px"
     else if (alpha <= 0.94) backdropBlurValue = "16px"
 
+    const supportsViewTransitions =
+        typeof document !== "undefined" && "startViewTransition" in document
+
     const overlayVariants = {
         open: {
             opacity: 1,
@@ -2291,16 +2369,20 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 finalPosStylesToApply.left === "50%" && !isMobileView
                     ? "-50%"
                     : "0%",
-            transition: { type: "spring", stiffness: 350, damping: 30 },
+            transition: supportsViewTransitions
+                ? { duration: 0 }
+                : { type: "spring", stiffness: 350, damping: 30 },
         },
         closed: {
-            opacity: 0,
-            y: isMobileView ? "100%" : 60,
+            opacity: supportsViewTransitions ? 1 : 0,
+            y: isMobileView ? (supportsViewTransitions ? 0 : "100%") : supportsViewTransitions ? 0 : 60,
             x:
                 finalPosStylesToApply.left === "50%" && !isMobileView
                     ? "-50%"
                     : "0%",
-            transition: { type: "spring", stiffness: 350, damping: 35 },
+            transition: supportsViewTransitions
+                ? { duration: 0 }
+                : { type: "spring", stiffness: 350, damping: 35 },
         },
     }
 
@@ -2486,7 +2568,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: expanded ? 1 : 0 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        transition={
+                            supportsViewTransitions
+                                ? { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }
+                                : { duration: 0.25, ease: "easeOut" }
+                        }
                         style={{
                             position: "fixed",
                             top: 0,
@@ -2534,7 +2620,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             : "none",
                         overflow: "hidden",
                         maxWidth: "100vw",
-                    }}
+                        viewTransitionName: "chat-overlay-morph",
+                    } as CSSProperties & { viewTransitionName?: string }}
                 >
                     <div
                         data-layer="drag-indicator-bar"
@@ -3617,10 +3704,17 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         ? "transform, opacity"
                         : undefined,
                     transition: enableScrollReveal
-                        ? "transform 0.25s ease-out, opacity 0.25s ease-out"
-                        : "opacity 0.25s ease-out",
+                        ? supportsViewTransitions
+                            ? "transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)"
+                            : "transform 0.25s ease-out, opacity 0.25s ease-out"
+                        : supportsViewTransitions
+                          ? "opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)"
+                          : "opacity 0.25s ease-out",
+                    viewTransitionName: expanded
+                        ? "none"
+                        : "chat-overlay-morph",
                     ...style,
-                }}
+                } as CSSProperties & { viewTransitionName?: string }}
                 onClick={(e) => {
                     const target = e.target as HTMLElement
                     if (
