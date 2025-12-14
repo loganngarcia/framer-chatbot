@@ -10,16 +10,21 @@ import {
     useCallback,
     CSSProperties,
     Fragment,
+    useMemo,
 } from "react"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
-// Framer Motion: animations + scroll hooks for collapsed input scroll-reveal
-import { motion, useDragControls, useScroll, useMotionValueEvent } from "framer-motion"
+import {
+    motion,
+    useDragControls,
+    useScroll,
+    useMotionValueEvent,
+    AnimatePresence,
+} from "framer-motion"
 
 // -----------------------------------------------------------------------------
 // Type Definitions
 // -----------------------------------------------------------------------------
 
-/** Defines the reasoning effort for the Gemini API call. */
 type ReasoningEffort = "low" | "medium" | "high" | "none"
 
 interface FramerFontInfo {
@@ -43,8 +48,10 @@ interface ChatOverlayProps {
     model: string
     reasoningEffort: ReasoningEffort
     systemPrompt: string
-    welcomeMessage?: string // New prop for the welcome message
+    welcomeMessage?: string
     placeholder: string
+    additionalPlaceholders: string[]
+    placeholderRotateInterval: number
     inputBarBackground: string
     expandedInputAreaBackground: string
     chatAreaBackground: string
@@ -66,13 +73,8 @@ interface ChatOverlayProps {
     suggestedReply3?: string
     enableAiSuggestions?: boolean
     universalBorderRadius: number
-    /**
-     * Enables scroll-reveal for the collapsed input bar.
-     * When true (and not on Canvas/Thumbnail), the input bar animates
-     * from translateY(400px) scale(0.3), opacity 0.5 to translateY(0) scale(1), opacity 1
-     * once window scrollY >= 10. Disabled when expanded.
-     */
     enableScrollReveal?: boolean
+    enableGeminiLive?: boolean
 }
 
 interface Message {
@@ -82,8 +84,22 @@ interface Message {
         | Array<
               | { type: "text"; text: string }
               | { type: "image_url"; image_url: { url: string } }
+              | {
+                    type: "inline_data"
+                    inline_data: { mimeType: string; data: string }
+                }
+              | {
+                    type: "file"
+                    file: {
+                        uri: string
+                        mimeType?: string
+                        name?: string
+                        thumbnailDataUrl?: string
+                    }
+                }
           >
 }
+
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
@@ -103,22 +119,83 @@ const DEFAULT_FONT_INFO: FramerFontInfo = {
 }
 
 const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
+const INLINE_MAX_BYTES = 20 * 1024 * 1024 // 20MB
+
+// Gemini Native Audio Output Rate
+const MODEL_OUTPUT_SAMPLE_RATE = 24000
+// We will downsample input to this rate for robustness
+const INPUT_TARGET_SAMPLE_RATE = 16000
+
+// -----------------------------------------------------------------------------
+// Audio Processing Helpers for Live API
+// -----------------------------------------------------------------------------
+
+function base64ToFloat32Array(base64: string): Float32Array {
+    const binaryString = atob(base64)
+    const len = binaryString.length
+    const bytes = new Uint8Array(len)
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+    }
+    const int16 = new Int16Array(bytes.buffer)
+    const float32 = new Float32Array(int16.length)
+    for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768
+    }
+    return float32
+}
+
+function float32ToBase64(float32: Float32Array): string {
+    const int16 = new Int16Array(float32.length)
+    for (let i = 0; i < float32.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32[i]))
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+    }
+    const bytes = new Uint8Array(int16.buffer)
+    let binary = ""
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+}
+
+/**
+ * Simple linear downsampler to convert browser audio (e.g. 48kHz) to 16kHz for Gemini
+ */
+function downsampleBuffer(
+    buffer: Float32Array,
+    inputRate: number,
+    outputRate: number
+): Float32Array {
+    if (outputRate === inputRate) return buffer
+    const sampleRateRatio = inputRate / outputRate
+    const newLength = Math.round(buffer.length / sampleRateRatio)
+    const result = new Float32Array(newLength)
+    let offsetResult = 0
+    let offsetBuffer = 0
+    while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio)
+        let accum = 0,
+            count = 0
+        for (
+            let i = offsetBuffer;
+            i < nextOffsetBuffer && i < buffer.length;
+            i++
+        ) {
+            accum += buffer[i]
+            count++
+        }
+        result[offsetResult] = count > 0 ? accum / count : 0
+        offsetResult++
+        offsetBuffer = nextOffsetBuffer
+    }
+    return result
+}
 
 // -----------------------------------------------------------------------------
 // Helper Functions
 // -----------------------------------------------------------------------------
 
-/**
- * Extracts the alpha (opacity) value from various color string formats.
- *
- * This utility function parses RGBA/HSLA color strings and hex colors with alpha
- * channels to extract the transparency value. Used throughout the component for
- * dynamic styling decisions based on background opacity, such as adjusting
- * backdrop blur intensity and shadow visibility.
- *
- * @param color - Color string in formats like "rgba(255,0,0,0.5)", "hsla(120,100%,50%,0.3)", or "#rrggbbaa"
- * @returns Alpha value between 0.0 (fully transparent) and 1.0 (fully opaque)
- */
 function getAlphaFromColorString(color: string): number {
     if (!color || typeof color !== "string") return 1.0
     const trimmedColor = color.toLowerCase().trim()
@@ -149,17 +226,6 @@ function getAlphaFromColorString(color: string): number {
     return 1.0
 }
 
-/**
- * Ensures URLs have a proper protocol prefix for secure external linking.
- *
- * This function validates and prepends "https://" to URLs that appear to be
- * web addresses but lack a protocol. Used by the markdown renderer when
- * processing links to prevent broken hrefs and ensure secure external navigation.
- * Handles special protocols like mailto: and tel: that should remain unchanged.
- *
- * @param url - Raw URL string that may or may not have a protocol
- * @returns Properly formatted URL with protocol prefix when appropriate
- */
 function ensureProtocol(url: string): string {
     if (
         url.startsWith("mailto:") ||
@@ -177,66 +243,29 @@ function ensureProtocol(url: string): string {
     return url
 }
 
-/**
- * Strips markdown formatting from text to prepare it for text-to-speech synthesis.
- *
- * This function removes markdown syntax elements that would interfere with
- * natural speech patterns or be pronounced awkwardly by TTS engines. Used
- * specifically by the text-to-speech functionality to provide clean, natural
- * audio output of assistant responses. Preserves the essential content while
- * removing visual formatting artifacts.
- *
- * @param markdownText - Raw markdown-formatted text from assistant messages
- * @returns Plain text with markdown syntax removed, optimized for speech synthesis
- */
 function stripMarkdownForTTS(markdownText: string): string {
     if (!markdownText) return ""
-    return (
-        markdownText
-            // Remove headings
-            .replace(/^#{1,6}\s+/gm, "")
-            // Remove bold and italic (asterisks and underscores)
-            .replace(/(\*\*|__)(.*?)\1/g, "$2")
-            .replace(/(\*|_)(.*?)\1/g, "$2")
-            // Remove strikethrough
-            .replace(/~~(.*?)~~/g, "$1")
-            // Convert markdown links to just their text
-            .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-            // Remove images, keeping alt text if present
-            .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "$1")
-            // Remove horizontal rules
-            .replace(/^(---|\*\*\*|___)\s*$/gm, "")
-            // Remove blockquotes
-            .replace(/^>\s?/gm, "")
-            // Remove list markers (unordered and ordered)
-            .replace(/^\s*[-*+]\s+/gm, "")
-            .replace(/^\s*\d+\.\s+/gm, "")
-            // Remove inline code backticks
-            .replace(/`([^`]+)`/g, "$1")
-            // Collapse multiple newlines into a single space
-            .replace(/\n+/g, " ")
-            .trim()
-    )
+    return markdownText
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/(\*\*|__)(.*?)\1/g, "$2")
+        .replace(/<(?:strong|b)>(.*?)<\/(?:strong|b)>/g, "$1")
+        .replace(/(\*|_)(.*?)\1/g, "$2")
+        .replace(/<(?:em|i)>(.*?)<\/(?:em|i)>/g, "$1")
+        .replace(/~~(.*?)~~/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+        .replace(/<a\s+(?:[^>]*?\s+)?href="[^"]*"[^>]*>(.*?)<\/a>/g, "$1")
+        .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "$1")
+        .replace(/^\s*[-*+]\s+/gm, "")
+        .replace(/^\s*\d+\.\s+/gm, "")
+        .replace(/\n+/g, " ")
+        .trim()
 }
 
-/**
- * Parses and renders inline markdown formatting within text segments.
- *
- * This core markdown rendering function processes text for bold, italic, links,
- * email addresses, and general URLs, converting them into styled React elements.
- * It's the foundation of the component's rich text display capabilities, used
- * by renderSimpleMarkdown to transform plain text with markdown syntax into
- * visually formatted content with interactive links.
- *
- * The function uses a sophisticated regex to match multiple markdown patterns
- * simultaneously, then recursively processes nested formatting within each match.
- * This enables complex formatting like **bold with [links](url) inside**.
- *
- * @param textSegment - Raw text that may contain markdown formatting
- * @param keyPrefix - Unique prefix for React keys to avoid conflicts in rendering
- * @param linkStyle - CSS styles to apply to rendered links
- * @returns Array of strings and JSX elements representing the formatted content
- */
+// -----------------------------------------------------------------------------
+// Markdown Parsing & Rendering
+// -----------------------------------------------------------------------------
+
 const applyInlineFormatting = (
     textSegment: string,
     keyPrefix: string,
@@ -245,103 +274,115 @@ const applyInlineFormatting = (
     if (!textSegment) return []
     const parts: (string | JSX.Element)[] = []
     let lastIndex = 0
+
     const combinedRegex =
-        /(\*\*(.*?)\*\*|__(.*?)__|\_(.*?)\_|\[([^\]]+?)\]\(([^\s)]+)\)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|((?:https?:\/\/)?(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}|localhost)(?::\d+)?(?:(?:\/[^\s!"'(),.:;<>@[\]`{|}~]*)*)?))/gi
+        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^\s)]+)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|((?:https?:\/\/)?(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}|localhost)(?::\d+)?(?:(?:\/[^\s!"'(),.:;<>@[\]`{|}~]*)*)?))/gi
+
     let match
     while ((match = combinedRegex.exec(textSegment)) !== null) {
         if (match.index > lastIndex) {
             parts.push(textSegment.substring(lastIndex, match.index))
         }
-        const fullMatch = match[0]
-        const boldStarContent = match[2]
-        const boldUnderscoreContent = match[3]
-        const italicUnderscoreContent = match[4]
-        const markdownLinkText = match[5]
-        const markdownLinkUrl = match[6]
-        const emailAddress = match[7]
-        const generalLinkUrl = match[8]
 
-        if (boldStarContent !== undefined) {
+        const [
+            fullMatch,
+            matchText,
+            boldInner,
+            boldInner2,
+            strongInner,
+            bInner,
+            codeInner,
+            strikeInner,
+            italicDelim,
+            italicInner,
+            emInner,
+            iInner,
+            linkText,
+            linkUrl,
+            htmlLinkUrl,
+            htmlLinkText,
+            email,
+            autoUrl,
+        ] = match
+
+        if (
+            boldInner !== undefined ||
+            boldInner2 !== undefined ||
+            strongInner !== undefined ||
+            bInner !== undefined
+        ) {
             parts.push(
-                <strong key={`${keyPrefix}-${match.index}-bs`}>
-                    {applyInlineFormatting(
-                        boldStarContent,
-                        `${keyPrefix}-${match.index}-bs-text`,
-                        linkStyle
-                    )}
+                <strong key={`${keyPrefix}-${match.index}-b`}>
+                    {boldInner || boldInner2 || strongInner || bInner}
                 </strong>
             )
-        } else if (boldUnderscoreContent !== undefined) {
+        } else if (codeInner !== undefined) {
             parts.push(
-                <strong key={`${keyPrefix}-${match.index}-bu`}>
-                    {applyInlineFormatting(
-                        boldUnderscoreContent,
-                        `${keyPrefix}-${match.index}-bu-text`,
-                        linkStyle
-                    )}
-                </strong>
+                <span
+                    key={`${keyPrefix}-${match.index}-code`}
+                    className="chat-markdown-inline-code"
+                >
+                    {codeInner}
+                </span>
             )
-        } else if (italicUnderscoreContent !== undefined) {
+        } else if (strikeInner !== undefined) {
             parts.push(
-                <em key={`${keyPrefix}-${match.index}-iu`}>
-                    {applyInlineFormatting(
-                        italicUnderscoreContent,
-                        `${keyPrefix}-${match.index}-iu-text`,
-                        linkStyle
-                    )}
-                </em>
+                <del key={`${keyPrefix}-${match.index}-del`}>{strikeInner}</del>
             )
         } else if (
-            markdownLinkText !== undefined &&
-            markdownLinkUrl !== undefined
+            italicInner !== undefined ||
+            emInner !== undefined ||
+            iInner !== undefined
         ) {
-            let href = markdownLinkUrl.trim()
-            if (
-                /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$/.test(
-                    href
-                ) &&
-                !href.toLowerCase().startsWith("mailto:")
-            ) {
-                href = `mailto:${href}`
-            } else {
-                href = ensureProtocol(href)
-            }
             parts.push(
-                <a
-                    key={`${keyPrefix}-${match.index}-mdlink`}
-                    href={href}
-                    target={
-                        href.startsWith("mailto:") || href.startsWith("tel:")
-                            ? "_self"
-                            : "_blank"
-                    }
-                    rel="noopener noreferrer"
-                    style={linkStyle}
-                >
-                    {markdownLinkText}
-                </a>
+                <em key={`${keyPrefix}-${match.index}-em`}>
+                    {italicInner || emInner || iInner}
+                </em>
             )
-        } else if (emailAddress !== undefined) {
+        } else if (linkText !== undefined && linkUrl !== undefined) {
             parts.push(
                 <a
-                    key={`${keyPrefix}-${match.index}-email`}
-                    href={`mailto:${emailAddress}`}
-                    style={linkStyle}
-                >
-                    {emailAddress}
-                </a>
-            )
-        } else if (generalLinkUrl !== undefined) {
-            const fullUrl = ensureProtocol(generalLinkUrl.trim())
-            parts.push(
-                <a
-                    key={`${keyPrefix}-${match.index}-link`}
-                    href={fullUrl}
+                    key={`${keyPrefix}-${match.index}-a`}
+                    href={ensureProtocol(linkUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {generalLinkUrl}
+                    {linkText}
+                </a>
+            )
+        } else if (htmlLinkText !== undefined && htmlLinkUrl !== undefined) {
+            parts.push(
+                <a
+                    key={`${keyPrefix}-${match.index}-html-a`}
+                    href={ensureProtocol(htmlLinkUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                >
+                    {htmlLinkText}
+                </a>
+            )
+        } else if (email !== undefined) {
+            parts.push(
+                <a
+                    key={`${keyPrefix}-${match.index}-mail`}
+                    href={`mailto:${email}`}
+                    style={linkStyle}
+                >
+                    {email}
+                </a>
+            )
+        } else if (autoUrl !== undefined) {
+            parts.push(
+                <a
+                    key={`${keyPrefix}-${match.index}-url`}
+                    href={ensureProtocol(autoUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                >
+                    {autoUrl}
                 </a>
             )
         } else {
@@ -355,249 +396,208 @@ const applyInlineFormatting = (
     return parts
 }
 
-/**
- * Renders markdown-formatted text as structured React elements.
- *
- * This is the main markdown rendering engine that converts plain text with
- * markdown syntax into a structured JSX element tree. It handles block-level
- * elements like headings, paragraphs, lists, and delegates inline formatting
- * to applyInlineFormatting. Used throughout the chat interface to display
- * rich text responses from the Gemini API with proper visual hierarchy and
- * interactive elements.
- *
- * The function processes text block by block, maintaining state for list
- * processing and ensuring proper nesting of elements. It's designed to be
- * lightweight while supporting the most common markdown features needed
- * for chat conversations.
- *
- * @param markdownText - Raw markdown text to be rendered
- * @param baseTextStyle - Base CSS styles for text elements
- * @param linkStyle - CSS styles for link elements
- * @returns JSX Fragment containing the fully rendered markdown content
- */
+const renderTable = (
+    block: string,
+    key: string,
+    baseStyle: CSSProperties,
+    linkStyle: CSSProperties
+) => {
+    const lines = block.trim().split("\n")
+    if (lines.length < 2) return null
+
+    const headerLine = lines[0]
+    const separatorLine = lines[1]
+    const bodyLines = lines.slice(2)
+
+    if (!separatorLine.includes("-") || !separatorLine.includes("|"))
+        return null
+
+    const headers = headerLine
+        .split("|")
+        .filter((h) => h.trim().length > 0)
+        .map((h) => h.trim())
+    const rows = bodyLines.map((line) =>
+        line
+            .split("|")
+            .filter((c) => c.trim().length > 0)
+            .map((c) => c.trim())
+    )
+
+    return (
+        <div key={key} style={{ overflowX: "auto", width: "100%" }}>
+            <table className="chat-markdown-table">
+                <thead>
+                    <tr>
+                        {headers.map((h, i) => (
+                            <th key={`th-${i}`}>
+                                {applyInlineFormatting(
+                                    h,
+                                    `${key}-th-${i}`,
+                                    linkStyle
+                                )}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row, i) => (
+                        <tr key={`tr-${i}`}>
+                            {row.map((cell, j) => (
+                                <td key={`td-${i}-${j}`}>
+                                    {applyInlineFormatting(
+                                        cell,
+                                        `${key}-td-${i}-${j}`,
+                                        linkStyle
+                                    )}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
 const renderSimpleMarkdown = (
     markdownText: string,
     baseTextStyle: CSSProperties,
     linkStyle: CSSProperties
 ): JSX.Element => {
     if (!markdownText) return <Fragment />
-    const elements: JSX.Element[] = []
-    const blocks = markdownText.split(/\n\s*\n+/)
-    const baseFontSize = parseFloat(baseTextStyle.fontSize as string) || 16
 
-    blocks.forEach((block, blockIndex) => {
-        if (block.trim() === "") return
+    const codeBlockRegex = /(```[\s\S]*?```)/g
+    const segments = markdownText.split(codeBlockRegex)
 
-        const lines = block.split("\n")
-        let currentListType: "ul" | "ol" | null = null
-        let listItems: JSX.Element[] = []
-
-        const flushList = () => {
-            if (listItems.length > 0) {
-                const listKey = `${currentListType}-${blockIndex}-${elements.length}`
-                const listStyle: CSSProperties = {
-                    ...baseTextStyle,
-                    listStylePosition: "outside",
-                    paddingLeft: "20px",
-                    margin: "0.5em 0",
-                }
-                if (currentListType === "ul") {
-                    elements.push(
-                        <ul key={listKey} style={listStyle}>
-                            {listItems}
-                        </ul>
-                    )
-                } else if (currentListType === "ol") {
-                    elements.push(
-                        <ol key={listKey} style={listStyle}>
-                            {listItems}
-                        </ol>
-                    )
-                }
-                listItems = []
-            }
-            currentListType = null
+    const renderedSegments = segments.map((segment, segIndex) => {
+        if (segment.startsWith("```")) {
+            const content = segment.replace(/^```\w*\n?/, "").replace(/```$/, "")
+            return (
+                <div
+                    key={`codeblock-${segIndex}`}
+                    className="chat-markdown-code-block"
+                >
+                    {content}
+                </div>
+            )
         }
 
-        lines.forEach((line, lineIndex) => {
-            const lineKeyPrefix = `b${blockIndex}-l${lineIndex}`
+        const blocks = segment.split(/\n{2,}/)
 
-            if (line.startsWith("# ")) {
-                flushList()
-                elements.push(
-                    <h1
-                        key={`${lineKeyPrefix}-h1`}
-                        style={{
-                            ...baseTextStyle,
-                            fontSize: `${Math.max(baseFontSize * 1.8, 24)}px`,
-                            fontWeight: "bold",
-                            margin: "0.67em 0",
-                        }}
-                    >
-                        {applyInlineFormatting(
-                            line.substring(2),
-                            `${lineKeyPrefix}-h1c`,
-                            linkStyle
-                        )}
-                    </h1>
-                )
-                return
-            }
-            if (line.startsWith("## ")) {
-                flushList()
-                elements.push(
-                    <h2
-                        key={`${lineKeyPrefix}-h2`}
-                        style={{
-                            ...baseTextStyle,
-                            fontSize: `${Math.max(baseFontSize * 1.4, 20)}px`,
-                            fontWeight: "bold",
-                            margin: "0.83em 0",
-                        }}
-                    >
-                        {applyInlineFormatting(
-                            line.substring(3),
-                            `${lineKeyPrefix}-h2c`,
-                            linkStyle
-                        )}
-                    </h2>
-                )
-                return
-            }
-            if (line.startsWith("### ")) {
-                flushList()
-                elements.push(
-                    <h3
-                        key={`${lineKeyPrefix}-h3`}
-                        style={{
-                            ...baseTextStyle,
-                            fontSize: `${Math.max(baseFontSize * 1.15, 18)}px`,
-                            fontWeight: "bold",
-                            margin: "1em 0",
-                        }}
-                    >
-                        {applyInlineFormatting(
-                            line.substring(4),
-                            `${lineKeyPrefix}-h3c`,
-                            linkStyle
-                        )}
-                    </h3>
-                )
-                return
+        return blocks.map((block, blockIndex) => {
+            const key = `seg-${segIndex}-blk-${blockIndex}`
+            const trimmed = block.trim()
+            if (!trimmed) return null
+
+            if (
+                trimmed.includes("|") &&
+                trimmed.includes("\n") &&
+                trimmed.split("\n")[1].includes("---")
+            ) {
+                const table = renderTable(trimmed, key, baseTextStyle, linkStyle)
+                if (table) return table
             }
 
-            const ulMatch = line.match(/^(\s*)(?:[-*]|\u2022)\s+(.*)/)
-            if (ulMatch) {
-                if (currentListType !== "ul") {
-                    flushList()
-                    currentListType = "ul"
-                }
-                const indentLevel = Math.floor(ulMatch[1].length / 2)
-                listItems.push(
-                    <li
-                        key={`${lineKeyPrefix}-li`}
-                        style={{
-                            ...baseTextStyle,
-                            marginLeft: `${indentLevel * 20}px`,
-                            display: "list-item",
-                            listStyleType: "disc",
-                        }}
-                    >
-                        {applyInlineFormatting(
-                            ulMatch[2],
-                            `${lineKeyPrefix}-lic`,
-                            linkStyle
-                        )}
-                    </li>
-                )
-                return
+            if (/^---+$|^\*\*\*+$/.test(trimmed)) {
+                return <hr key={key} className="chat-markdown-hr" />
             }
 
-            const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/)
-            if (olMatch) {
-                if (currentListType !== "ol") {
-                    flushList()
-                    currentListType = "ol"
-                }
-                const indentLevel = Math.floor(olMatch[1].length / 2)
-                listItems.push(
-                    <li
-                        key={`${lineKeyPrefix}-li`}
-                        style={{
-                            ...baseTextStyle,
-                            marginLeft: `${indentLevel * 20}px`,
-                            display: "list-item",
-                            listStyleType: "decimal",
-                        }}
-                    >
-                        {applyInlineFormatting(
-                            olMatch[3],
-                            `${lineKeyPrefix}-lic`,
-                            linkStyle
-                        )}
-                    </li>
-                )
-                return
-            }
-
-            flushList()
-            if (line.trim() !== "") {
-                elements.push(
+            const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
+            if (headingMatch) {
+                const level = headingMatch[1].length
+                const content = headingMatch[2]
+                const sizes = [24, 20, 18, 16, 14, 12]
+                return (
                     <div
-                        key={`${lineKeyPrefix}-p`}
-                        style={{ ...baseTextStyle, margin: "0.5em 0" }}
+                        key={key}
+                        style={{
+                            ...baseTextStyle,
+                            fontSize: `${Math.max(sizes[level - 1], 14)}px`,
+                            fontWeight: "bold",
+                            margin: "0.5em 0",
+                        }}
                     >
-                        {applyInlineFormatting(
-                            line,
-                            `${lineKeyPrefix}-pc`,
-                            linkStyle
-                        )}
+                        {applyInlineFormatting(content, `${key}-h`, linkStyle)}
                     </div>
                 )
             }
+
+            if (trimmed.startsWith(">")) {
+                const content = trimmed.replace(/^>\s?/gm, "").trim()
+                return (
+                    <blockquote key={key} className="chat-markdown-blockquote">
+                        {applyInlineFormatting(content, `${key}-qt`, linkStyle)}
+                    </blockquote>
+                )
+            }
+
+            if (/^[-*]\s/.test(trimmed)) {
+                const items = trimmed
+                    .split("\n")
+                    .map((l) => l.replace(/^[-*]\s+/, ""))
+                return (
+                    <ul
+                        key={key}
+                        style={{
+                            paddingLeft: 20,
+                            margin: "0.5em 0",
+                            listStyleType: "disc",
+                        }}
+                    >
+                        {items.map((item, i) => (
+                            <li key={`${key}-li-${i}`} style={baseTextStyle}>
+                                {applyInlineFormatting(
+                                    item,
+                                    `${key}-li-${i}`,
+                                    linkStyle
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )
+            }
+
+            if (/^\d+\.\s/.test(trimmed)) {
+                const items = trimmed
+                    .split("\n")
+                    .map((l) => l.replace(/^\d+\.\s+/, ""))
+                return (
+                    <ol
+                        key={key}
+                        style={{
+                            paddingLeft: 20,
+                            margin: "0.5em 0",
+                            listStyleType: "decimal",
+                        }}
+                    >
+                        {items.map((item, i) => (
+                            <li key={`${key}-li-${i}`} style={baseTextStyle}>
+                                {applyInlineFormatting(
+                                    item,
+                                    `${key}-li-${i}`,
+                                    linkStyle
+                                )}
+                            </li>
+                        ))}
+                    </ol>
+                )
+            }
+
+            return (
+                <div key={key} style={{ ...baseTextStyle, margin: "0.5em 0" }}>
+                    {applyInlineFormatting(trimmed, `${key}-p`, linkStyle)}
+                </div>
+            )
         })
-        flushList()
     })
 
-    return <Fragment>{elements}</Fragment>
+    return <Fragment>{renderedSegments}</Fragment>
 }
+
 // -----------------------------------------------------------------------------
 // Main ChatOverlay Component
 // -----------------------------------------------------------------------------
-/**
- * A chat overlay component that connects to Gemini for responses.
- * Allows text and image inputs, streaming, and AI-generated suggestions.
- * @framerIntrinsicWidth 248
- * @framerIntrinsicHeight 48
- * @framerSupportedLayoutWidth any
- * @framerSupportedLayoutHeight any
- */
-/**
- * Main ChatOverlay component that provides a Gemini AI chat interface.
- *
- * This component implements a complete chat experience with the following key features:
- * - Text and image input capabilities
- * - Streaming responses from Gemini API
- * - Mobile and desktop responsive design
- * - Rich markdown rendering of responses
- * - Text-to-speech functionality
- * - AI-generated contextual suggestions
- * - Framer-compatible property controls for design customization
- *
- * The component operates in two main states: collapsed (compact input bar) and
- * expanded (full chat interface). It integrates deeply with Framer's rendering
- * system and follows best practices for Canvas/Preview safety.
- */
 export default function ChatOverlay(props: ChatOverlayProps) {
-    // =========================================================================
-    // Props Destructuring & Configuration
-    // =========================================================================
-
-    /**
-     * Extract and provide default values for all component props.
-     * These props control the behavior, appearance, and integration of the chat overlay.
-     * Many have sensible defaults while others are required for core functionality.
-     */
     const {
         geminiApiKey,
         model,
@@ -605,6 +605,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         systemPrompt,
         welcomeMessage = "Hi, how can I help?",
         placeholder,
+        additionalPlaceholders = [],
+        placeholderRotateInterval = 3,
         inputBarBackground,
         expandedInputAreaBackground,
         chatAreaBackground,
@@ -626,26 +628,168 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         enableAiSuggestions = true,
         universalBorderRadius = 24,
         enableScrollReveal = true,
+        enableGeminiLive = true,
     } = props
 
-    // =========================================================================
-    // Core State Management & Refs
-    // =========================================================================
+    const baseFontSize =
+        typeof textFont.fontSize === "number"
+            ? textFont.fontSize
+            : parseFloat(textFont.fontSize) || 16
+    const tableFontSize = Math.max(10, baseFontSize - 1) + "px"
 
-    /**
-     * Framer Motion drag controls for handling mobile gesture-based collapse.
-     * Enables the overlay to be dragged down to close on mobile devices.
-     */
+    const markdownStyles = `
+        .chat-markdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: ${tableFontSize};
+        }
+        .chat-markdown-table th,
+        .chat-markdown-table td {
+            border-bottom: 1px solid ${props.iconColor ? props.iconColor.replace(")", ", 0.1)").replace("rgb", "rgba") : "rgba(0,0,0,0.1)"};
+            padding: 8px 12px;
+            text-align: left;
+            color: ${props.textColor};
+        }
+        .chat-markdown-table th {
+            font-weight: 600;
+        }
+        .chat-markdown-code-block {
+            background: rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.06);
+            color: ${props.textColor};
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+            margin: 1em 0;
+            white-space: pre;
+        }
+        .chat-markdown-inline-code {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: ${props.linkColor};
+        }
+        .chat-markdown-blockquote {
+            border-left: 4px solid ${props.iconColor || "rgba(0,0,0,0.2)"};
+            padding-left: 16px;
+            margin: 1em 0;
+            opacity: 0.8;
+            font-style: italic;
+        }
+        .chat-markdown-hr {
+            border: 0;
+            height: 1px;
+            background: ${props.iconColor ? props.iconColor.replace(")", ", 0.1)").replace("rgb", "rgba") : "rgba(0,0,0,0.1)"};
+            margin: 1.5em 0;
+        }
+        .chat-overlay-collapsed-input::placeholder { color: transparent; opacity: 0; }
+        .chat-overlay-collapsed-input::-webkit-input-placeholder { color: transparent; opacity: 0; }
+        .chat-overlay-collapsed-input::-moz-placeholder { color: transparent; opacity: 0; }
+    `
+
+    const placeholderStyleTagContent = `
+      .chat-overlay-collapsed-input::placeholder {
+          color: transparent;
+          opacity: 0;
+      }
+      .chat-overlay-collapsed-input::-webkit-input-placeholder {
+          color: transparent;
+          opacity: 0;
+      }
+      .chat-overlay-collapsed-input::-moz-placeholder {
+          color: transparent;
+          opacity: 0;
+      }
+      .chat-overlay-collapsed-input:-ms-input-placeholder {
+          color: transparent;
+          opacity: 0;
+      }
+      .chat-overlay-collapsed-input::-ms-input-placeholder {
+          color: transparent;
+          opacity: 0;
+      }
+  `
+
+    const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
+    const isCanvas = RenderTarget.current() === RenderTarget.canvas
+
+    const allPlaceholders = [placeholder, ...additionalPlaceholders].filter(
+        (p) => p && p.trim() !== ""
+    )
+
+    useEffect(() => {
+        if (isCanvas || allPlaceholders.length <= 1) return
+        const intervalId = setInterval(
+            () => {
+                setCurrentPlaceholderIndex(
+                    (prev) => (prev + 1) % allPlaceholders.length
+                )
+            },
+            Math.max(1, placeholderRotateInterval) * 1000
+        )
+        return () => clearInterval(intervalId)
+    }, [allPlaceholders, placeholderRotateInterval, isCanvas])
+
+    const activePlaceholder = isCanvas
+        ? placeholder
+        : allPlaceholders[currentPlaceholderIndex] || placeholder
+
+    const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(
+        null
+    )
+    const copyTimeoutRef = useRef<any>(null)
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+        }
+    }, [])
+
+    const handleCopy = useCallback((text: string, index: number) => {
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+            navigator.clipboard.writeText(text)
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+            setCopiedMessageIndex(index)
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopiedMessageIndex(null)
+            }, 2000)
+        }
+    }, [])
+
+    async function uploadFileToGemini(
+        file: File
+    ): Promise<{ uri: string; name?: string; mimeType?: string } | null> {
+        try {
+            const endpoint = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiApiKey}&uploadType=media`
+            const res = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": file.type || "application/octet-stream",
+                },
+                body: file,
+            })
+            if (!res.ok) return null
+            const data = await res.json()
+            const uri = data?.file?.uri || data?.uri || data?.name || ""
+            if (!uri) return null
+            return {
+                uri,
+                name: data?.file?.displayName || file.name,
+                mimeType: data?.file?.mimeType || file.type,
+            }
+        } catch (e) {
+            return null
+        }
+    }
+
     const dragControls = useDragControls()
-    // Motion value that tracks window scrollY (Framer Motion). Used to drive the
-    // collapsed input's reveal-on-scroll animation when enabled.
     const { scrollY } = useScroll()
 
-    /**
-     * Computed font styles from the textFont prop.
-     * Converts Framer font configuration into CSS-compatible properties.
-     * Used throughout the component for consistent typography.
-     */
     const globalFontStyles: CSSProperties = {
         fontFamily: textFont.fontFamily,
         fontSize:
@@ -664,25 +808,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 : textFont.letterSpacing,
     }
 
-    // =========================================================================
-    // Component State Variables
-    // =========================================================================
-
-    /**
-     * Core UI state variables that control the chat interface behavior.
-     * These manage everything from user input to API communication state.
-     */
-
-    /** Current text input from the user */
     const [input, setInput] = useState<string>("")
-
-    /** Whether the chat overlay is in expanded (full) or collapsed (compact) mode */
     const [expanded, setExpanded] = useState<boolean>(false)
-    /**
-     * Array of chat messages with roles (system, user, assistant).
-     * Initialized with system prompt and optional welcome message.
-     * This is the core data structure that tracks the conversation history.
-     */
     const [messages, setMessages] = useState<Message[]>(() => {
         const initialMessages: Message[] = [
             {
@@ -698,133 +825,343 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
         return initialMessages
     })
-    /** Whether a message is currently being sent to/received from the Gemini API */
     const [isLoading, setIsLoading] = useState<boolean>(false)
-
-    /** Current error message to display to the user (if any) */
     const [error, setError] = useState<string>("")
-
-    /** Partial response text being streamed from Gemini API (shown before complete) */
     const [streamed, setStreamed] = useState<string>("")
-
-    /** Currently selected image file for upload with the next message */
     const [imageFile, setImageFile] = useState<File | null>(null)
-
-    /** Object URL for previewing the selected image file */
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("")
-    /** Index of the message currently being spoken via TTS (null if none) */
+    const [attachmentPreview, setAttachmentPreview] = useState<{
+        name: string
+        type: string
+    } | null>(null)
+    const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+    const [isRecording, setIsRecording] = useState<boolean>(false)
+    const [recordedAudioUrl, setRecordedAudioUrl] = useState<string>("")
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const audioChunksRef = useRef<Blob[]>([])
     const [speakingMessageIndex, setSpeakingMessageIndex] = useState<
         number | null
     >(null)
 
-    /** Whether the current viewport is considered mobile (affects layout and interactions) */
     const [isMobileView, setIsMobileView] = useState<boolean>(
         typeof window !== "undefined"
             ? window.innerWidth < DESKTOP_BREAKPOINT
             : false
     )
-    /** Selected voice for text-to-speech synthesis */
     const [selectedVoice, setSelectedVoice] =
         useState<SpeechSynthesisVoice | null>(null)
 
-    /** Bottom offset for expanded overlay to avoid viewport conflicts */
     const [expandedViewBottomOffset, setExpandedViewBottomOffset] =
         useState<number>(DEFAULT_EXPANDED_BOTTOM_OFFSET)
 
-    /** Array of AI-generated contextual reply suggestions */
     const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = useState<
         string[]
     >([])
 
-    // =========================================================================
-    // DOM Refs & Imperative Handles
-    // =========================================================================
-
-    /** Controller for aborting ongoing API requests */
     const abortControllerRef = useRef<AbortController | null>(null)
-
-    /** Ref to the collapsed input bar container for positioning calculations */
     const inputBarRef = useRef<HTMLDivElement | null>(null)
-
-    /** Ref to the collapsed input field for focus management */
     const collapsedInputRef = useRef<HTMLInputElement | null>(null)
-
-    /** Ref to the expanded textarea for dynamic resizing and focus management */
     const inputRef = useRef<HTMLTextAreaElement | null>(null)
-
-    /** Hidden file input element for image uploads */
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-    /** Ref for scrolling to bottom of messages (auto-scroll behavior) */
     const messagesEndRef = useRef<HTMLDivElement | null>(null)
-
-    /** Current TTS utterance being spoken */
     const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
-
-    /** Ref to expanded overlay for click-outside detection */
+    const recordedAudioBlobRef = useRef<Blob | null>(null)
     const expandedOverlayRef = useRef<HTMLDivElement | null>(null)
-
-    /** Tracks whether initial focus has been applied to prevent focus conflicts */
     const initialFocusPendingRef = useRef(true)
-
-    /** Ref to messages scroll container for gesture handling */
     const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-
-    /** Tracks the start of mobile drag gestures for collapse functionality */
     const gestureStartRef = useRef<{ y: number; isDragging: boolean } | null>(
         null
     )
-
-    /** Previous loading state for detecting state transitions */
     const prevIsLoadingRef = useRef<boolean>(isLoading)
-
-    /** Previous expanded state for detecting state transitions */
     const prevExpandedRef = useRef<boolean>(expanded)
-    // Local style state for collapsed input scroll-reveal.
-    // Initialized synchronously so the first paint matches the intended state
-    // (avoids a flash/jump from visible -> hidden).
-    const [scrollRevealStyle, setScrollRevealStyle] = useState<CSSProperties | null>(() => {
-        const isStaticEnv =
-            RenderTarget.current() === RenderTarget.canvas ||
-            RenderTarget.current() === RenderTarget.thumbnail
-        if (!enableScrollReveal || expanded || isStaticEnv) return null
-        if (typeof window === "undefined") {
-            return { opacity: 0.5, transform: "translateY(400px) scale(0.3)" }
+    const prevScrollY = useRef(
+        typeof window !== "undefined" ? window.scrollY : 0
+    )
+
+    // -------------------------------------------------------------------------
+    // Gemini Live API Logic
+    // -------------------------------------------------------------------------
+    const [isLiveMode, setIsLiveMode] = useState(false)
+    const [isLiveGenerating, setIsLiveGenerating] = useState(false)
+    const liveClientRef = useRef<WebSocket | null>(null)
+    const liveAudioContextRef = useRef<AudioContext | null>(null)
+    const liveInputStreamRef = useRef<MediaStream | null>(null)
+    const liveProcessorRef = useRef<ScriptProcessorNode | null>(null)
+    const liveSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+    const liveNextPlayTimeRef = useRef(0)
+
+    const stopLiveSession = useCallback(() => {
+        if (liveClientRef.current) {
+            liveClientRef.current.close()
+            liveClientRef.current = null
         }
-        const initialVisible = window.scrollY >= 10
-        return {
-            opacity: initialVisible ? 1 : 0.5,
-            transform: initialVisible
-                ? "translateY(0px) scale(1)"
-                : "translateY(400px) scale(0.3)",
+        if (liveProcessorRef.current) {
+            liveProcessorRef.current.disconnect()
+            liveProcessorRef.current = null
         }
-    })
+        if (liveSourceRef.current) {
+            liveSourceRef.current.disconnect()
+            liveSourceRef.current = null
+        }
+        if (liveInputStreamRef.current) {
+            liveInputStreamRef.current
+                .getTracks()
+                .forEach((track) => track.stop())
+            liveInputStreamRef.current = null
+        }
+        if (liveAudioContextRef.current) {
+            liveAudioContextRef.current.close()
+            liveAudioContextRef.current = null
+        }
+        setIsLiveMode(false)
+        setIsLiveGenerating(false)
+    }, [])
 
-    // =========================================================================
-    // Computed Values & UI State
-    // =========================================================================
+    const startLiveSession = useCallback(async () => {
+        if (!geminiApiKey) return
 
-    /** Whether the input has content (text or image) ready to send */
-    const hasContent = !!(input.trim() || imageFile)
+        const liveModel = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 
-    /** Whether the send button should be disabled in collapsed mode */
+        try {
+            const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiApiKey}`
+            const ws = new WebSocket(url)
+            liveClientRef.current = ws
+
+            ws.onopen = async () => {
+                ws.send(
+                    JSON.stringify({
+                        setup: {
+                            model: liveModel,
+                            generationConfig: {
+                                responseModalities: ["AUDIO"],
+                            },
+                            systemInstruction: {
+                                parts: [{ text: systemPrompt }],
+                            },
+                            // FIX: Use empty object to enable transcription
+                            inputAudioTranscription: {},
+                            outputAudioTranscription: {},
+                        },
+                    })
+                )
+
+                // Safari Audio Context: do not force sampleRate
+                const AudioContextClass =
+                    window.AudioContext || window.webkitAudioContext
+                const audioCtx = new AudioContextClass()
+
+                // FIX: Resume audio context if suspended (common browser behavior especially Safari)
+                if (audioCtx.state === "suspended") {
+                    await audioCtx.resume()
+                }
+
+                liveAudioContextRef.current = audioCtx
+                liveNextPlayTimeRef.current = audioCtx.currentTime + 0.1
+
+                try {
+                    // Capture at system default rate (robust for Safari)
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 1,
+                            // Do NOT force sampleRate here
+                        },
+                    })
+                    liveInputStreamRef.current = stream
+                    const source = audioCtx.createMediaStreamSource(stream)
+                    liveSourceRef.current = source
+
+                    const processor = audioCtx.createScriptProcessor(4096, 1, 1)
+                    liveProcessorRef.current = processor
+
+                    processor.onaudioprocess = (e) => {
+                        if (!liveClientRef.current) return
+                        const inputData = e.inputBuffer.getChannelData(0)
+
+                        // Downsample to 16kHz for Gemini Input
+                        const downsampledData = downsampleBuffer(
+                            inputData,
+                            audioCtx.sampleRate,
+                            INPUT_TARGET_SAMPLE_RATE
+                        )
+
+                        const b64 = float32ToBase64(downsampledData)
+
+                        if (ws.readyState === WebSocket.OPEN && b64.length > 0) {
+                            ws.send(
+                                JSON.stringify({
+                                    realtimeInput: {
+                                        mediaChunks: [
+                                            {
+                                                mimeType: `audio/pcm;rate=${INPUT_TARGET_SAMPLE_RATE}`,
+                                                data: b64,
+                                            },
+                                        ],
+                                    },
+                                })
+                            )
+                        }
+                    }
+
+                    source.connect(processor)
+                    processor.connect(audioCtx.destination)
+                } catch (err) {
+                    console.error("Audio capture failed", err)
+                    stopLiveSession()
+                }
+            }
+
+            ws.onmessage = async (event) => {
+                try {
+                    let data
+                    if (event.data instanceof Blob) {
+                        data = JSON.parse(await event.data.text())
+                    } else {
+                        data = JSON.parse(event.data)
+                    }
+
+                    if (data.serverContent?.modelTurn?.parts) {
+                        setIsLiveGenerating(true) // AI is actively generating content
+                        const parts = data.serverContent.modelTurn.parts
+                        for (const part of parts) {
+                            if (part.inlineData) {
+                                if (
+                                    liveAudioContextRef.current &&
+                                    part.inlineData.data
+                                ) {
+                                    const audioCtx = liveAudioContextRef.current
+                                    const float32 = base64ToFloat32Array(
+                                        part.inlineData.data
+                                    )
+                                    // Gemini 2.5 Native Audio is 24kHz
+                                    const buffer = audioCtx.createBuffer(
+                                        1,
+                                        float32.length,
+                                        MODEL_OUTPUT_SAMPLE_RATE
+                                    )
+                                    buffer.copyToChannel(float32, 0)
+
+                                    const source = audioCtx.createBufferSource()
+                                    source.buffer = buffer
+                                    source.connect(audioCtx.destination)
+
+                                    const now = audioCtx.currentTime
+                                    const playTime = Math.max(
+                                        now,
+                                        liveNextPlayTimeRef.current
+                                    )
+                                    source.start(playTime)
+                                    liveNextPlayTimeRef.current =
+                                        playTime + buffer.duration
+                                }
+                            }
+                        }
+                    }
+
+                    if (data.serverContent?.turnComplete) {
+                        setIsLiveGenerating(false) // Turn is complete
+                    }
+
+                    if (data.serverContent?.outputTranscription?.text) {
+                        const text = data.serverContent.outputTranscription.text
+                        startTransition(() => {
+                            setMessages((prev) => {
+                                const last = prev[prev.length - 1]
+                                if (last && last.role === "assistant") {
+                                    return [
+                                        ...prev.slice(0, -1),
+                                        {
+                                            ...last,
+                                            content:
+                                                (last.content as string) + text,
+                                        },
+                                    ]
+                                }
+                                return [
+                                    ...prev,
+                                    { role: "assistant", content: text },
+                                ]
+                            })
+                        })
+                    }
+
+                    if (data.serverContent?.inputTranscription?.text) {
+                        const text = data.serverContent.inputTranscription.text
+                        startTransition(() => {
+                            setMessages((prev) => {
+                                const last = prev[prev.length - 1]
+                                // Coalesce if last message was user and content is string
+                                if (
+                                    last &&
+                                    last.role === "user" &&
+                                    typeof last.content === "string"
+                                ) {
+                                    return [
+                                        ...prev.slice(0, -1),
+                                        { ...last, content: last.content + text },
+                                    ]
+                                }
+                                return [...prev, { role: "user", content: text }]
+                            })
+                        })
+                    }
+                } catch (e) {
+                    console.error("WS Parse Error", e)
+                }
+            }
+
+            ws.onclose = (ev) => {
+                console.log("WebSocket Closed", ev.code, ev.reason)
+                stopLiveSession()
+            }
+
+            ws.onerror = (e) => {
+                console.error("WebSocket Error", e)
+                stopLiveSession()
+            }
+
+            setIsLiveMode(true)
+            if (!expanded) handleExpand()
+        } catch (e) {
+            console.error("Live Init Error", e)
+            stopLiveSession()
+        }
+    }, [geminiApiKey, model, expanded, stopLiveSession, systemPrompt])
+
+    const handleToggleLive = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!enableGeminiLive) return
+        if (isLiveMode) {
+            stopLiveSession()
+        } else {
+            startLiveSession()
+        }
+    }
+
+    const [scrollRevealStyle, setScrollRevealStyle] =
+        useState<CSSProperties | null>(() => {
+            const isStaticEnv =
+                RenderTarget.current() === RenderTarget.canvas ||
+                RenderTarget.current() === RenderTarget.thumbnail
+            if (!enableScrollReveal || expanded || isStaticEnv) return null
+            if (typeof window === "undefined") {
+                return {
+                    opacity: 0.5,
+                    transform: "translateY(400px) scale(0.3)",
+                }
+            }
+            const initialVisible = window.scrollY >= 10
+            return {
+                opacity: initialVisible ? 1 : 0.5,
+                transform: initialVisible
+                    ? "translateY(0px) scale(1)"
+                    : "translateY(400px) scale(0.3)",
+            }
+        })
+
+    const hasContent = !!(input.trim() || imageFile || attachmentFile)
     const isCollapsedSendDisabled = isLoading || !hasContent
-
-    /** Computed opacity for send button based on disabled state */
     const sendButtonEffectiveOpacity = isCollapsedSendDisabled ? 0.5 : 1
 
-    // =========================================================================
-    // Effect Hooks - Side Effects & Lifecycle Management
-    // =========================================================================
-
-    /**
-     * COLLAPSED INPUT SCROLL-REVEAL EFFECT
-     * - Enabled via enableScrollReveal
-     * - Trigger: window.scrollY >= 10
-     * - Animation: translateY(400px) scale(0.3), opacity 0.5 -> translateY(0) scale(1), opacity 1
-     * - Environments: active in Preview/Export, skipped on Canvas/Thumbnail
-     * - Inactive when overlay is expanded
-     */
     useEffect(() => {
         const isStaticEnv =
             RenderTarget.current() === RenderTarget.canvas ||
@@ -848,21 +1185,21 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             RenderTarget.current() === RenderTarget.canvas ||
             RenderTarget.current() === RenderTarget.thumbnail
         if (!enableScrollReveal || expanded || isStaticEnv) return
+
+        const previous = prevScrollY.current
+        const direction = latest > previous ? "down" : "up"
+        prevScrollY.current = latest
+
+        const shouldShow = latest >= 10 && direction === "down"
+
         setScrollRevealStyle({
-            opacity: latest >= 10 ? 1 : 0.5,
-            transform:
-                latest >= 10
-                    ? "translateY(0px) scale(1)"
-                    : "translateY(400px) scale(0.3)",
+            opacity: shouldShow ? 1 : 0.5,
+            transform: shouldShow
+                ? "translateY(0px) scale(1)"
+                : "translateY(400px) scale(0.3)",
         })
     })
 
-    /**
-     * MOBILE SCROLL LOCK EFFECT
-     * Prevents background scrolling and touch actions when overlay is expanded on mobile.
-     * This creates a modal-like experience where the user can only interact with the chat.
-     * Also compensates for scrollbar disappearance by adding right padding to prevent layout shift.
-     */
     useEffect(() => {
         if (
             typeof document === "undefined" ||
@@ -928,12 +1265,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 )
 
                 if (!response.ok) {
-                    const errorData = await response.text()
-                    console.error(
-                        "Error fetching AI suggestions:",
-                        response.status,
-                        errorData
-                    )
                     setAiGeneratedSuggestions([])
                     return
                 }
@@ -965,19 +1296,12 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             setAiGeneratedSuggestions([])
                         }
                     } catch (e) {
-                        console.error(
-                            "Failed to parse AI suggestions JSON:",
-                            e,
-                            "\nRaw text for suggestions:",
-                            responseText
-                        )
                         setAiGeneratedSuggestions([])
                     }
                 } else {
                     setAiGeneratedSuggestions([])
                 }
             } catch (e) {
-                console.error("Exception fetching AI suggestions:", e)
                 setAiGeneratedSuggestions([])
             }
         },
@@ -1014,14 +1338,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             setExpandedViewBottomOffset(DEFAULT_EXPANDED_BOTTOM_OFFSET)
         }
         startTransition(() => setExpanded(true))
-    }, [])
+    }, [handleStopGeneration])
 
-    /**
-     * VIEWPORT DETECTION EFFECT
-     * Monitors window resize events to determine if we're in mobile or desktop view.
-     * This affects layout decisions, interaction patterns, and overlay positioning.
-     * Uses DESKTOP_BREAKPOINT (855px) as the threshold for switching between modes.
-     */
     useEffect(() => {
         const checkViewport = () => {
             if (typeof window !== "undefined") {
@@ -1035,29 +1353,24 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [])
 
-    /**
-     * IMAGE PREVIEW URL MANAGEMENT EFFECT
-     * Creates and manages object URLs for image previews when files are selected.
-     * Properly cleans up URLs to prevent memory leaks when images change or are removed.
-     * This enables showing image thumbnails in the input area before sending.
-     */
     useEffect(() => {
-        if (imageFile && typeof window !== "undefined") {
+        if (
+            imageFile &&
+            typeof window !== "undefined" &&
+            imageFile.type &&
+            imageFile.type.startsWith("image/")
+        ) {
             const objectUrl = URL.createObjectURL(imageFile)
             setImagePreviewUrl(objectUrl)
             return () => URL.revokeObjectURL(objectUrl)
         } else {
-            setImagePreviewUrl("")
+            const isVideoSelected = !!(
+                attachmentFile && attachmentFile.type.startsWith("video/")
+            )
+            if (!isVideoSelected) setImagePreviewUrl("")
         }
-    }, [imageFile])
+    }, [imageFile, attachmentFile])
 
-    /**
-     * COLLAPSED INPUT FOCUS MANAGEMENT EFFECT
-     * Manages focus behavior for the collapsed input bar to ensure good UX.
-     * Automatically focuses the input when component mounts or when appropriate,
-     * but only in Preview/Export (not Canvas/Thumbnail) to avoid focus issues.
-     * Resets focus pending state when expanding to allow expanded input focus.
-     */
     useEffect(() => {
         if (
             !expanded &&
@@ -1082,15 +1395,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [expanded])
 
-    /**
-     * EXPANDED INPUT FOCUS MANAGEMENT EFFECT
-     * Handles focus transitions for the expanded textarea with smart timing.
-     * Focuses the expanded input when:
-     * - Chat overlay is first opened (justOpened)
-     * - Message loading completes (justFinishedLoading)
-     * Uses previous state refs to detect transitions and applies delayed focus
-     * to ensure DOM is ready. Only operates in Preview/Export, not Canvas.
-     */
     useEffect(() => {
         const wasExpanded = prevExpandedRef.current
         const wasLoading = prevIsLoadingRef.current
@@ -1121,12 +1425,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         prevIsLoadingRef.current = isLoading
     }, [expanded, isLoading])
 
-    /**
-     * INITIAL SCROLL TO BOTTOM EFFECT
-     * Scrolls to bottom of messages when overlay first opens.
-     * Uses setTimeout to ensure DOM is fully rendered before scrolling.
-     * Uses "auto" behavior for instant positioning on initial load.
-     */
     useEffect(() => {
         if (expanded && messagesEndRef.current) {
             setTimeout(() => {
@@ -1135,13 +1433,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [expanded])
 
-    /**
-     * CONTINUOUS SCROLL TO BOTTOM EFFECT
-     * Maintains scroll position at bottom during active conversations.
-     * Triggers on new messages, streaming text, or new AI suggestions.
-     * Uses smooth scrolling for better UX during ongoing conversations.
-     * Only scrolls when there are actual messages (length > 1 excludes initial state).
-     */
     useEffect(() => {
         if (
             expanded &&
@@ -1154,13 +1445,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [messages, streamed, expanded, aiGeneratedSuggestions])
 
-    /**
-     * SYSTEM PROMPT & WELCOME MESSAGE UPDATE EFFECT
-     * Dynamically updates the conversation when system prompt or welcome message changes.
-     * Preserves user messages while updating the system context and welcome message.
-     * Uses startTransition for smooth state updates to prevent blocking UI.
-     * Carefully manages message ordering to maintain conversation continuity.
-     */
     useEffect(() => {
         startTransition(() => {
             setMessages((prevMessages) => {
@@ -1188,16 +1472,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         })
     }, [systemPrompt, welcomeMessage])
 
-    /**
-     * TEXT-TO-SPEECH VOICE POPULATION EFFECT
-     * Initializes and selects the best available TTS voice for speech synthesis.
-     * Implements a sophisticated fallback strategy prioritizing:
-     * 1. Neural voices (highest quality)
-     * 2. Cloud-based voices (better than local)
-     * 3. Default English voices
-     * 4. Any available voice as last resort
-     * Handles asynchronous voice loading with onvoiceschanged event listener.
-     */
     useEffect(() => {
         const populate = () => {
             if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -1241,12 +1515,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [])
 
-    /**
-     * TEXT-TO-SPEECH CLEANUP EFFECT
-     * Ensures proper cleanup of TTS resources when component unmounts.
-     * Clears event listeners from current utterance, cancels any ongoing speech,
-     * and resets speaking state to prevent memory leaks and state corruption.
-     */
     useEffect(() => {
         const utt = utteranceRef.current
         return () => {
@@ -1265,95 +1533,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [])
 
-    /**
-     * TEXTAREA AUTO-RESIZE EFFECT
-     * Dynamically adjusts textarea height based on content, images, and font settings.
-     * Implements sophisticated sizing logic that:
-     * 1. Calculates minimum height based on font size and line height
-     * 2. Accounts for image preview space when present (48px + 8px gap)
-     * 3. Respects maximum container height while allowing scrolling within bounds
-     * 4. Handles various font configurations (px, em, unitless numbers)
-     * 5. Ensures consistent UX across different font settings and content types
-     * This creates a smooth, responsive input experience that adapts to content.
-     */
-    useEffect(() => {
-        if (expanded && inputRef.current) {
-            const txt = inputRef.current
-            txt.style.height = "auto"
-            let sH = txt.scrollHeight
-            const imgP = imageFile && imagePreviewUrl
-            const imgH = imgP ? 48 + 8 : 0
-
-            let minTextareaHeight = 24
-            if (globalFontStyles.fontSize) {
-                const fontSizeNum = parseFloat(
-                    globalFontStyles.fontSize as string
-                )
-                if (globalFontStyles.lineHeight) {
-                    if (typeof globalFontStyles.lineHeight === "number") {
-                        minTextareaHeight =
-                            fontSizeNum * globalFontStyles.lineHeight
-                    } else if (
-                        typeof globalFontStyles.lineHeight === "string" &&
-                        globalFontStyles.lineHeight.endsWith("px")
-                    ) {
-                        minTextareaHeight = parseFloat(
-                            globalFontStyles.lineHeight
-                        )
-                    } else if (
-                        typeof globalFontStyles.lineHeight === "string" &&
-                        !isNaN(parseFloat(globalFontStyles.lineHeight))
-                    ) {
-                        minTextareaHeight =
-                            fontSizeNum *
-                            parseFloat(globalFontStyles.lineHeight)
-                    } else {
-                        minTextareaHeight =
-                            fontSizeNum *
-                            (typeof DEFAULT_FONT_INFO.lineHeight === "number"
-                                ? DEFAULT_FONT_INFO.lineHeight
-                                : 1.5)
-                    }
-                } else {
-                    minTextareaHeight =
-                        fontSizeNum *
-                        (typeof DEFAULT_FONT_INFO.lineHeight === "number"
-                            ? DEFAULT_FONT_INFO.lineHeight
-                            : 1.5)
-                }
-            }
-            minTextareaHeight = Math.max(minTextareaHeight, 24)
-
-            const btnH = 36 + 12
-            const pad = 12 * 2
-            const totalMaxInputBoxHeight = 196
-
-            const maxTextAndImageScrollAreaHeight =
-                totalMaxInputBoxHeight - pad - btnH
-            const maxTextareaHeight = maxTextAndImageScrollAreaHeight - imgH
-
-            const cappedMaxTextareaHeight = Math.max(
-                minTextareaHeight,
-                maxTextareaHeight > 0 ? maxTextareaHeight : minTextareaHeight
-            )
-
-            if (sH > cappedMaxTextareaHeight) {
-                sH = cappedMaxTextareaHeight
-            } else if (sH < minTextareaHeight) {
-                sH = minTextareaHeight
-            }
-            txt.style.height = `${sH}px`
-        }
-    }, [input, expanded, imageFile, imagePreviewUrl, globalFontStyles])
-
-    /**
-     * CLICK-OUTSIDE COLLAPSE EFFECT
-     * Automatically collapses the expanded overlay when user clicks outside.
-     * Implements smart exclusion logic to prevent accidental collapse when:
-     * - Clicking on mobile backdrop (handled separately)
-     * - Clicking on suggestion buttons (allows interaction)
-     * Only active when overlay is expanded. Uses mousedown for immediate response.
-     */
     useEffect(() => {
         if (!expanded || typeof document === "undefined") {
             return
@@ -1378,172 +1557,150 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }, [expanded, handleCollapse])
 
-    /**
-     * MAIN MESSAGE SENDING FUNCTION
-     * Core business logic for sending messages to Gemini API with full feature support.
-     *
-     * FEATURES HANDLED:
-     * - Text message sending with optional image attachments
-     * - Streaming response handling with real-time UI updates
-     * - Request cancellation and error handling
-     * - Image upload with base64 encoding
-     * - AI suggestions generation after responses
-     * - AbortController management for request cancellation
-     *
-     * FLOW:
-     * 1. Input validation and preparation
-     * 2. Image processing (if present)
-     * 3. Message state updates and UI preparation
-     * 4. API request with streaming response
-     * 5. Response processing and state updates
-     * 6. Error handling and cleanup
-     *
-     * @param overrideText - Optional text to send instead of current input (used by suggestions)
-     */
     async function sendMessage(overrideText?: string) {
-        // =========================================================================
-        // INPUT VALIDATION & EARLY RETURNS
-        // =========================================================================
-
-        /** Prevent duplicate requests while one is in progress */
         if (isLoading) return
-
-        /** Clear any existing AI suggestions when sending new message */
         setAiGeneratedSuggestions([])
 
-        // =========================================================================
-        // CONTENT PREPARATION
-        // =========================================================================
-
-        /** Use override text (from suggestions) or current input */
         const textToSend = overrideText || input
-
-        /** Only send images with manual input, not with suggestion clicks */
         const imageFileToSend = overrideText ? null : imageFile
+        const attachmentFileToSend = overrideText ? null : attachmentFile
+        const recordedAudioBlobToSend = overrideText
+            ? null
+            : recordedAudioBlobRef.current
 
-        /** Validate that we have content to send and required API key */
-        if ((!textToSend.trim() && !imageFileToSend) || !geminiApiKey) {
+        if (
+            (!textToSend.trim() &&
+                !imageFileToSend &&
+                !attachmentFileToSend &&
+                !recordedAudioBlobToSend) ||
+            !geminiApiKey
+        ) {
             if (!geminiApiKey) setError("Gemini API key is required.")
             return
         }
 
-        // =========================================================================
-        // REQUEST SETUP & STATE INITIALIZATION
-        // =========================================================================
-
-        /** Cancel any existing request before starting new one */
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
         }
 
-        /** Create new abort controller for this request */
         abortControllerRef.current = new AbortController()
         const signal = abortControllerRef.current.signal
 
-        /** Update UI state to show loading and clear previous results */
         setIsLoading(true)
         setError("")
         setStreamed("")
 
-        // =========================================================================
-        // CONTENT PROCESSING & MESSAGE PREPARATION
-        // =========================================================================
-
-        /** Will hold the processed content for state updates (string or complex object) */
         let userContentForState: Message["content"]
 
-        /** Handle different content types based on input method */
         if (overrideText) {
-            /** Simple text content from suggestion clicks */
             userContentForState = overrideText
         } else if (imageFileToSend) {
-            /** Complex content with both text and image - requires base64 processing */
-                try {
-                    /** Convert image file to base64 string for API transmission */
-                    const base64 = await new Promise<string>((resolve, reject) => {
-                        if (typeof window !== "undefined" && window.FileReader) {
-                            const reader = new window.FileReader()
-                            reader.onload = () => {
-                                const result = reader.result as string
-                                if (typeof result === "string") {
-                                    /** Extract base64 data after comma (removes "data:image/jpeg;base64," prefix) */
-                                    const base64str = result.substring(
-                                        result.indexOf(",") + 1
+            try {
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    if (typeof window !== "undefined" && window.FileReader) {
+                        const reader = new window.FileReader()
+                        reader.onload = () => {
+                            const result = reader.result as string
+                            if (typeof result === "string") {
+                                const base64str = result.substring(
+                                    result.indexOf(",") + 1
+                                )
+                                resolve(base64str)
+                            } else {
+                                reject(
+                                    new Error(
+                                        "Failed to read image as base64 string"
                                     )
-                                    resolve(base64str)
-                                } else {
-                                    reject(
-                                        new Error(
-                                            "Failed to read image as base64 string"
-                                        )
-                                    )
-                                }
+                                )
                             }
-                            reader.onerror = reject
-                            reader.readAsDataURL(imageFileToSend)
-                        } else {
-                            reject(new Error("FileReader API not available"))
                         }
-                    })
+                        reader.onerror = reject
+                        reader.readAsDataURL(imageFileToSend)
+                    } else {
+                        reject(new Error("FileReader API not available"))
+                    }
+                })
 
-                    /** Create multimodal content parts array for Gemini API */
-                    const parts: Array<
-                        | { type: "text"; text: string }
-                        | { type: "image_url"; image_url: { url: string } }
-                    > = []
+                const parts: Array<
+                    | { type: "text"; text: string }
+                    | { type: "image_url"; image_url: { url: string } }
+                > = []
 
-                    /** Add text part if present */
-                    if (textToSend.trim())
-                        parts.push({ type: "text", text: textToSend })
+                if (textToSend.trim())
+                    parts.push({ type: "text", text: textToSend })
 
-                    /** Add image part with proper data URL format */
-                    parts.push({
-                        type: "image_url",
-                        image_url: {
-                            url: `data:${imageFileToSend.type};base64,${base64}`,
-                        },
-                    })
-                    userContentForState = parts
-                } catch (e: any) {
-                    /** Handle image processing errors gracefully */
-                    setError("Failed to process image. " + e.message)
-                    setIsLoading(false)
-                    abortControllerRef.current = null
-                    return
-                }
-            } else {
-                /** Simple text-only content */
-                userContentForState = textToSend
+                parts.push({
+                    type: "image_url",
+                    image_url: {
+                        url: `data:${imageFileToSend.type};base64,${base64}`,
+                    },
+                })
+                userContentForState = parts
+            } catch (e: any) {
+                setError("Failed to process image. " + e.message)
+                setIsLoading(false)
+                abortControllerRef.current = null
+                return
             }
+        } else if (attachmentFileToSend) {
+            const parts: any[] = []
+            if (textToSend.trim())
+                parts.push({ type: "text", text: textToSend })
+            parts.push({
+                type: "file",
+                file: {
+                    uri: "local:attachment",
+                    name: attachmentFileToSend.name,
+                    mimeType: attachmentFileToSend.type,
+                },
+            })
+            userContentForState = parts
+        } else if (recordedAudioBlobToSend) {
+            const parts: any[] = []
+            if (textToSend.trim())
+                parts.push({ type: "text", text: textToSend })
+            parts.push({
+                type: "file",
+                file: {
+                    uri: "local:recording",
+                    mimeType: "audio/webm",
+                    name: "recording.webm",
+                },
+            })
+            userContentForState = parts
+        } else {
+            userContentForState = textToSend
+        }
 
-        // =========================================================================
-        // MESSAGE STATE UPDATE & UI PREPARATION
-        // =========================================================================
-
-        /** Create the new user message object with processed content */
         const newUserMessage: Message = {
             role: "user",
             content: userContentForState,
         }
 
-        /** Capture current messages state before async operations */
         const currentMessagesSnapshot = messages
 
-        /** Update UI state with new message using React's concurrent features */
         startTransition(() => {
-            /** Add new message to conversation history */
             setMessages((prev) => [...prev, newUserMessage])
-
-            /** Clear input field after sending */
             setInput("")
 
-            /** Clear image file if it was sent (or if using suggestion) */
-            if (overrideText || imageFileToSend) {
+            if (
+                overrideText ||
+                imageFileToSend ||
+                attachmentFileToSend ||
+                recordedAudioBlobToSend
+            ) {
                 setImageFile(null)
+                setAttachmentFile(null)
+                if (recordedAudioUrl) {
+                    try {
+                        URL.revokeObjectURL(recordedAudioUrl)
+                    } catch {}
+                    setRecordedAudioUrl("")
+                    recordedAudioBlobRef.current = null
+                }
                 if (fileInputRef.current) fileInputRef.current.value = ""
             }
 
-            /** Smooth scroll to show new message (delayed for DOM update) */
             setTimeout(() => {
                 if (expanded && messagesEndRef.current)
                     messagesEndRef.current.scrollIntoView({
@@ -1552,16 +1709,10 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             }, 0)
         })
 
-        // =========================================================================
-        // API REQUEST PREPARATION & DATA TRANSFORMATION
-        // =========================================================================
-
-        /** Extract system message for special Gemini API handling */
         const systemInstructionMessage = currentMessagesSnapshot.find(
             (msg) => msg.role === "system"
         )
 
-        /** Prepare conversation history for API (exclude system message, include new message) */
         const chatHistoryForApi = [
             ...currentMessagesSnapshot.filter(
                 (m) => m.role === "user" || m.role === "assistant"
@@ -1569,66 +1720,198 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             newUserMessage,
         ]
 
-        /**
-         * TRANSFORM INTERNAL MESSAGE FORMAT TO GEMINI API FORMAT
-         * Convert our Message[] structure to Gemini's expected {role, parts}[] format.
-         * Handles complex multimodal content (text + images) and ensures proper data types.
-         */
-        const geminiContents = chatHistoryForApi.map((msg) => {
-            /** Map internal roles to Gemini API roles */
-            const role = msg.role === "assistant" ? "model" : "user"
-            let parts: any[] = []
+        const geminiContents = await Promise.all(
+            chatHistoryForApi.map(async (msg) => {
+                const role = msg.role === "assistant" ? "model" : "user"
+                let parts: any[] = []
 
-            if (Array.isArray(msg.content)) {
-                /** Handle multimodal content (text + images) */
-                parts = msg.content
-                    .map((part) => {
-                        if (part.type === "text") {
-                            /** Convert text parts to Gemini format */
-                            return { text: part.text }
-                        }
-                        if (part.type === "image_url" && part.image_url?.url) {
-                            /** Convert image parts to Gemini's inlineData format */
-                            const [header, base64Data] =
-                                part.image_url.url.split(",")
-                            if (!base64Data) {
-                                console.warn(
-                                    "Invalid image_url format:",
-                                    part.image_url.url
-                                )
-                                return null
+                if (Array.isArray(msg.content)) {
+                    const transformed = await Promise.all(
+                        msg.content.map(async (part) => {
+                            if (part.type === "text") {
+                                return { text: part.text }
                             }
-                            /** Extract MIME type from data URL header */
-                            const mimeTypeMatch =
-                                header.match(/data:(.*);base64/)
-                            const mimeType = mimeTypeMatch
-                                ? mimeTypeMatch[1]
-                                : "image/jpeg"
-                            return {
-                                inlineData: { mimeType, data: base64Data },
+                            if (
+                                part.type === "image_url" &&
+                                part.image_url?.url
+                            ) {
+                                const [header, base64Data] =
+                                    part.image_url.url.split(",")
+                                if (!base64Data) {
+                                    return null
+                                }
+                                const mimeTypeMatch =
+                                    header.match(/data:(.*);base64/)
+                                const mimeType = mimeTypeMatch
+                                    ? mimeTypeMatch[1]
+                                    : "image/jpeg"
+                                return {
+                                    inlineData: { mimeType, data: base64Data },
+                                }
                             }
-                        }
-                        return null
-                    })
-                    .filter(Boolean) /** Remove any null entries */
-            } else if (typeof msg.content === "string") {
-                /** Handle simple text-only messages */
-                parts = [{ text: msg.content }]
-            }
+                            if (part.type === "file" && part.file?.uri) {
+                                const mimeType =
+                                    part.file.mimeType ||
+                                    "application/octet-stream"
+                                if (
+                                    part.file.uri === "local:attachment" &&
+                                    attachmentFileToSend
+                                ) {
+                                    try {
+                                        if (
+                                            attachmentFileToSend.size <=
+                                            INLINE_MAX_BYTES
+                                        ) {
+                                            const b64 =
+                                                await new Promise<string>(
+                                                    (resolve, reject) => {
+                                                        const fr =
+                                                            new FileReader()
+                                                        fr.onload = () => {
+                                                            const res =
+                                                                fr.result as string
+                                                            resolve(
+                                                                res.substring(
+                                                                    res.indexOf(
+                                                                        ","
+                                                                    ) + 1
+                                                                )
+                                                            )
+                                                        }
+                                                        fr.onerror = reject
+                                                        fr.readAsDataURL(
+                                                            attachmentFileToSend
+                                                        )
+                                                    }
+                                                )
+                                            return {
+                                                inlineData: {
+                                                    mimeType:
+                                                        attachmentFileToSend.type ||
+                                                        mimeType,
+                                                    data: b64,
+                                                },
+                                            }
+                                        } else {
+                                            const uploaded =
+                                                await uploadFileToGemini(
+                                                    attachmentFileToSend
+                                                )
+                                            if (uploaded?.uri) {
+                                                return {
+                                                    fileData: {
+                                                        fileUri: uploaded.uri,
+                                                        mimeType:
+                                                            uploaded.mimeType ||
+                                                            mimeType,
+                                                    },
+                                                }
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.error(
+                                            "Attachment transform failed",
+                                            e
+                                        )
+                                    }
+                                    return null
+                                }
+                                if (
+                                    part.file.uri === "local:recording" &&
+                                    recordedAudioBlobToSend
+                                ) {
+                                    try {
+                                        if (
+                                            recordedAudioBlobToSend.size <=
+                                            INLINE_MAX_BYTES
+                                        ) {
+                                            const arrayBuf =
+                                                await recordedAudioBlobToSend.arrayBuffer()
+                                            const b64 = btoa(
+                                                String.fromCharCode(
+                                                    ...new Uint8Array(arrayBuf)
+                                                )
+                                            )
+                                            return {
+                                                inlineData: {
+                                                    mimeType: "audio/webm",
+                                                    data: b64,
+                                                },
+                                            }
+                                        } else {
+                                            const f = new File(
+                                                [recordedAudioBlobToSend],
+                                                "recording.webm",
+                                                { type: "audio/webm" }
+                                            )
+                                            const uploaded =
+                                                await uploadFileToGemini(f)
+                                            if (uploaded?.uri) {
+                                                return {
+                                                    fileData: {
+                                                        fileUri: uploaded.uri,
+                                                        mimeType: "audio/webm",
+                                                    },
+                                                }
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.error(
+                                            "Recording transform failed",
+                                            e
+                                        )
+                                    }
+                                    return null
+                                }
+                                if (part.file.uri.startsWith("blob:")) {
+                                    try {
+                                        const resp = await fetch(part.file.uri)
+                                        const buf = await resp.arrayBuffer()
+                                        const b64 = btoa(
+                                            String.fromCharCode(
+                                                ...new Uint8Array(buf)
+                                            )
+                                        )
+                                        return {
+                                            inlineData: { mimeType, data: b64 },
+                                        }
+                                    } catch (e) {
+                                        console.error(
+                                            "Blob inline transform failed",
+                                            e
+                                        )
+                                    }
+                                    return null
+                                }
+                                return {
+                                    fileData: {
+                                        fileUri: part.file.uri,
+                                        mimeType,
+                                    },
+                                }
+                            }
+                            return null
+                        })
+                    )
+                    parts = transformed.filter(Boolean)
+                } else if (typeof msg.content === "string") {
+                    parts = [{ text: msg.content }]
+                }
 
-            /** Ensure every message has at least one part (Gemini requirement) */
-            if (parts.length === 0 && (role === "user" || role === "model")) {
-                parts.push({ text: "" })
-            }
-            return { role, parts }
-        })
+                if (
+                    parts.length === 0 &&
+                    (role === "user" || role === "model")
+                ) {
+                    parts.push({ text: "" })
+                }
+                return { role, parts }
+            })
+        )
 
-        /** Construct the final Gemini API payload */
         const geminiPayload: any = {
             contents: geminiContents,
         }
 
-        /** Add system instruction if present (special Gemini API feature) */
         if (
             systemInstructionMessage &&
             typeof systemInstructionMessage.content === "string" &&
@@ -1639,15 +1922,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             }
         }
 
-        // =========================================================================
-        // API REQUEST EXECUTION & STREAMING RESPONSE HANDLING
-        // =========================================================================
-
         try {
-            /** Construct streaming API endpoint URL with authentication */
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}&alt=sse`
 
-            /** Make the streaming request with abort signal for cancellation support */
             const response = await fetch(url, {
                 method: "POST",
                 headers: {
@@ -1705,11 +1982,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     candidate.finishReason !== "STOP" &&
                                     candidate.finishReason !== "MAX_TOKENS"
                                 ) {
-                                    console.error(
-                                        "Streaming error from API:",
-                                        candidate.finishReason,
-                                        json
-                                    )
                                     let displayError = `API Error: ${candidate.finishReason}`
                                     if (json.promptFeedback?.blockReason) {
                                         displayError = `Blocked: ${json.promptFeedback.blockReason}`
@@ -1740,12 +2012,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     )
                                 }
                             } catch (e) {
-                                console.error(
-                                    "Error parsing streaming chunk:",
-                                    e,
-                                    "Chunk part:",
-                                    line
-                                )
+                                // ignore
                             }
                         }
                     }
@@ -1786,27 +2053,12 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }
 
-    // =========================================================================
-    // Event Handlers & User Interactions
-    // =========================================================================
-
-    /**
-     * INPUT CHANGE HANDLER
-     * Updates the input state as user types in either collapsed or expanded input fields.
-     * Connected to both the collapsed input bar and expanded textarea for consistent behavior.
-     */
     const handleInput = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
         setInput(e.target.value)
     }
 
-    /**
-     * EXPANDED VIEW KEYBOARD HANDLER
-     * Handles Enter key in expanded textarea to send messages.
-     * Shift+Enter creates new lines, Enter alone sends the message.
-     * Includes loading state check to prevent duplicate requests.
-     */
     const handleExpandedViewKeyDown = (
         e: React.KeyboardEvent<HTMLTextAreaElement>
     ) => {
@@ -1816,78 +2068,152 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
     }
 
-    /**
-     * EXPANDED VIEW SEND BUTTON HANDLER
-     * Triggered when user clicks the send button in expanded view.
-     * Validates content availability and loading state before sending.
-     */
     const handleExpandedViewSendClick = () => {
-        if (!isLoading && (input.trim() || imageFile)) sendMessage()
+        if (
+            !isLoading &&
+            (input.trim() || imageFile || attachmentFile || recordedAudioUrl)
+        )
+            sendMessage()
     }
 
-    /**
-     * AI SUGGESTION CLICK HANDLER
-     * Handles clicks on AI-generated contextual reply suggestions.
-     * Sends the suggestion text as a new message, enabling conversational flow.
-     * Clears suggestions after sending to prevent UI clutter.
-     */
     const handleSuggestionClick = (suggestionText: string) => {
         if (!isLoading && suggestionText.trim()) {
             sendMessage(suggestionText)
         }
     }
 
-    /**
-     * IMAGE FILE SELECTION HANDLER
-     * Processes image file selection from the hidden file input.
-     * Automatically expands the overlay if collapsed, enabling multimodal input.
-     * Clears AI suggestions when image is selected to prevent context confusion.
-     */
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files && e.target.files[0]
-        setImageFile(file || null)
+        if (!file) {
+            setImageFile(null)
+            setAttachmentFile(null)
+            setAttachmentPreview(null)
+            return
+        }
+        if (file.type.startsWith("image/")) {
+            setImageFile(file)
+            setAttachmentFile(null)
+            setAttachmentPreview(null)
+        } else if (file.type.startsWith("video/")) {
+            try {
+                const url = URL.createObjectURL(file)
+                const video = document.createElement("video")
+                video.src = url
+                video.muted = true
+                video.playsInline = true as any
+                video.currentTime = 0
+                const capture = () => {
+                    const canvas = document.createElement("canvas")
+                    const w = 320
+                    const h = Math.max(
+                        1,
+                        Math.round((video.videoHeight / video.videoWidth) * w)
+                    )
+                    canvas.width = w
+                    canvas.height = h
+                    const ctx = canvas.getContext("2d")
+                    if (ctx) {
+                        ctx.drawImage(video, 0, 0, w, h)
+                        const dataUrl = canvas.toDataURL("image/jpeg", 0.8)
+                        setImagePreviewUrl((prev) => {
+                            if (prev)
+                                try {
+                                    URL.revokeObjectURL(prev)
+                                } catch {}
+                            return dataUrl
+                        })
+                        setImageFile(file)
+                        setAttachmentFile(null)
+                        setAttachmentPreview(null)
+                        try {
+                            URL.revokeObjectURL(url)
+                        } catch {}
+                    }
+                }
+                video.onloadeddata = () => capture()
+                video.onerror = () => {
+                    setAttachmentFile(file)
+                    setAttachmentPreview({ name: file.name, type: file.type })
+                    try {
+                        URL.revokeObjectURL(url)
+                    } catch {}
+                }
+            } catch {
+                setAttachmentFile(file)
+                setAttachmentPreview({ name: file.name, type: file.type })
+            }
+        } else {
+            setAttachmentFile(file)
+            setAttachmentPreview({ name: file.name, type: file.type })
+            setImageFile(null)
+            setImagePreviewUrl("")
+        }
         setAiGeneratedSuggestions([])
         if (!expanded && file) handleExpand()
     }
 
-    /**
-     * IMAGE REMOVAL HANDLER
-     * Removes selected image from the input area.
-     * Stops event propagation to prevent triggering parent click handlers.
-     * Resets file input value to allow re-selection of the same file.
-     */
+    const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files && e.target.files[0]
+        setAttachmentFile(file || null)
+        if (!expanded && file) handleExpand()
+    }
+
+    const toggleRecording = async () => {
+        if (typeof window === "undefined") return
+        try {
+            if (!isRecording) {
+                if (
+                    !navigator.mediaDevices ||
+                    !navigator.mediaDevices.getUserMedia
+                )
+                    return
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                })
+                const mr = new MediaRecorder(stream)
+                audioChunksRef.current = []
+                mr.ondataavailable = (evt) => {
+                    if (evt.data && evt.data.size > 0)
+                        audioChunksRef.current.push(evt.data)
+                }
+                mr.onstop = () => {
+                    const blob = new Blob(audioChunksRef.current, {
+                        type: "audio/webm",
+                    })
+                    recordedAudioBlobRef.current = blob
+                    const url = URL.createObjectURL(blob)
+                    setRecordedAudioUrl((prev) => {
+                        if (prev) URL.revokeObjectURL(prev)
+                        return url
+                    })
+                }
+                mr.start()
+                mediaRecorderRef.current = mr
+                setIsRecording(true)
+            } else {
+                mediaRecorderRef.current?.stop()
+                mediaRecorderRef.current = null
+                setIsRecording(false)
+            }
+        } catch (err) {
+            console.error("Recording error:", err)
+        }
+    }
+
     const handleRemoveImage = (e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation()
         setImageFile(null)
+        setAttachmentFile(null)
+        setAttachmentPreview(null)
         if (fileInputRef.current) fileInputRef.current.value = ""
     }
-    // =========================================================================
-    // Text-to-Speech (TTS) Functions
-    // =========================================================================
 
-    /**
-     * TEXT-TO-SPEECH PLAYBACK HANDLER
-     * Converts text messages to speech using Web Speech API.
-     * Provides audio accessibility for visually impaired users and enhances UX.
-     *
-     * FEATURES:
-     * - Intelligent pause/resume: clicking same message stops playback
-     * - Markdown stripping: cleans formatting for natural speech
-     * - Voice optimization: uses selected neural/cloud voice with tuned parameters
-     * - Error handling: gracefully handles TTS failures
-     * - State management: tracks which message is currently speaking
-     *
-     * @param text - Raw message text (may contain markdown)
-     * @param index - Message index for state tracking and UI feedback
-     */
     const handlePlayTTS = (text: string, index: number) => {
-        // Validate TTS availability and voice selection
         if (
             typeof window !== "undefined" &&
             window.speechSynthesis &&
             selectedVoice
         ) {
-            // Handle play/pause toggle: if clicking same message, stop playback
             if (window.speechSynthesis.speaking) {
                 window.speechSynthesis.cancel()
                 if (speakingMessageIndex === index) {
@@ -1897,42 +2223,32 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 }
             }
 
-            // Clean markdown formatting for natural speech synthesis
             const cleanedText = stripMarkdownForTTS(text)
 
-            // Create and configure speech utterance
             utteranceRef.current = new SpeechSynthesisUtterance(cleanedText)
             utteranceRef.current.voice = selectedVoice
-            utteranceRef.current.rate = 1.1      // Slightly faster than default for better UX
-            utteranceRef.current.pitch = 1.0     // Natural pitch
-            utteranceRef.current.volume = 1.0     // Full volume
+            utteranceRef.current.rate = 1.1
+            utteranceRef.current.pitch = 1.0
+            utteranceRef.current.volume = 1.0
 
-            // Handle successful speech completion
             utteranceRef.current.onend = () => {
                 setSpeakingMessageIndex(null)
                 utteranceRef.current = null
             }
 
-            // Handle speech synthesis errors
             utteranceRef.current.onerror = (event) => {
                 console.error("SpeechSynthesisUtterance.onerror:", event)
                 setSpeakingMessageIndex(null)
                 utteranceRef.current = null
             }
 
-            // Start speech synthesis and update UI state
             window.speechSynthesis.speak(utteranceRef.current)
             setSpeakingMessageIndex(index)
         } else if (!selectedVoice && typeof window !== "undefined") {
             console.error("TTS voice not available.")
         }
     }
-    /**
-     * TEXT-TO-SPEECH STOP HANDLER
-     * Immediately stops any ongoing speech synthesis.
-     * Used by stop buttons in the UI and cleanup functions.
-     * Ensures proper state reset and resource cleanup.
-     */
+
     const handleStopTTS = () => {
         if (typeof window !== "undefined" && window.speechSynthesis) {
             window.speechSynthesis.cancel()
@@ -1941,198 +2257,95 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         utteranceRef.current = null
     }
 
-    // =========================================================================
-    // Layout & Positioning Calculations
-    // =========================================================================
-
-    /**
-     * DESKTOP OVERLAY POSITIONING
-     * Defines the layout for expanded overlay on desktop screens.
-     * Fixed dimensions with centered positioning and dynamic bottom offset
-     * to avoid overlapping with collapsed input bar.
-     */
     const finalDesktopPosStyle: CSSProperties = {
-        width: 760,                                    // Fixed width for desktop
-        height: 540,                                   // Fixed height for desktop
-        bottom: `${expandedViewBottomOffset}px`,       // Dynamic offset from bottom
-        left: "50%",                                   // Center horizontally
-        borderRadius: `${universalBorderRadius}px`,    // Configurable corner radius
+        width: 760,
+        height: 540,
+        bottom: `${expandedViewBottomOffset}px`,
+        left: "50%",
+        borderRadius: `${universalBorderRadius}px`,
     }
 
-    /**
-     * MOBILE OVERLAY POSITIONING
-     * Defines full-screen layout for mobile devices.
-     * Uses viewport units for responsive sizing and bottom-aligned positioning.
-     * Top corners rounded to create modal-like appearance.
-     */
     const finalMobilePosStyle: CSSProperties = {
-        width: "100vw",                                // Full viewport width
-        height: "95dvh",                               // 95% of viewport height (leaves space for browser UI)
-        bottom: "0",                                   // Align to bottom of screen
-        left: "0",                                     // Align to left edge
-        borderRadius: `${universalBorderRadius}px ${universalBorderRadius}px 0px 0px`, // Rounded top corners only
+        width: "100vw",
+        height: "95dvh",
+        bottom: "0",
+        left: "0",
+        borderRadius: `${universalBorderRadius}px ${universalBorderRadius}px 0px 0px`,
     }
 
-    /**
-     * RESPONSIVE POSITION STYLE SELECTION
-     * Chooses appropriate positioning based on current viewport.
-     * Dynamically switches between desktop and mobile layouts.
-     */
     const finalPosStylesToApply = isMobileView
         ? finalMobilePosStyle
         : finalDesktopPosStyle
 
-    // =========================================================================
-    // Dynamic Visual Effects & Backdrop Calculations
-    // =========================================================================
-
-    /**
-     * BACKDROP BLUR INTENSITY CALCULATION
-     * Dynamically adjusts backdrop blur based on background opacity.
-     * More transparent backgrounds need stronger blur for better readability.
-     * Creates depth and focus without being computationally expensive.
-     */
     const alpha = getAlphaFromColorString(chatAreaBackground)
-    let backdropBlurValue = "8px"                    // Default blur for opaque backgrounds
-    if (alpha <= 0.7) backdropBlurValue = "32px"     // Strong blur for very transparent backgrounds
-    else if (alpha <= 0.84) backdropBlurValue = "24px" // Medium blur for semi-transparent
-    else if (alpha <= 0.94) backdropBlurValue = "16px" // Light blur for mostly opaque
+    let backdropBlurValue = "8px"
+    if (alpha <= 0.7) backdropBlurValue = "32px"
+    else if (alpha <= 0.84) backdropBlurValue = "24px"
+    else if (alpha <= 0.94) backdropBlurValue = "16px"
 
-    // =========================================================================
-    // Animation Variants & Motion Configuration
-    // =========================================================================
-
-    /**
-     * FRAMER MOTION ANIMATION VARIANTS
-     * Defines smooth enter/exit animations for the overlay.
-     * Uses spring physics for natural, bouncy feel.
-     * Desktop: slides down from top, Mobile: slides up from bottom.
-     * Includes transform origin compensation for centered desktop layout.
-     */
     const overlayVariants = {
         open: {
             opacity: 1,
-            y: 0,                                       // No vertical offset when open
+            y: 0,
             x:
                 finalPosStylesToApply.left === "50%" && !isMobileView
-                    ? "-50%"                             // Center horizontally on desktop
-                    : "0%",                             // No horizontal offset on mobile
-            transition: { type: "spring", stiffness: 350, damping: 30 }, // Smooth, responsive spring
+                    ? "-50%"
+                    : "0%",
+            transition: { type: "spring", stiffness: 350, damping: 30 },
         },
         closed: {
             opacity: 0,
-            y: isMobileView ? "100%" : 60,              // Mobile: slide down off-screen, Desktop: slide up slightly
+            y: isMobileView ? "100%" : 60,
             x:
                 finalPosStylesToApply.left === "50%" && !isMobileView
-                    ? "-50%"                             // Maintain horizontal centering
+                    ? "-50%"
                     : "0%",
-            transition: { type: "spring", stiffness: 350, damping: 35 }, // Slightly more damped for exit
+            transition: { type: "spring", stiffness: 350, damping: 35 },
         },
     }
 
-    // =========================================================================
-    // Asset & Icon Handling
-    // =========================================================================
-
-    /** Safely extract icon URLs with null coalescing for optional custom icons */
     const safeSendIconUrl = sendIconOverrideUrl?.src
     const safeLoadingIconUrl = loadingIconOverrideUrl?.src
 
-    // =========================================================================
-    // Typography & Text Styling
-    // =========================================================================
-
-    /**
-     * BASE MARKDOWN TEXT STYLE
-     * Foundation styling for all rendered message content.
-     * Inherits global font settings and applies consistent color.
-     * Word-wrap ensures long URLs and text don't overflow containers.
-     */
     const markdownBaseTextStyle: CSSProperties = {
-        ...globalFontStyles,                            // Inherit font family, size, weight, etc.
-        color: props.textColor,                         // User-configurable text color
-        wordWrap: "break-word",                         // Break long words to prevent overflow
+        ...globalFontStyles,
+        color: props.textColor,
+        wordWrap: "break-word",
     }
 
-    /**
-     * MARKDOWN LINK STYLE
-     * Styling for clickable links within message content.
-     * Uses user-configurable link color with underline for accessibility.
-     * Maintains readability while being clearly identifiable as interactive.
-     */
     const markdownLinkStyle: CSSProperties = {
-        color: props.linkColor,                         // User-configurable link color
-        textDecoration: "underline",                    // Standard underline for link indication
+        color: props.linkColor,
+        textDecoration: "underline",
     }
 
-    /**
-     * ERROR MESSAGE TEXT STYLE
-     * Specialized styling for error messages with reduced font size.
-     * Makes errors visually distinct without being overwhelming.
-     * Scales down from base font size while maintaining minimum readability.
-     */
     const errorFontStyle: CSSProperties = {
         ...globalFontStyles,
         fontSize:
             typeof globalFontStyles.fontSize === "string"
-                ? `${Math.max(parseFloat(globalFontStyles.fontSize) * 0.875, 12)}px` // 87.5% of base size, min 12px
-                : "14px",                             // Fallback for non-string font sizes
+                ? `${Math.max(parseFloat(globalFontStyles.fontSize) * 0.875, 12)}px`
+                : "14px",
     }
 
-    // =========================================================================
-    // Suggestion System Logic & Display Conditions
-    // =========================================================================
-
-    /**
-     * STATIC SUGGESTIONS PREPARATION
-     * Filters out empty suggestion props and prepares them for display.
-     * Only shows suggestions that have actual content after trimming whitespace.
-     */
     const staticSuggestedReplies = [
         suggestedReply1,
         suggestedReply2,
         suggestedReply3,
     ].filter((reply) => reply && reply.trim() !== "")
 
-    /**
-     * COMMON SUGGESTION DISPLAY CONDITIONS
-     * Shared prerequisites for showing any type of suggestions.
-     * Suggestions only appear when overlay is expanded, not loading, and no image is selected.
-     */
     const commonSuggestionDisplayConditions =
         expanded && !isLoading && !imageFile
 
-    /**
-     * AI-GENERATED SUGGESTIONS DISPLAY CONDITION
-     * Shows AI-generated contextual suggestions when:
-     * - AI suggestions are enabled
-     * - AI suggestions are available
-     * - Common display conditions are met
-     */
     const showAiSuggestions =
         enableAiSuggestions &&
         aiGeneratedSuggestions.length > 0 &&
         commonSuggestionDisplayConditions
 
-    /**
-     * STATIC PROP SUGGESTIONS DISPLAY CONDITION
-     * Shows designer-configured suggestions when:
-     * - AI suggestions are not being shown
-     * - Static suggestions are available
-     * - No user messages exist yet (welcome context)
-     * - Common display conditions are met
-     */
     const showPropSuggestions =
         !showAiSuggestions &&
         staticSuggestedReplies.length > 0 &&
         messages.filter((m) => m.role === "user").length === 0 &&
         commonSuggestionDisplayConditions
 
-    /**
-     * SUGGESTION PRIORITY & SELECTION LOGIC
-     * Determines which suggestions to display based on availability and context.
-     * AI suggestions take priority over static suggestions for better UX.
-     */
     let displayedSuggestions: string[] = []
     if (showAiSuggestions) {
         displayedSuggestions = aiGeneratedSuggestions
@@ -2140,166 +2353,87 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         displayedSuggestions = staticSuggestedReplies
     }
 
-    /** Whether to render the suggestions area based on available suggestions */
     const showSuggestionsArea = displayedSuggestions.length > 0
 
-    // =========================================================================
-    // Button & Interactive Element Styling
-    // =========================================================================
-
-    /**
-     * SUGGESTION BUTTON STYLE CONFIGURATION
-     * Defines the visual appearance of suggestion buttons.
-     * Features responsive font sizing, transparent background with colored border,
-     * and optimized layout for various suggestion text lengths.
-     *
-     * KEY FEATURES:
-     * - Responsive font size (90% of base, minimum 13px)
-     * - Dynamic border color with opacity for visual consistency
-     * - Flexible layout with word wrapping for long suggestions
-     * - Smooth hover transitions for better UX
-     * - Consistent spacing and alignment
-     */
     const suggestedReplyButtonStyle: CSSProperties = {
-        ...globalFontStyles,                           // Inherit base font properties
+        ...globalFontStyles,
         fontSize:
             typeof globalFontStyles.fontSize === "string"
-                ? `${Math.max(parseFloat(globalFontStyles.fontSize as string) * 0.9, 13)}px` // 90% of base size, min 13px
-                : "13px",                              // Fallback for numeric font sizes
-        lineHeight: globalFontStyles.lineHeight || "1.4em", // Consistent line height
-        color: iconColor,                             // Use icon color for text
-        backgroundColor: "transparent",               // Transparent background
-        padding: "8px 12px",                         // Balanced padding
-        borderRadius: `${universalBorderRadius}px`,   // Configurable corner radius
+                ? `${Math.max(parseFloat(globalFontStyles.fontSize as string) * 0.9, 13)}px`
+                : "13px",
+        lineHeight: globalFontStyles.lineHeight || "1.4em",
+        color: iconColor,
+        backgroundColor: "transparent",
+        padding: "8px 12px",
+        borderRadius: `${universalBorderRadius}px`,
         border: `1px solid ${iconColor ? iconColor.replace(/rgba?\((\d+,\s*\d+,\s*\d+)(?:,\s*[\d.]+)?\)/, "rgba($1, 0.25)") : "rgba(0,0,0,0.25)"}`,
-                                                        // Dynamic border color with 25% opacity
-        cursor: "pointer",                            // Pointer cursor for interactivity
-        textAlign: "center",                          // Center-aligned text
-        whiteSpace: "normal",                         // Allow text wrapping
-        maxWidth: "180px",                            // Maximum width constraint
-        minWidth: "max-content",                      // Minimum width based on content
-        minHeight: "39px",                            // Minimum touch target height
-        wordBreak: "break-word",                      // Break long words
-        display: "inline-flex",                       // Flexible inline layout
-        alignItems: "center",                         // Vertical center alignment
-        justifyContent: "center",                     // Horizontal center alignment
-        flexShrink: 0,                                // Prevent shrinking
-        transition: "background-color 0.2s ease, border-color 0.2s ease", // Smooth hover effects
+        cursor: "pointer",
+        textAlign: "center",
+        whiteSpace: "normal",
+        maxWidth: "180px",
+        minWidth: "max-content",
+        minHeight: "39px",
+        wordBreak: "break-word",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        transition: "background-color 0.2s ease, border-color 0.2s ease",
     }
 
-    // =========================================================================
-    // Layout Container Styling
-    // =========================================================================
-
-    /**
-     * SUGGESTIONS CONTAINER STYLE
-     * Horizontal scrolling container for suggestion buttons.
-     * Optimized for touch interaction with hidden scrollbars.
-     * Provides smooth scrolling experience on both desktop and mobile.
-     */
     const suggestionsContainerStyle: CSSProperties = {
-        display: "flex",                                // Horizontal flex layout
-        flexWrap: "nowrap",                            // Prevent wrapping to single row
-        gap: "8px",                                    // Consistent spacing between buttons
-        padding: "8px 12px 12px 12px",                 // Balanced padding (more bottom padding)
-        justifyContent: "flex-start",                   // Left-aligned buttons
-        alignItems: "stretch",                          // Stretch to consistent height
-        overflowX: "auto",                             // Horizontal scrolling for overflow
-        scrollbarWidth: "none",                        // Hide scrollbars (Firefox)
-        WebkitOverflowScrolling: "touch",              // Smooth touch scrolling (iOS)
-        flexShrink: 0,                                 // Prevent shrinking
-        position: "relative",                          // Positioning context
+        display: "flex",
+        flexWrap: "nowrap",
+        gap: "8px",
+        padding: "8px 12px 12px 12px",
+        justifyContent: "flex-start",
+        alignItems: "stretch",
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        WebkitOverflowScrolling: "touch",
+        flexShrink: 0,
+        position: "relative",
     }
 
-    /**
-     * MESSAGES SCROLL CONTAINER STYLE
-     * Main scrolling area for chat messages with optimized spacing.
-     * Uses flexbox column layout with proper gap between messages.
-     * Contains overscroll behavior to prevent background scroll.
-     */
     const messagesScrollContainerStyle: CSSProperties = {
-        flexGrow: 1,                                   // Take remaining vertical space
-        overflowY: "auto",                             // Vertical scrolling only
-        paddingTop: 12,                                // Top padding for visual balance
-        paddingLeft: 12,                               // Left padding for content margin
-        paddingRight: 12,                              // Right padding for content margin
-        paddingBottom: 8,                              // Bottom padding before input area
-        display: "flex",                               // Flex layout for message stacking
-        flexDirection: "column",                       // Vertical stacking of messages
-        gap: 24,                                       // Generous gap between messages
-        overscrollBehavior: "contain",                 // Prevent scroll propagation
-        position: "relative",                          // Positioning context
+        flexGrow: 1,
+        overflowY: "auto",
+        paddingTop: 12,
+        paddingLeft: 12,
+        paddingRight: 12,
+        paddingBottom: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 24,
+        overscrollBehavior: "contain",
+        position: "relative",
     }
 
-    /**
-     * INPUT AREA FRAME STYLE
-     * Container for the input area with consistent layout structure.
-     * Centers content and provides proper spacing for input elements.
-     * Acts as the foundation for the input bar in both collapsed and expanded states.
-     */
     const inputAreaFrameStyle: CSSProperties = {
-        width: "100%",                                 // Full width container
-        flexShrink: 0,                                 // Prevent shrinking
-        display: "flex",                               // Flex layout for input elements
-        flexDirection: "column",                       // Vertical stacking
-        alignItems: "center",                          // Center-aligned content
-        gap: 8,                                        // Spacing between input elements
-        position: "relative",                          // Positioning context
+        width: "100%",
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+        position: "relative",
     }
 
-    /**
-     * DRAG INDICATOR BAR STYLE
-     * Visual drag handle for mobile gesture-based overlay collapse.
-     * Provides visual feedback and proper touch interaction area.
-     * Centers the drag indicator (three dots) and prevents accidental scrolling.
-     */
     const dragIndicatorBarStyle: CSSProperties = {
-        width: "100%",                                 // Full width container
-        height: 16,                                    // Fixed height for touch target
-        paddingTop: 5,                                 // Top padding for visual balance
-        paddingBottom: 5,                              // Bottom padding for visual balance
-        position: "relative",                          // Positioning context
-        flexShrink: 0,                                 // Prevent shrinking
-        cursor: "grab",                                // Visual cursor for drag interaction
-        display: "flex",                               // Flex layout for centering
-        justifyContent: "center",                      // Horizontal center alignment
-        alignItems: "center",                          // Vertical center alignment
-        touchAction: "none",                          // Prevent default touch behaviors
+        width: "100%",
+        height: 16,
+        paddingTop: 5,
+        paddingBottom: 5,
+        position: "relative",
+        flexShrink: 0,
+        cursor: "grab",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        touchAction: "none",
     }
 
-    const placeholderStyleTagContent = `
-      .chat-overlay-collapsed-input::placeholder {
-          color: ${placeholderTextColor};
-          opacity: 1; /* Firefox */
-      }
-      .chat-overlay-collapsed-input::-webkit-input-placeholder {
-          color: ${placeholderTextColor};
-      }
-      .chat-overlay-collapsed-input::-moz-placeholder { /* Mozilla Firefox 19+ */
-          color: ${placeholderTextColor};
-          opacity: 1;
-      }
-      .chat-overlay-collapsed-input:-ms-input-placeholder { /* Internet Explorer 10-11 */
-          color: ${placeholderTextColor};
-      }
-      .chat-overlay-collapsed-input::-ms-input-placeholder { /* Microsoft Edge */
-          color: ${placeholderTextColor};
-      }
-  `
-    // =========================================================================
-    // Pointer/Touch Gesture Handlers
-    // =========================================================================
-
-    /**
-     * POINTER MOVE GESTURE HANDLER
-     * Processes pointer movement during mobile drag gestures.
-     * Detects when user has dragged far enough to initiate overlay collapse.
-     * Uses a 5px threshold to distinguish between scrolling and drag-to-close.
-     *
-     * @param event - Pointer event with client coordinates
-     */
     const handleContainerPointerMove = (event: PointerEvent) => {
-        // Ignore if no gesture is in progress or already dragging
         if (!gestureStartRef.current || gestureStartRef.current.isDragging)
             return
 
@@ -2307,82 +2441,45 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         const currentY = event.clientY
         const deltaY = currentY - startY
 
-        // If dragged down more than 5px, initiate drag-to-close
         if (deltaY > 5) {
             gestureStartRef.current.isDragging = true
-            dragControls.start(event)                    // Start Framer Motion drag
-            handleContainerPointerUp()                   // Clean up event listeners
+            dragControls.start(event)
+            handleContainerPointerUp()
         }
     }
 
-    /**
-     * POINTER UP GESTURE CLEANUP HANDLER
-     * Cleans up event listeners and resets gesture state.
-     * Called when pointer is released or gesture is cancelled.
-     * Ensures no memory leaks and proper state management.
-     */
     const handleContainerPointerUp = () => {
         window.removeEventListener("pointermove", handleContainerPointerMove)
         window.removeEventListener("pointerup", handleContainerPointerUp)
         window.removeEventListener("pointercancel", handleContainerPointerUp)
-        gestureStartRef.current = null                 // Reset gesture state
+        gestureStartRef.current = null
     }
 
-    /**
-     * POINTER DOWN GESTURE INITIALIZER
-     * Initiates mobile drag-to-close gesture when user touches the scroll container.
-     * Only activates when:
-     * - Device is mobile (not desktop)
-     * - Primary button (left mouse/touch) is pressed
-     * - Scroll container is at the top (scrollTop === 0)
-     * This prevents gesture conflicts with scrolling through messages.
-     *
-     * @param event - React pointer event from the scroll container
-     */
     const handleContainerPointerDown = (event: React.PointerEvent) => {
-        // Only handle primary button on mobile devices
         if (!isMobileView || event.button !== 0) return
 
-        // Only initiate gesture if scrolled to top (prevents scroll conflict)
         if (
             scrollContainerRef.current &&
             scrollContainerRef.current.scrollTop === 0
         ) {
-            // Initialize gesture state
             gestureStartRef.current = { y: event.clientY, isDragging: false }
 
-            // Set up event listeners for gesture tracking
             window.addEventListener("pointermove", handleContainerPointerMove)
             window.addEventListener("pointerup", handleContainerPointerUp)
             window.addEventListener("pointercancel", handleContainerPointerUp)
         }
     }
 
-    /**
-     * GESTURE HANDLER CLEANUP EFFECT
-     * Ensures gesture event listeners are cleaned up when component unmounts.
-     * Prevents memory leaks and stale event listeners in React's cleanup phase.
-     */
     useEffect(() => {
         return () => {
             handleContainerPointerUp()
         }
     }, [])
 
-    // =========================================================================
-    // MAIN COMPONENT RENDER - EXPANDED VIEW
-    // =========================================================================
-
-    /**
-     * EXPANDED CHAT INTERFACE RENDER
-     * The full-screen chat experience when the overlay is expanded.
-     * Features mobile backdrop, gesture-based drag-to-close, message history,
-     * streaming responses, AI suggestions, and rich input area.
-     */
     if (expanded) {
         return (
             <Fragment>
-                {/* MOBILE BACKDROP - Only shown on mobile for modal-like experience */}
+                <style>{markdownStyles}</style>
                 {isMobileView && (
                     <motion.div
                         data-layer="mobile-backdrop"
@@ -2396,13 +2493,12 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            background: "rgba(0, 0, 0, 0.7)", // Semi-transparent dark overlay
-                            zIndex: 999,                       // Below overlay but above page content
+                            background: "rgba(0, 0, 0, 0.7)",
+                            zIndex: 999,
                         }}
-                        onClick={handleCollapse}               // Clicking backdrop closes overlay
+                        onClick={handleCollapse}
                     />
                 )}
-                {/* MAIN EXPANDED OVERLAY CONTAINER */}
                 <motion.div
                     ref={expandedOverlayRef}
                     data-layer="expanded-chat-overlay-root"
@@ -2440,87 +2536,80 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         maxWidth: "100vw",
                     }}
                 >
-                    {/* DRAG INDICATOR BAR - Mobile gesture handle */}
                     <div
                         data-layer="drag-indicator-bar"
                         style={dragIndicatorBarStyle}
                         onPointerDown={(event: React.PointerEvent) => {
-                            dragControls.start(event)                    // Start drag gesture
+                            dragControls.start(event)
                             ;(event.currentTarget as HTMLElement).style.cursor =
-                                "grabbing"                             // Visual feedback
+                                "grabbing"
                         }}
                         onPointerUp={(event: React.PointerEvent) => {
                             ;(event.currentTarget as HTMLElement).style.cursor =
-                                "grab"                                 // Reset cursor
+                                "grab"
                         }}
                         onClick={() => {
                             if (expanded) {
-                                handleCollapse()                         // Clicking also closes
+                                handleCollapse()
                             }
                         }}
                     >
-                        {/* SVG DRAG INDICATOR - Three dots visual cue */}
                         <svg
                             width="32"
                             height="5"
                             viewBox="0 0 32 5"
                             fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                            xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                         >
                             <rect
                                 width="32"
                                 height="5"
-                                rx={Math.min(universalBorderRadius, 4)} // Rounded corners, max 4px
+                                rx={Math.min(universalBorderRadius, 4)}
                                 fill={props.iconColor}
-                                style={{ opacity: 0.65 }}             // Subtle appearance
+                                style={{ opacity: 0.65 }}
                             />
                         </svg>
                     </div>
 
-                    {/* MESSAGES SCROLL CONTAINER - Main chat area */}
                     <div
                         ref={scrollContainerRef}
-                        onPointerDown={handleContainerPointerDown}     // Mobile drag gesture handler
+                        onPointerDown={handleContainerPointerDown}
                         data-layer="messages-scroll-container"
                         style={messagesScrollContainerStyle}
                     >
-                        {/* ERROR MESSAGE DISPLAY */}
                         {error && (
                             <div
                                 style={{
-                                    ...errorFontStyle,                       // Specialized error styling
+                                    ...errorFontStyle,
                                     padding: 12,
-                                    background: "rgba(255,0,0,0.1)",         // Subtle red background
-                                    color: "rgb(180,0,0)",                   // Dark red text
+                                    background: "rgba(255,0,0,0.1)",
+                                    color: "rgb(180,0,0)",
                                     borderRadius: "8px",
-                                    wordWrap: "break-word",                  // Break long error messages
+                                    wordWrap: "break-word",
                                     textAlign: "left",
                                 }}
                             >
                                 {error}
                             </div>
                         )}
-                        {/* MESSAGE HISTORY RENDERING */}
                         {messages
-                            .filter((m) => m.role !== "system")      // Exclude system messages from display
+                            .filter((m) => m.role !== "system")
                             .map((message, msgIndex) => {
                                 const isUser = message.role === "user"
                                 const isAssistant = message.role === "assistant"
 
-                                // USER MESSAGE RENDERING
                                 if (isUser) {
-                                    // Normalize content to handle both simple strings and complex multimodal content
                                     const userContentParts = Array.isArray(
                                         message.content
                                     )
-                                        ? message.content                    // Already in parts format
+                                        ? message.content
                                         : [
                                               {
                                                   type: "text",
-                                                  text: message.content as string, // Convert simple string to parts format
+                                                  text: message.content as string,
                                               },
                                           ]
-                                    // Extract image and text content from multimodal message parts
+
                                     const userImageURL = (
                                         userContentParts.find(
                                             (item) => item.type === "image_url"
@@ -2530,7 +2619,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                   image_url: { url: string }
                                               }
                                             | undefined
-                                    )?.image_url.url                              // Get image URL if present
+                                    )?.image_url.url
 
                                     const userTextContent =
                                         (
@@ -2539,64 +2628,61 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             ) as
                                                 | { type: "text"; text: string }
                                                 | undefined
-                                        )?.text || ""                            // Get text content, default to empty string
+                                        )?.text || ""
 
                                     return (
                                         <div
                                             key={`user-${msgIndex}`}
                                             data-layer="user-input-message"
                                             style={{
-                                                alignSelf: "flex-end",             // Right-align user messages
+                                                alignSelf: "flex-end",
                                                 display: "flex",
-                                                flexDirection: "column",           // Stack image above text
-                                                alignItems: "flex-end",            // Right-align content
-                                                gap: 4,                            // Small gap between elements
-                                                maxWidth: "90%",                   // Prevent overly wide messages
+                                                flexDirection: "column",
+                                                alignItems: "flex-end",
+                                                gap: 4,
+                                                maxWidth: "90%",
                                             }}
                                         >
-                                            {/* USER IMAGE DISPLAY - If message contains image */}
                                             {userImageURL && (
                                                 <img
                                                     data-layer="user-sent-image"
                                                     style={{
-                                                        width: 76,                          // Fixed width for consistency
-                                                        maxHeight: 96,                      // Max height with aspect ratio
-                                                        objectFit: "contain",               // Maintain aspect ratio
+                                                        width: 76,
+                                                        maxHeight: 96,
+                                                        objectFit: "contain",
                                                         background:
-                                                            props.chatAreaBackground,       // Match chat background
-                                                        borderRadius: 13.33,                // Rounded corners
+                                                            props.chatAreaBackground,
+                                                        borderRadius: 13.33,
                                                         border: `0.67px solid ${props.iconColor ? props.iconColor.replace(/rgba?\((\d+,\s*\d+,\s*\d+)(?:,\s*[\d.]+)?\)/, "rgba($1, 0.20)") : "rgba(0,0,0,0.20)"}`,
-                                                                    // Subtle border with opacity
                                                     }}
                                                     src={userImageURL}
                                                     alt="User upload"
                                                 />
                                             )}
-                                            {/* USER TEXT BUBBLE - If message has text content */}
                                             {userTextContent && (
                                                 <div
                                                     data-layer="user-message-bubble"
                                                     style={{
-                                                        maxWidth: 336,                        // Max width for readability
+                                                        maxWidth: 336,
                                                         paddingLeft: 12,
                                                         paddingRight: 12,
                                                         paddingTop: 8,
                                                         paddingBottom: 8,
                                                         background:
-                                                            props.userMessageBackgroundColor, // User-configurable background
-                                                        borderRadius: `${universalBorderRadius}px`, // Configurable corner radius
-                                                        display: "inline-flex",              // Shrink to content
+                                                            props.userMessageBackgroundColor,
+                                                        borderRadius: `${universalBorderRadius}px`,
+                                                        display: "inline-flex",
                                                     }}
                                                 >
                                                     <div
                                                         data-layer="user-message-text"
                                                         style={{
-                                                            ...globalFontStyles,               // Inherit font settings
-                                                            color: props.textColor,            // User-configurable text color
+                                                            ...globalFontStyles,
+                                                            color: props.textColor,
                                                             wordWrap:
-                                                                "break-word",                 // Break long words
+                                                                "break-word",
                                                             whiteSpace:
-                                                                "pre-wrap",                   // Preserve line breaks
+                                                                "pre-wrap",
                                                         }}
                                                     >
                                                         {userTextContent}
@@ -2605,119 +2691,143 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             )}
                                         </div>
                                     )
-                                // ASSISTANT MESSAGE RENDERING
                                 } else if (isAssistant) {
+                                    // Check if this is the last message
+                                    const isLastMessage =
+                                        msgIndex === messages.length - 1
+                                    // Hide actions if it is the last message AND (we are loading standard chat OR live generation is active)
+                                    // Also hide if it's the welcome message
+                                    const hideActions =
+                                        (isLastMessage &&
+                                            (isLoading || isLiveGenerating)) ||
+                                        (typeof welcomeMessage === "string" &&
+                                            welcomeMessage.trim() !== "" &&
+                                            (message.content as string) ===
+                                                welcomeMessage)
+
                                     return (
                                         <div
                                             key={`assistant-${msgIndex}`}
                                             data-layer="assistant-message"
                                             style={{
-                                                alignSelf: "stretch",               // Full width for assistant messages
+                                                alignSelf: "stretch",
                                                 display: "flex",
-                                                flexDirection: "column",            // Stack content vertically
-                                                alignItems: "flex-start",           // Left-align content
-                                                gap: 12,                            // Gap between text and action buttons
+                                                flexDirection: "column",
+                                                alignItems: "flex-start",
+                                                gap: 12,
                                             }}
                                         >
-                                            {/* ASSISTANT MESSAGE TEXT - Rich markdown rendering */}
                                             <div
                                                 data-layer="assistant-message-text"
                                                 style={{
-                                                    alignSelf: "stretch",              // Full width container
-                                                    maxWidth: "100%",                 // Responsive to container
+                                                    alignSelf: "stretch",
+                                                    maxWidth: "100%",
                                                 }}
                                             >
-                                                {/* RENDER MARKDOWN - Convert Gemini response to styled React elements */}
                                                 {renderSimpleMarkdown(
-                                                    message.content as string,       // Gemini response text
-                                                    markdownBaseTextStyle,           // Base text styling
-                                                    markdownLinkStyle               // Link-specific styling
+                                                    message.content as string,
+                                                    markdownBaseTextStyle,
+                                                    markdownLinkStyle
                                                 )}
                                             </div>
-                                            {/* ACTION BUTTONS CONTAINER - Copy and TTS controls */}
                                             <div
                                                 data-layer="assistant-action-icons"
                                                 style={{
-                                                    display:
-                                                        typeof welcomeMessage === "string" &&
-                                                        welcomeMessage.trim() !== "" &&
-                                                        (message.content as string) === welcomeMessage
-                                                            ? "none"
-                                                            : "flex",
+                                                    display: hideActions
+                                                        ? "none"
+                                                        : "flex",
                                                     justifyContent:
-                                                        "flex-start",                 // Left-align buttons
+                                                        "flex-start",
                                                     alignItems: "center",
-                                                    gap: 16,                         // Spacing between buttons
+                                                    gap: 16,
                                                 }}
                                             >
-                                                {/* COPY TO CLIPBOARD BUTTON */}
                                                 <button
-                                                    aria-label="Copy message"
-                                                    onClick={(
-                                                        e: React.MouseEvent<HTMLButtonElement>
-                                                    ) => {
-                                                        // COPY TO CLIPBOARD - Modern Clipboard API with fallback
-                                                        if (
-                                                            typeof navigator !==
-                                                                "undefined" &&
-                                                            navigator.clipboard
-                                                        ) {
-                                                            navigator.clipboard.writeText(
-                                                                message.content as string
-                                                            )
-                                                            // VISUAL FEEDBACK - Temporary opacity change
-                                                            const btn =
-                                                                e.currentTarget
-                                                            btn.style.opacity =
-                                                                "0.65"              // Dim button
-                                                            setTimeout(
-                                                                () =>
-                                                                    (btn.style.opacity =
-                                                                        "1"),       // Restore opacity
-                                                                500                  // 500ms feedback duration
-                                                            )
-                                                        }
-                                                    }}
+                                                    aria-label={
+                                                        copiedMessageIndex ===
+                                                        msgIndex
+                                                            ? "Copied"
+                                                            : "Copy message"
+                                                    }
+                                                    onClick={() =>
+                                                        handleCopy(
+                                                            message.content as string,
+                                                            msgIndex
+                                                        )
+                                                    }
                                                     style={{
-                                                        background: "none",                // Transparent background
-                                                        border: "none",                    // Remove default border
-                                                        padding: 0,                        // Remove default padding
-                                                        cursor: "pointer",                 // Pointer cursor for interactivity
+                                                        background: "none",
+                                                        border: "none",
+                                                        padding: 0,
+                                                        cursor: "pointer",
+                                                        width: 16,
+                                                        height: 16,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent:
+                                                            "center",
+                                                        transition:
+                                                            "opacity 0.2s ease",
                                                     }}
                                                 >
-                                                    <svg
-                                                        width="14"
-                                                        height="14"
-                                                        viewBox="0 0 14 14"
-                                                        fill="none"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                    >
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            clipRule="evenodd"
-                                                            d="M5.6 0C4.44021 0 3.5 0.940205 3.5 2.1V3.5H2.1C0.940205 3.5 0 4.44021 0 5.6V11.9C0 13.0598 0.940205 14 2.1 14H8.4C9.55983 14 10.5 13.0598 10.5 11.9V10.5H11.9C13.0598 10.5 14 9.55983 14 8.4V2.1C14 0.940205 13.0598 0 11.9 0H5.6ZM10.5 5.6C10.5 4.44021 9.55983 3.5 8.4 3.5H4.9V2.1C4.9 1.7134 5.2134 1.4 5.6 1.4H11.9C12.2866 1.4 12.6 1.7134 12.6 2.1V8.4C12.6 8.78661 12.2866 9.1 11.9 9.1H10.5V5.6ZM1.4 5.6C1.4 5.2134 1.7134 4.9 2.1 4.9H8.4C8.78661 4.9 9.1 5.2134 9.1 5.6V11.9C9.1 12.2866 8.78661 12.6 8.4 12.6H2.1C1.7134 12.6 1.4 12.2866 1.4 11.9V5.6Z"
-                                                            fill={
-                                                                props.iconColor
-                                                                    ? props.iconColor.replace(
-                                                                          /rgba?\((\d+,\s*\d+,\s*\d+)(?:,\s*[\d.]+)?\)/,
-                                                                          "rgba($1, 0.45)"
-                                                                      )
-                                                                    : "rgba(0,0,0,0.45)"
-                                                            }
-                                                        />
-                                                    </svg>
+                                                    {copiedMessageIndex ===
+                                                    msgIndex ? (
+                                                        <svg
+                                                            width="17"
+                                                            height="17"
+                                                            viewBox="0 0 14 14"
+                                                            fill="none"
+                                                            xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                                        >
+                                                            <path
+                                                                d="M11.6666 3.5L5.24992 9.91667L2.33325 7"
+                                                                stroke={
+                                                                    props.iconColor
+                                                                        ? props.iconColor.replace(
+                                                                              /rgba?\((\d+,\s*\d+,\s*\d+)(?:,\s*[\d.]+)?\)/,
+                                                                              "rgba($1, 0.45)"
+                                                                          )
+                                                                        : "rgba(0,0,0,0.45)"
+                                                                }
+                                                                strokeWidth="1.5"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                            />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg
+                                                            width="14"
+                                                            height="14"
+                                                            viewBox="0 0 14 14"
+                                                            fill="none"
+                                                            xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                                        >
+                                                            <path
+                                                                fillRule="evenodd"
+                                                                clipRule="evenodd"
+                                                                d="M5.6 0C4.44021 0 3.5 0.940205 3.5 2.1V3.5H2.1C0.940205 3.5 0 4.44021 0 5.6V11.9C0 13.0598 0.940205 14 2.1 14H8.4C9.55983 14 10.5 13.0598 10.5 11.9V10.5H11.9C13.0598 10.5 14 9.55983 14 8.4V2.1C14 0.940205 13.0598 0 11.9 0H5.6ZM10.5 5.6C10.5 4.44021 9.55983 3.5 8.4 3.5H4.9V2.1C4.9 1.7134 5.2134 1.4 5.6 1.4H11.9C12.2866 1.4 12.6 1.7134 12.6 2.1V8.4C12.6 8.78661 12.2866 9.1 11.9 9.1H10.5V5.6ZM1.4 5.6C1.4 5.2134 1.7134 4.9 2.1 4.9H8.4C8.78661 4.9 9.1 5.2134 9.1 5.6V11.9C9.1 12.2866 8.78661 12.6 8.4 12.6H2.1C1.7134 12.6 1.4 12.2866 1.4 11.9V5.6Z"
+                                                                fill={
+                                                                    props.iconColor
+                                                                        ? props.iconColor.replace(
+                                                                              /rgba?\((\d+,\s*\d+,\s*\d+)(?:,\s*[\d.]+)?\)/,
+                                                                              "rgba($1, 0.45)"
+                                                                          )
+                                                                        : "rgba(0,0,0,0.45)"
+                                                                }
+                                                            />
+                                                        </svg>
+                                                    )}
                                                 </button>
-                                                {/* CONDITIONAL TTS BUTTON - Play or Stop based on current speaking state */}
                                                 {speakingMessageIndex ===
                                                 msgIndex ? (
                                                     <button
                                                         aria-label="Stop speaking"
-                                                        onClick={handleStopTTS}              // Stop speech synthesis
+                                                        onClick={handleStopTTS}
                                                         style={{
-                                                            background: "none",                // Transparent background
-                                                            border: "none",                    // Remove default border
-                                                            padding: 0,                        // Remove default padding
-                                                            cursor: "pointer",                 // Pointer cursor
+                                                            background: "none",
+                                                            border: "none",
+                                                            padding: 0,
+                                                            cursor: "pointer",
                                                         }}
                                                     >
                                                         <svg
@@ -2725,7 +2835,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                             height="14"
                                                             viewBox="0 0 15 14"
                                                             fill="none"
-                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                                         >
                                                             <path
                                                                 fillRule="evenodd"
@@ -2747,8 +2857,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                         aria-label="Read message aloud"
                                                         onClick={() =>
                                                             handlePlayTTS(
-                                                                message.content as string,  // Message text to speak
-                                                                msgIndex                     // Message index for state tracking
+                                                                message.content as string,
+                                                                msgIndex
                                                             )
                                                         }
                                                         style={{
@@ -2763,7 +2873,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                             height="14"
                                                             viewBox="0 0 19 14"
                                                             fill="none"
-                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                                         >
                                                             <path
                                                                 fillRule="evenodd"
@@ -2836,7 +2946,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                 height="20"
                                                 viewBox="0 0 20 20"
                                                 fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                             >
                                                 <g clipPath="url(#clipLoadAnimExpandedFull)">
                                                     <path
@@ -2960,7 +3070,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                 top: -8,
                                                 width: 22,
                                                 height: 22,
-                                                borderRadius: `${universalBorderRadius}px`,
+                                                borderRadius: 11,
                                                 background: "black",
                                                 display: "flex",
                                                 alignItems: "center",
@@ -2974,7 +3084,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                 height="10"
                                                 viewBox="0 0 10 10"
                                                 fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                             >
                                                 <path
                                                     d="M1 1L9 9M9 1L1 9"
@@ -2982,6 +3092,179 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                     strokeWidth="1.5"
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                )}
+                                {!imageFile && attachmentPreview && (
+                                    <div
+                                        data-layer="files"
+                                        className="Files"
+                                        style={{
+                                            height: 48,
+                                            paddingTop: 7,
+                                            paddingBottom: 7,
+                                            paddingRight: 12,
+                                            position: "relative",
+                                            background: "#EEF0F2",
+                                            borderRadius: 14,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                        }}
+                                    >
+                                        <div
+                                            onClick={handleRemoveImage}
+                                            style={{
+                                                position: "absolute",
+                                                right: -8,
+                                                top: -8,
+                                                width: 22,
+                                                height: 22,
+                                                borderRadius: 11,
+                                                background: "black",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                cursor: "pointer",
+                                                border: "2px solid white",
+                                            }}
+                                        >
+                                            <svg
+                                                width="10"
+                                                height="10"
+                                                viewBox="0 0 10 10"
+                                                fill="none"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                            >
+                                                <path
+                                                    d="M1 1L9 9M9 1L1 9"
+                                                    stroke="white"
+                                                    strokeWidth="1.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="Frame 47412"
+                                            className="Frame47412"
+                                            style={{ position: "relative" }}
+                                        >
+                                            <svg
+                                                width="49"
+                                                height="49"
+                                                viewBox="0 0 49 49"
+                                                fill="none"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                            >
+                                                <path
+                                                    d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z"
+                                                    fill="#6AA4FB"
+                                                />
+                                                <path
+                                                    d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z"
+                                                    fill="white"
+                                                    fillOpacity="0.95"
+                                                />
+                                                <path
+                                                    d="M23.8125 30.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 23.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 16.5127C33.4559 16.5127 33.9775 17.0343 33.9775 17.6777C33.9775 18.3211 33.4559 18.8428 32.8125 18.8428H16.8125C16.1691 18.8428 15.6475 18.3211 15.6475 17.6777C15.6475 17.0343 16.1691 16.5127 16.8125 16.5127H32.8125Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="0.33"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div
+                                            data-layer="Frame 47417"
+                                            className="Frame47417"
+                                            style={{
+                                                flexDirection: "column",
+                                                justifyContent: "flex-start",
+                                                alignItems: "flex-start",
+                                                display: "inline-flex",
+                                            }}
+                                        >
+                                            <div
+                                                data-layer="fileName"
+                                                className="Filename"
+                                                style={{
+                                                    justifyContent: "center",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    color: "rgba(0, 0, 0, 0.95)",
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "400",
+                                                    lineHeight: 21,
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                {attachmentPreview.name}
+                                            </div>
+                                            <div
+                                                data-layer="fileType"
+                                                className="Filetype"
+                                                style={{
+                                                    justifyContent: "center",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    color: "rgba(0, 0, 0, 0.45)",
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "400",
+                                                    lineHeight: 21,
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                {(
+                                                    attachmentPreview.type ||
+                                                    "FILE"
+                                                )
+                                                    .split("/")[1]
+                                                    ?.toUpperCase() || "FILE"}
+                                            </div>
+                                        </div>
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="Frame 47418"
+                                            className="Frame47418"
+                                            style={{
+                                                left: 145,
+                                                top: -6,
+                                                position: "absolute",
+                                            }}
+                                        >
+                                            <svg
+                                                width="23"
+                                                height="23"
+                                                viewBox="0 0 23 23"
+                                                fill="none"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                            >
+                                                <rect
+                                                    x="2.3125"
+                                                    y="2.17773"
+                                                    width="19"
+                                                    height="19"
+                                                    rx="9.5"
+                                                    fill="black"
+                                                />
+                                                <rect
+                                                    x="2.3125"
+                                                    y="2.17773"
+                                                    width="19"
+                                                    height="19"
+                                                    rx="9.5"
+                                                    stroke="white"
+                                                    strokeWidth="3"
+                                                />
+                                                <path
+                                                    d="M10.9556 11.7253C10.9819 11.699 10.9819 11.6564 10.9556 11.6301L8.9801 9.65459C8.75663 9.43112 8.75663 9.06881 8.9801 8.84534C9.20357 8.62187 9.56589 8.62187 9.78936 8.84534L11.7649 10.8209C11.7912 10.8472 11.8338 10.8472 11.8601 10.8209L13.8356 8.84534C14.0591 8.62187 14.4214 8.62187 14.6449 8.84534C14.8684 9.06881 14.8684 9.43112 14.6449 9.65459L12.6694 11.6301C12.6431 11.6564 12.6431 11.699 12.6694 11.7253L14.6449 13.7009C14.8684 13.9243 14.8684 14.2867 14.6449 14.5101C14.4214 14.7336 14.0591 14.7336 13.8356 14.5101L11.8601 12.5346C11.8338 12.5083 11.7912 12.5083 11.7649 12.5346L9.78936 14.5101C9.56589 14.7336 9.20357 14.7336 8.9801 14.5101C8.75663 14.2867 8.75663 13.9243 8.9801 13.7009L10.9556 11.7253Z"
+                                                    fill="white"
                                                 />
                                             </svg>
                                         </div>
@@ -3024,7 +3307,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 }}
                             >
                                 <button
-                                    aria-label="Attach image"
+                                    aria-label="Add photos & files"
                                     onClick={() =>
                                         fileInputRef.current?.click()
                                     }
@@ -3046,7 +3329,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/*"
+                                        accept="image/*,audio/*,video/*,.pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.csv,.json,.xml,application/*"
                                         style={{ display: "none" }}
                                         onChange={handleImageChange}
                                         disabled={isLoading}
@@ -3056,7 +3339,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         height="36"
                                         viewBox="0 0 36 36"
                                         fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
+                                        xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                     >
                                         <rect
                                             width="36"
@@ -3111,7 +3394,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                 height="10"
                                                 viewBox="0 0 10 10"
                                                 fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
+                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
                                             >
                                                 <rect
                                                     width="10"
@@ -3130,15 +3413,35 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     </button>
                                 ) : (
                                     <button
-                                        aria-label="Send message"
-                                        onClick={handleExpandedViewSendClick}
-                                        disabled={!input.trim() && !imageFile}
+                                        aria-label={
+                                            input.trim() || imageFile
+                                                ? "Send message"
+                                                : isLiveMode
+                                                  ? "End Call"
+                                                  : "Start Call"
+                                        }
+                                        onClick={(e) => {
+                                            if (
+                                                !input.trim() &&
+                                                !imageFile &&
+                                                !attachmentFile
+                                            ) {
+                                                handleToggleLive(e)
+                                            } else {
+                                                handleExpandedViewSendClick()
+                                            }
+                                        }}
                                         style={{
-                                            background: props.sendBgColor,
-                                            opacity:
-                                                input.trim() || imageFile
-                                                    ? 1
-                                                    : 0.5,
+                                            background:
+                                                !input.trim() &&
+                                                !imageFile &&
+                                                isLiveMode
+                                                    ? "#FF3B30"
+                                                    : props.sendBgColor,
+                                            opacity: !input.trim() &&
+                                                !imageFile &&
+                                                !attachmentFile &&
+                                                !enableGeminiLive ? 0.5 : 1,
                                             border: "none",
                                             borderRadius: `${universalBorderRadius}px`,
                                             width: 36,
@@ -3146,43 +3449,109 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                            cursor:
-                                                input.trim() || imageFile
-                                                    ? "pointer"
-                                                    : "default",
+                                            cursor: !input.trim() &&
+                                                !imageFile &&
+                                                !attachmentFile &&
+                                                !enableGeminiLive ? "not-allowed" : "pointer",
                                             padding: 0,
+                                            transition: "background 0.2s ease",
                                         }}
                                     >
-                                        {safeSendIconUrl ? (
-                                            <img
-                                                src={safeSendIconUrl}
-                                                alt="Send"
-                                                style={{
-                                                    width: 18,
-                                                    height: 18,
-                                                }}
-                                            />
-                                        ) : (
-                                            <svg
-                                                width="36"
-                                                height="36"
-                                                viewBox="0 0 36 36"
-                                                fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                                <rect
+                                        {input.trim() ||
+                                        imageFile ||
+                                        attachmentFile ||
+                                        !enableGeminiLive ? (
+                                            safeSendIconUrl ? (
+                                                <img
+                                                    src={safeSendIconUrl}
+                                                    alt="Send"
+                                                    style={{
+                                                        width: 18,
+                                                        height: 18,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <svg
                                                     width="36"
                                                     height="36"
-                                                    rx={universalBorderRadius}
-                                                    fill={props.sendBgColor}
-                                                />
-                                                <path
-                                                    fillRule="evenodd"
-                                                    clipRule="evenodd"
-                                                    d="M14.5592 18.1299L16.869 15.8202V23.3716C16.869 23.9948 17.3742 24.5 17.9974 24.5C18.6206 24.5 19.1259 23.9948 19.1259 23.3716V15.8202L21.4356 18.1299C21.8762 18.5706 22.5907 18.5706 23.0314 18.1299C23.4721 17.6893 23.4721 16.9748 23.0314 16.5341L17.9974 11.5L12.9633 16.5341C12.5226 16.9748 12.5226 17.6893 12.9633 18.1299C13.404 18.5706 14.1185 18.5706 14.5592 18.1299Z"
-                                                    fill={props.sendIconColor}
-                                                />
-                                            </svg>
+                                                    viewBox="0 0 36 36"
+                                                    fill="none"
+                                                    xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                                >
+                                                    <rect
+                                                        width="36"
+                                                        height="36"
+                                                        rx={
+                                                            universalBorderRadius
+                                                        }
+                                                        fill={props.sendBgColor}
+                                                    />
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        clipRule="evenodd"
+                                                        d="M14.5592 18.1299L16.869 15.8202V23.3716C16.869 23.9948 17.3742 24.5 17.9974 24.5C18.6206 24.5 19.1259 23.9948 19.1259 23.3716V15.8202L21.4356 18.1299C21.8762 18.5706 22.5907 18.5706 23.0314 18.1299C23.4721 17.6893 23.4721 16.9748 23.0314 16.5341L17.9974 11.5L12.9633 16.5341C12.5226 16.9748 12.5226 17.6893 12.9633 18.1299C13.404 18.5706 14.1185 18.5706 14.5592 18.1299Z"
+                                                        fill={
+                                                            props.sendIconColor
+                                                        }
+                                                    />
+                                                </svg>
+                                            )
+                                        ) : isLiveMode ? (
+                                            // Red Hangup Button (Expanded)
+                                            <div
+                                                data-svg-wrapper
+                                                data-layer="Vector"
+                                                className="Vector"
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "center",
+                                                    alignItems: "center",
+                                                    width: "100%",
+                                                    height: "100%",
+                                                }}
+                                            >
+                                                <svg
+                                                    width="17"
+                                                    height="6"
+                                                    viewBox="0 0 17 6"
+                                                    fill="none"
+                                                    xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                                >
+                                                    <path
+                                                        d="M8.26514 0C5.53748 0 2.43384 0.509839 0.923414 2.06572C0.347446 2.64882 0 3.37491 0 4.28728C0 4.89816 0.188972 5.74968 0.796291 5.90709C1.02282 6.03478 1.27756 6.01119 1.63127 5.95298L3.67811 5.61044C4.38284 5.49373 4.73813 5.22516 4.92389 4.53789L5.25979 3.29924C5.32663 3.05597 5.40452 2.96384 5.67778 2.86308C6.25446 2.66086 7.14424 2.55568 8.26514 2.55126C9.3932 2.54906 10.283 2.66086 10.8597 2.86308C11.1329 2.96384 11.2109 3.05597 11.2728 3.29924L11.6136 4.53789C11.7972 5.22516 12.1546 5.49373 12.8593 5.61044L14.9062 5.95298C15.255 6.01119 15.5098 6.03478 15.7363 5.90709C16.3485 5.74968 16.5375 4.89816 16.5375 4.28728C16.5375 3.37491 16.19 2.64882 15.614 2.06572C14.1036 0.509839 11 0 8.26514 0Z"
+                                                        fill="white"
+                                                    />
+                                                </svg>
+                                            </div>
+                                        ) : (
+                                            // Call Button (Expanded)
+                                            <div
+                                                data-svg-wrapper
+                                                data-layer="Vector"
+                                                className="Vector"
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "center",
+                                                    alignItems: "center",
+                                                    width: "100%",
+                                                    height: "100%",
+                                                }}
+                                            >
+                                                <svg
+                                                    width="13"
+                                                    height="13"
+                                                    viewBox="0 0 13 13"
+                                                    fill="none"
+                                                    xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                                >
+                                                    <path
+                                                        d="M3.57064 9.3837C5.61989 11.4399 8.07817 13 10.0516 13C10.9769 13 11.784 12.6291 12.3163 12.038C12.8228 11.4683 13 11.0451 13 10.6648C13 10.374 12.8157 10.1 12.3587 9.78075L10.6552 8.56335C10.2316 8.26319 10.0423 8.20655 9.79145 8.20655C9.57605 8.20655 9.38954 8.24687 9.03184 8.44297L7.91947 9.05518C7.78915 9.13089 7.73028 9.14286 7.63321 9.14286C7.50064 9.14286 7.40851 9.10964 7.2782 9.05518C6.74596 8.80731 6.00274 8.2278 5.34019 7.56163C4.67765 6.89978 4.16839 6.23477 3.89458 5.69703C3.85913 5.6284 3.81879 5.51728 3.81879 5.40397C3.81879 5.31629 3.86622 5.23619 3.92294 5.14144L4.57619 4.02537C4.75833 3.72255 4.80576 3.55477 4.80576 3.31617C4.80576 3.04437 4.7136 2.75351 4.45567 2.38474L3.28436 0.749498C2.95064 0.283779 2.6998 0 2.32135 0C1.85293 0 1.28964 0.356794 0.88722 0.74461C0.307556 1.30459 0 2.08241 0 2.95938C0 4.94484 1.52849 7.34863 3.57064 9.3837Z"
+                                                        fill={
+                                                            props.sendIconColor
+                                                        }
+                                                    />
+                                                </svg>
+                                            </div>
                                         )}
                                     </button>
                                 )}
@@ -3209,7 +3578,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 aria-label={
                     input.trim()
                         ? `Continue chat: ${input.substring(0, 30)}...`
-                        : placeholder || "Open chat to ask anything"
+                        : activePlaceholder || "Open chat to ask anything"
                 }
                 data-layer="overlay prompt input box"
                 className="OverlayPromptInputBox"
@@ -3217,10 +3586,10 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                     width: "100%",
                     height: "100%",
                     position: "relative",
-                    paddingTop: 7,
-                    paddingBottom: 6,
-                    paddingLeft: 12,
-                    paddingRight: 6,
+                    paddingTop: 11,
+                    paddingBottom: 10,
+                    paddingLeft: 16,
+                    paddingRight: 10,
                     background: inputBarBackground,
                     boxShadow: shadow
                         ? "0px -4px 24px rgba(0, 0, 0, 0.08)"
@@ -3238,16 +3607,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                     opacity: expanded
                         ? 0
                         : scrollRevealStyle && enableScrollReveal
-                            ? (scrollRevealStyle.opacity as number)
-                            : 1,
-                    // When scroll reveal is enabled, drive transform via local style
-                    // so the element rises and scales in as the page scrolls.
+                          ? (scrollRevealStyle.opacity as number)
+                          : 1,
                     transform:
                         !expanded && scrollRevealStyle && enableScrollReveal
                             ? (scrollRevealStyle.transform as string)
                             : undefined,
-                    willChange: enableScrollReveal ? "transform, opacity" : undefined,
-                    // Slightly longer duration to avoid harsh motion on reveal
+                    willChange: enableScrollReveal
+                        ? "transform, opacity"
+                        : undefined,
                     transition: enableScrollReveal
                         ? "transform 0.25s ease-out, opacity 0.25s ease-out"
                         : "opacity 0.25s ease-out",
@@ -3299,6 +3667,69 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         position: "relative",
                     }}
                 >
+                    {/* Animated Placeholder Overlay */}
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: 4,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            pointerEvents: "none", // Allow clicks to pass through to input
+                            overflow: "hidden",
+                        }}
+                    >
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            {!input &&
+                                !expanded &&
+                                (isCanvas ? (
+                                    <span
+                                        style={{
+                                            ...globalFontStyles,
+                                            color: placeholderTextColor,
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 0,
+                                            width: "100%",
+                                            whiteSpace: "nowrap",
+                                            textOverflow: "ellipsis",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {placeholder}
+                                    </span>
+                                ) : (
+                                    <motion.span
+                                        key={activePlaceholder}
+                                        initial={{ y: 20, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        exit={{ y: -20, opacity: 0 }}
+                                        transition={{
+                                            y: {
+                                                type: "spring",
+                                                stiffness: 100,
+                                                damping: 20,
+                                            },
+                                            opacity: { duration: 0.2 },
+                                        }}
+                                        style={{
+                                            ...globalFontStyles,
+                                            color: placeholderTextColor,
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 0,
+                                            width: "100%",
+                                            whiteSpace: "nowrap",
+                                            textOverflow: "ellipsis",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {activePlaceholder}
+                                    </motion.span>
+                                ))}
+                        </AnimatePresence>
+                    </div>
+
                     <input
                         ref={collapsedInputRef}
                         className="chat-overlay-collapsed-input"
@@ -3318,7 +3749,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 }
                             }
                         }}
-                        placeholder={placeholder}
+                        placeholder="" // Disabled native placeholder to use custom animation
                         style={{
                             ...globalFontStyles,
                             color: textColor,
@@ -3329,6 +3760,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             padding: "0",
                             boxSizing: "border-box",
                             cursor: "pointer",
+                            position: "relative", // Ensure it sits above/below correctly if needed
+                            zIndex: 1,
                         }}
                     />
                 </div>
@@ -3343,7 +3776,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 ? "Processing..."
                                 : hasContent
                                   ? "Send message and expand"
-                                  : "Expand chat"
+                                  : isLiveMode
+                                    ? "End Call"
+                                    : "Start Call"
                         }
                         onClick={(e) => {
                             e.stopPropagation()
@@ -3353,15 +3788,21 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     sendMessage()
                                     handleExpand()
                                 }
-                            } else if (!expanded) {
-                                handleExpand()
+                            } else if (expanded) {
+                                // Do nothing or focus input
+                            } else {
+                                // If collapsed and no content, toggle Live or just expand?
+                                // If we want the button to trigger Live even in collapsed, we do:
+                                handleToggleLive(e)
                             }
                         }}
-                        disabled={
-                            isCollapsedSendDisabled && !hasContent && !expanded
-                        }
                         style={{
-                            background: "transparent",
+                            background:
+                                !input.trim() &&
+                                !imageFile &&
+                                isLiveMode
+                                    ? "#FF3B30"
+                                    : "transparent",
                             border: "none",
                             width: 36,
                             height: 36,
@@ -3369,51 +3810,63 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             alignItems: "center",
                             justifyContent: "center",
                             padding: 0,
-                            cursor:
-                                isCollapsedSendDisabled &&
-                                !hasContent &&
-                                !expanded
-                                    ? "default"
-                                    : "pointer",
+                            cursor: !enableGeminiLive && !hasContent ? "not-allowed" : "pointer",
+                            borderRadius: `${universalBorderRadius}px`,
+                            opacity: !enableGeminiLive && !hasContent ? 0.5 : 1,
                         }}
                     >
-                        <svg
-                            width="36"
-                            height="36"
-                            viewBox="0 0 36 36"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <g opacity={sendButtonEffectiveOpacity}>
+                        {isLoading ? (
+                            <svg
+                                width="36"
+                                height="36"
+                                viewBox="0 0 36 36"
+                                fill="none"
+                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                            >
                                 <rect
                                     width="36"
                                     height="36"
                                     rx={universalBorderRadius}
                                     fill={sendBgColor}
                                 />
-                                {isLoading ? (
-                                    safeLoadingIconUrl ? (
-                                        <image
-                                            href={safeLoadingIconUrl}
-                                            x="9"
-                                            y="9"
-                                            height="18"
-                                            width="18"
-                                        />
-                                    ) : (
-                                        <rect
-                                            x="13"
-                                            y="13"
-                                            width="10"
-                                            height="10"
-                                            rx={Math.min(
-                                                universalBorderRadius,
-                                                1.5
-                                            )}
-                                            fill={sendIconColor}
-                                        />
-                                    )
-                                ) : safeSendIconUrl ? (
+                                {safeLoadingIconUrl ? (
+                                    <image
+                                        href={safeLoadingIconUrl}
+                                        x="9"
+                                        y="9"
+                                        height="18"
+                                        width="18"
+                                    />
+                                ) : (
+                                    <rect
+                                        x="13"
+                                        y="13"
+                                        width="10"
+                                        height="10"
+                                        rx={Math.min(
+                                            universalBorderRadius,
+                                            1.5
+                                        )}
+                                        fill={sendIconColor}
+                                    />
+                                )}
+                            </svg>
+                        ) : hasContent || !enableGeminiLive ? (
+                            // Standard Send Icon Logic (for content OR when Gemini Live is disabled)
+                            <svg
+                                width="36"
+                                height="36"
+                                viewBox="0 0 36 36"
+                                fill="none"
+                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                            >
+                                <rect
+                                    width="36"
+                                    height="36"
+                                    rx={universalBorderRadius}
+                                    fill={sendBgColor}
+                                />
+                                {safeSendIconUrl ? (
                                     <image
                                         href={safeSendIconUrl}
                                         x="9"
@@ -3429,8 +3882,63 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         fill={sendIconColor}
                                     />
                                 )}
-                            </g>
-                        </svg>
+                            </svg>
+                        ) : isLiveMode ? (
+                            // Red Hangup Button (Collapsed)
+                            <div
+                                data-svg-wrapper
+                                data-layer="Vector"
+                                className="Vector"
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: `${universalBorderRadius}px`,
+                                    background: "#FF3B30",
+                                }}
+                            >
+                                <svg
+                                    width="17"
+                                    height="6"
+                                    viewBox="0 0 17 6"
+                                    fill="none"
+                                    xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                >
+                                    <path
+                                        d="M8.26514 0C5.53748 0 2.43384 0.509839 0.923414 2.06572C0.347446 2.64882 0 3.37491 0 4.28728C0 4.89816 0.188972 5.74968 0.796291 5.90709C1.02282 6.03478 1.27756 6.01119 1.63127 5.95298L3.67811 5.61044C4.38284 5.49373 4.73813 5.22516 4.92389 4.53789L5.25979 3.29924C5.32663 3.05597 5.40452 2.96384 5.67778 2.86308C6.25446 2.66086 7.14424 2.55568 8.26514 2.55126C9.3932 2.54906 10.283 2.66086 10.8597 2.86308C11.1329 2.96384 11.2109 3.05597 11.2728 3.29924L11.6136 4.53789C11.7972 5.22516 12.1546 5.49373 12.8593 5.61044L14.9062 5.95298C15.255 6.01119 15.5098 6.03478 15.7363 5.90709C16.3485 5.74968 16.5375 4.89816 16.5375 4.28728C16.5375 3.37491 16.19 2.64882 15.614 2.06572C14.1036 0.509839 11 0 8.26514 0Z"
+                                        fill="white"
+                                    />
+                                </svg>
+                            </div>
+                        ) : (
+                            // Call Button (Collapsed)
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: `${universalBorderRadius}px`,
+                                    background: sendBgColor,
+                                }}
+                            >
+                                <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 13 13"
+                                    fill="none"
+                                    xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
+                                >
+                                    <path
+                                        d="M3.57064 9.3837C5.61989 11.4399 8.07817 13 10.0516 13C10.9769 13 11.784 12.6291 12.3163 12.038C12.8228 11.4683 13 11.0451 13 10.6648C13 10.374 12.8157 10.1 12.3587 9.78075L10.6552 8.56335C10.2316 8.26319 10.0423 8.20655 9.79145 8.20655C9.57605 8.20655 9.38954 8.24687 9.03184 8.44297L7.91947 9.05518C7.78915 9.13089 7.73028 9.14286 7.63321 9.14286C7.50064 9.14286 7.40851 9.10964 7.2782 9.05518C6.74596 8.80731 6.00274 8.2278 5.34019 7.56163C4.67765 6.89978 4.16839 6.23477 3.89458 5.69703C3.85913 5.6284 3.81879 5.51728 3.81879 5.40397C3.81879 5.31629 3.86622 5.23619 3.92294 5.14144L4.57619 4.02537C4.75833 3.72255 4.80576 3.55477 4.80576 3.31617C4.80576 3.04437 4.7136 2.75351 4.45567 2.38474L3.28436 0.749498C2.95064 0.283779 2.6998 0 2.32135 0C1.85293 0 1.28964 0.356794 0.88722 0.74461C0.307556 1.30459 0 2.08241 0 2.95938C0 4.94484 1.52849 7.34863 3.57064 9.3837Z"
+                                        fill={props.sendIconColor}
+                                    />
+                                </svg>
+                            </div>
+                        )}
                     </button>
                 </div>
             </div>
@@ -3442,38 +3950,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 // Framer Property Controls Configuration
 // =========================================================================
 
-/**
- * FRAMER PROPERTY CONTROLS CONFIGURATION
- * Defines the customizable properties available in Framer's design panel.
- * These controls allow designers to customize the chat overlay without code changes.
- * Each control maps to a component prop and provides a user-friendly interface
- * for configuration with validation, defaults, and helpful descriptions.
- */
 addPropertyControls(ChatOverlay, {
-    // =========================================================================
-    // API & Model Configuration
-    // =========================================================================
-
-    /**
-     * GEMINI API KEY CONTROL
-     * Secure input for Google's Gemini API authentication.
-     * Uses obscured text to protect sensitive credentials.
-     * Required for the component to communicate with Gemini services.
-     */
     geminiApiKey: {
         type: ControlType.String,
         title: "Gemini API Key",
         defaultValue: "",
         placeholder: "Paste API key",
-        obscured: true,                                 // Hides the actual key for security
+        obscured: true,
         description: "Create a free API key on Google AI Studio",
     },
-    /**
-     * UNIVERSAL BORDER RADIUS CONTROL
-     * Controls corner roundness for all rounded elements in the component.
-     * Provides consistent visual design with granular control from 0-50px.
-     * Affects buttons, input fields, overlay corners, and message bubbles.
-     */
     universalBorderRadius: {
         type: ControlType.Number,
         title: "Corner Radius",
@@ -3482,49 +3967,23 @@ addPropertyControls(ChatOverlay, {
         max: 50,
         unit: "px",
         step: 1,
-        displayStepper: true,                           // Shows +/- stepper buttons
+        displayStepper: true,
         description:
             "Universal corner radius for most elements (0-50px). Default: 24px.",
     },
-
-    // =========================================================================
-    // Content & Behavior Configuration
-    // =========================================================================
-
-    /**
-     * SYSTEM PROMPT CONTROL
-     * Defines the AI assistant's personality, behavior, and task context.
-     * Uses textarea for longer prompts with better formatting support.
-     * This is sent to Gemini as the system instruction for each conversation.
-     */
     systemPrompt: {
         type: ControlType.String,
         title: "Instructions",
-        displayTextArea: true,                         // Shows larger textarea input
+        displayTextArea: true,
         defaultValue: "You are a helpful assistant.",
         description: "System prompt to define the bot's personality and task.",
     },
-
-    /**
-     * WELCOME MESSAGE CONTROL
-     * Optional initial greeting displayed when the chat loads.
-     * Leave empty to start with no initial message from the assistant.
-     * Useful for providing context or personality from the first interaction.
-     */
     welcomeMessage: {
         type: ControlType.String,
         title: "Welcome Message",
         defaultValue: "Hi, how can I help?",
-        description:
-            "(Optional) An initial message from the assistant",
+        description: "(Optional) An initial message from the assistant",
     },
-
-    /**
-     * AI MODEL SELECTION CONTROL
-     * Specifies which Gemini model to use for generating responses.
-     * Currently optimized for gemini-2.5-flash-lite for speed and accuracy.
-     * Allows future extensibility to other Gemini models.
-     */
     model: {
         type: ControlType.String,
         title: "AI Model",
@@ -3533,18 +3992,32 @@ addPropertyControls(ChatOverlay, {
         description:
             "Ideal: gemini-2.5-flash-lite for best speed and high accuracy.",
     },
-
-    /**
-     * INPUT PLACEHOLDER CONTROL
-     * Text shown in the input field when empty.
-     * Guides users on what type of input is expected.
-     * Supports localization and brand voice customization.
-     */
     placeholder: {
         type: ControlType.String,
-        title: "Placeholder Text",
+        title: "Placeholder (Default)",
         defaultValue: "Ask anything",
-        description: "Input placeholder.",
+        description: "Initial placeholder text.",
+    },
+    additionalPlaceholders: {
+        type: ControlType.Array,
+        title: "Rotate Placeholders",
+        control: {
+            type: ControlType.String,
+            defaultValue: "New placeholder",
+        },
+        defaultValue: [],
+        maxCount: 10,
+        description: "Optional: Cycle through these additional placeholders.",
+    },
+    placeholderRotateInterval: {
+        type: ControlType.Number,
+        title: "Rotate Speed (s)",
+        defaultValue: 3,
+        min: 1,
+        max: 20,
+        step: 0.5,
+        displayStepper: true,
+        description: "Seconds between placeholder rotations.",
     },
     textFont: {
         type: ControlType.Font,
@@ -3567,6 +4040,12 @@ addPropertyControls(ChatOverlay, {
         title: "Reply Suggestions",
         defaultValue: true,
         description: "Generate AI contextual follow-up replies.",
+    },
+    enableGeminiLive: {
+        type: ControlType.Boolean,
+        title: "Enable Gemini Live",
+        defaultValue: true,
+        description: "Enable Gemini Live voice calling. When off, call button is grayed out.",
     },
     suggestedReply1: {
         type: ControlType.String,
@@ -3601,8 +4080,7 @@ addPropertyControls(ChatOverlay, {
         type: ControlType.Boolean,
         title: "Scroll Reveal",
         defaultValue: true,
-        description:
-            "Scale in from bottom on scroll.",
+        description: "Scale in from bottom on scroll.",
     },
     shadow: {
         type: ControlType.Boolean,
