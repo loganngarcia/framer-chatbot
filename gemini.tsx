@@ -51,8 +51,6 @@ interface ChatOverlayProps {
     systemPrompt: string
     welcomeMessage?: string
     placeholder: string
-    additionalPlaceholders: string[]
-    placeholderRotateInterval: number
     inputBarBackground: string
     expandedInputAreaBackground: string
     chatAreaBackground: string
@@ -69,13 +67,14 @@ interface ChatOverlayProps {
     loadingIconOverrideUrl?: ResponsiveImageType
     textFont?: FramerFontInfo
     style?: CSSProperties
-    suggestedReply1?: string
-    suggestedReply2?: string
-    suggestedReply3?: string
+    rotateSuggestions?: boolean
+    defaultSuggestions: string[]
+    suggestionRotateInterval: number
     enableAiSuggestions?: boolean
     universalBorderRadius: number
     enableScrollReveal?: boolean
     enableGeminiLive?: boolean
+    interruptionThreshold?: number
 }
 
 interface Message {
@@ -131,6 +130,73 @@ const INPUT_TARGET_SAMPLE_RATE = 16000
 // Audio Processing Helpers for Live API
 // -----------------------------------------------------------------------------
 
+/**
+ * High-pass filter to remove low-frequency noise (rumble, hum)
+ */
+function highPassFilter(audioData: Float32Array, sampleRate: number, cutoffFreq: number = 80): Float32Array {
+    const RC = 1.0 / (cutoffFreq * 2 * Math.PI)
+    const dt = 1.0 / sampleRate
+    const alpha = RC / (RC + dt)
+    
+    const filtered = new Float32Array(audioData.length)
+    filtered[0] = audioData[0]
+    
+    for (let i = 1; i < audioData.length; i++) {
+        filtered[i] = alpha * (filtered[i - 1] + audioData[i] - audioData[i - 1])
+    }
+    
+    return filtered
+}
+
+/**
+ * Dynamic range compression / normalization to handle varying speech volumes
+ */
+function normalizeAudio(audioData: Float32Array): Float32Array {
+    let maxAmp = 0
+    for (let i = 0; i < audioData.length; i++) {
+        const amp = Math.abs(audioData[i])
+        if (amp > maxAmp) maxAmp = amp
+    }
+    
+    if (maxAmp === 0) return audioData
+    
+    // Normalize to 0.7 to leave headroom and avoid clipping
+    const normalized = new Float32Array(audioData.length)
+    const targetLevel = 0.7
+    const gain = targetLevel / maxAmp
+    
+    for (let i = 0; i < audioData.length; i++) {
+        normalized[i] = audioData[i] * gain
+    }
+    
+    return normalized
+}
+
+/**
+ * Improved Voice Activity Detection using RMS energy and zero-crossing rate
+ */
+function detectVoiceActivity(audioData: Float32Array, threshold: number): boolean {
+    // Calculate RMS energy
+    let sumSquares = 0
+    let zeroCrossings = 0
+    
+    for (let i = 0; i < audioData.length; i++) {
+        sumSquares += audioData[i] * audioData[i]
+        
+        // Count zero crossings
+        if (i > 0 && audioData[i] * audioData[i - 1] < 0) {
+            zeroCrossings++
+        }
+    }
+    
+    const rms = Math.sqrt(sumSquares / audioData.length)
+    const zcr = zeroCrossings / audioData.length
+    
+    // Voice typically has RMS above threshold and moderate zero-crossing rate
+    // ZCR helps distinguish voice from pure noise
+    return rms > threshold && zcr > 0.01 && zcr < 0.5
+}
+
 function base64ToFloat32Array(base64: string): Float32Array {
     const binaryString = atob(base64)
     const len = binaryString.length
@@ -161,7 +227,8 @@ function float32ToBase64(float32: Float32Array): string {
 }
 
 /**
- * Simple linear downsampler to convert browser audio (e.g. 48kHz) to 16kHz for Gemini
+ * High-quality downsampler with anti-aliasing to prevent frequency artifacts
+ * Uses linear interpolation and averaging for better audio quality
  */
 function downsampleBuffer(
     buffer: Float32Array,
@@ -169,27 +236,37 @@ function downsampleBuffer(
     outputRate: number
 ): Float32Array {
     if (outputRate === inputRate) return buffer
+    
     const sampleRateRatio = inputRate / outputRate
     const newLength = Math.round(buffer.length / sampleRateRatio)
     const result = new Float32Array(newLength)
-    let offsetResult = 0
-    let offsetBuffer = 0
-    while (offsetResult < result.length) {
-        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio)
-        let accum = 0,
-            count = 0
-        for (
-            let i = offsetBuffer;
-            i < nextOffsetBuffer && i < buffer.length;
-            i++
-        ) {
-            accum += buffer[i]
+    
+    // Downsample with linear interpolation and averaging to prevent aliasing
+    for (let i = 0; i < newLength; i++) {
+        const srcIndex = i * sampleRateRatio
+        const srcIndexInt = Math.floor(srcIndex)
+        const fraction = srcIndex - srcIndexInt
+        
+        // Average multiple source samples for anti-aliasing (low-pass filter)
+        let sum = 0
+        let count = 0
+        const windowSize = Math.ceil(sampleRateRatio)
+        
+        for (let j = 0; j < windowSize && srcIndexInt + j < buffer.length; j++) {
+            sum += buffer[srcIndexInt + j]
             count++
         }
-        result[offsetResult] = count > 0 ? accum / count : 0
-        offsetResult++
-        offsetBuffer = nextOffsetBuffer
+        
+        const averaged = count > 0 ? sum / count : 0
+        
+        // Linear interpolation for smoothness
+        if (srcIndexInt + 1 < buffer.length && fraction > 0) {
+            result[i] = averaged * (1 - fraction * 0.5) + buffer[srcIndexInt + 1] * (fraction * 0.5)
+        } else {
+            result[i] = averaged
+        }
     }
+    
     return result
 }
 
@@ -276,8 +353,10 @@ const applyInlineFormatting = (
     const parts: (string | JSX.Element)[] = []
     let lastIndex = 0
 
+    // Improved regex with better URL detection
+    // Order matters: specific patterns (markdown links, HTML) before auto-detection
     const combinedRegex =
-        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^\s)]+)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|((?:https?:\/\/)?(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}|localhost)(?::\d+)?(?:(?:\/[^\s!"'(),.:;<>@[\]`{|}~]*)*)?))/gi
+        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|(https?:\/\/[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\].,;:!?)])|([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/[^\s<>"{}|\\^`\[\]]*)?(?=[.,;:!?)]*(?:\s|$)))/gi
 
     let match
     while ((match = combinedRegex.exec(textSegment)) !== null) {
@@ -303,7 +382,8 @@ const applyInlineFormatting = (
             htmlLinkUrl,
             htmlLinkText,
             email,
-            autoUrl,
+            httpUrl,
+            plainUrl,
         ] = match
 
         if (
@@ -374,16 +454,28 @@ const applyInlineFormatting = (
                     {email}
                 </a>
             )
-        } else if (autoUrl !== undefined) {
+        } else if (httpUrl !== undefined) {
             parts.push(
                 <a
-                    key={`${keyPrefix}-${match.index}-url`}
-                    href={ensureProtocol(autoUrl)}
+                    key={`${keyPrefix}-${match.index}-http`}
+                    href={httpUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {autoUrl}
+                    {httpUrl}
+                </a>
+            )
+        } else if (plainUrl !== undefined) {
+            parts.push(
+                <a
+                    key={`${keyPrefix}-${match.index}-url`}
+                    href={ensureProtocol(plainUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                >
+                    {plainUrl}
                 </a>
             )
         } else {
@@ -606,8 +698,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         systemPrompt,
         welcomeMessage = "Hi, how can I help?",
         placeholder,
-        additionalPlaceholders = [],
-        placeholderRotateInterval = 3,
         inputBarBackground,
         expandedInputAreaBackground,
         chatAreaBackground,
@@ -623,13 +713,14 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         loadingIconOverrideUrl,
         textFont = DEFAULT_FONT_INFO,
         style,
-        suggestedReply1 = "",
-        suggestedReply2 = "",
-        suggestedReply3 = "",
+        rotateSuggestions = true,
+        defaultSuggestions = [],
+        suggestionRotateInterval = 3,
         enableAiSuggestions = true,
         universalBorderRadius = 24,
         enableScrollReveal = true,
         enableGeminiLive = true,
+        interruptionThreshold = 0.01,
     } = props
 
     const baseFontSize =
@@ -750,6 +841,31 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         /* Start fading in IMMEDIATELY (no delay) to fill the void */
         animation: 0.2s ease-out both fade-in;
       }
+      
+      /* --- Mobile Backdrop Transition --- */
+      ::view-transition-group(mobile-backdrop) {
+        animation-duration: 0.2s;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      ::view-transition-new(mobile-backdrop) {
+        animation: 0.2s ease-out both fade-in;
+      }
+      
+      ::view-transition-old(mobile-backdrop) {
+        animation: 0.2s ease-out both fade-out;
+      }
+
+      /* --- Send/Call Button Morph --- */
+      ::view-transition-group(send-button-morph) {
+        animation-duration: 0.2s;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      ::view-transition-new(send-button-morph),
+      ::view-transition-old(send-button-morph) {
+        animation: none;
+      }
 
       @keyframes fade-out { 
         0% { opacity: 1; }
@@ -761,29 +877,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       }
   `
 
-    const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0)
     const isCanvas = RenderTarget.current() === RenderTarget.canvas
-
-    const allPlaceholders = [placeholder, ...additionalPlaceholders].filter(
-        (p) => p && p.trim() !== ""
-    )
-
-    useEffect(() => {
-        if (isCanvas || allPlaceholders.length <= 1) return
-        const intervalId = setInterval(
-            () => {
-                setCurrentPlaceholderIndex(
-                    (prev) => (prev + 1) % allPlaceholders.length
-                )
-            },
-            Math.max(1, placeholderRotateInterval) * 1000
-        )
-        return () => clearInterval(intervalId)
-    }, [allPlaceholders, placeholderRotateInterval, isCanvas])
-
-    const activePlaceholder = isCanvas
-        ? placeholder
-        : allPlaceholders[currentPlaceholderIndex] || placeholder
 
     const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(
         null
@@ -872,6 +966,41 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         return initialMessages
     })
     const [isLoading, setIsLoading] = useState<boolean>(false)
+    
+    // Rotating suggestions logic for collapsed placeholder
+    const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState(0)
+    
+    const allDefaultSuggestions = defaultSuggestions.filter(
+        (s) => s && s.trim() !== ""
+    )
+    
+    // Create rotation cycle: placeholder first, then suggestions
+    const rotationCycle = rotateSuggestions && allDefaultSuggestions.length > 0
+        ? [placeholder, ...allDefaultSuggestions]
+        : [placeholder]
+
+    // Cycle through placeholder + suggestions in collapsed view
+    useEffect(() => {
+        if (isCanvas || expanded || !rotateSuggestions || rotationCycle.length <= 1) return
+        
+        // Reset index when suggestions change
+        setCurrentSuggestionIndex(0)
+        
+        const intervalId = setInterval(
+            () => {
+                setCurrentSuggestionIndex(
+                    (prev) => (prev + 1) % rotationCycle.length
+                )
+            },
+            Math.max(1, suggestionRotateInterval) * 1000
+        )
+        return () => clearInterval(intervalId)
+    }, [rotationCycle.length, suggestionRotateInterval, isCanvas, rotateSuggestions, expanded])
+    
+    // Determine active placeholder text for collapsed view
+    const activePlaceholder = rotateSuggestions && rotationCycle.length > 1
+        ? rotationCycle[currentSuggestionIndex]
+        : placeholder
     const [error, setError] = useState<string>("")
     const [streamed, setStreamed] = useState<string>("")
     const [imageFile, setImageFile] = useState<File | null>(null)
@@ -925,18 +1054,58 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     )
 
     // -------------------------------------------------------------------------
-    // Gemini Live API Logic
+    // -------------------------------------------------------------------------
+    // Gemini Live API with Built-in Interruption Support
+    // -------------------------------------------------------------------------
+    // How interruption works:
+    // 1. We continuously stream user audio to the API (even while AI is talking)
+    // 2. The API has built-in VAD that automatically detects when user speaks
+    // 3. When the API detects interruption, it sends: { serverContent: { interrupted: true } }
+    // 4. We immediately stop all audio playback and discard the audio buffer
+    // 5. We continue streaming user audio so the API can process the new input
+    // 6. No manual signaling needed - the API handles everything!
     // -------------------------------------------------------------------------
     const [isLiveMode, setIsLiveMode] = useState(false)
     const [isLiveGenerating, setIsLiveGenerating] = useState(false)
+    const [userIsSpeaking, setUserIsSpeaking] = useState(false)
     const liveClientRef = useRef<WebSocket | null>(null)
     const liveAudioContextRef = useRef<AudioContext | null>(null)
     const liveInputStreamRef = useRef<MediaStream | null>(null)
     const liveProcessorRef = useRef<ScriptProcessorNode | null>(null)
     const liveSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
     const liveNextPlayTimeRef = useRef(0)
+    const activeAudioSourcesRef = useRef<AudioBufferSourceNode[]>([])
+    const lastUserSpeechTimeRef = useRef(0)
+    const lastTranscriptionTimeRef = useRef(0)
+    const transcriptionTimeoutRef = useRef<any>(null)
+    const suggestionsGeneratedForTurnRef = useRef(false)
+    const isUserMessageInProgressRef = useRef(false)
+    
+    // Use refs for real-time checks inside audio processor (avoid stale closure)
+    const isLiveGeneratingRef = useRef(false)
+    const userIsSpeakingRef = useRef(false)
+
+    // Stop all currently playing AI audio sources
+    // Called when the server sends interrupted: true
+    const stopAllAudio = useCallback(() => {
+        activeAudioSourcesRef.current.forEach(source => {
+            try {
+                source.stop()
+                source.disconnect()
+            } catch (e) {
+                // Source may already be stopped
+            }
+        })
+        activeAudioSourcesRef.current = []
+        
+        // Reset the play time so new audio starts immediately after interruption
+        if (liveAudioContextRef.current) {
+            liveNextPlayTimeRef.current = liveAudioContextRef.current.currentTime
+        }
+    }, [])
 
     const stopLiveSession = useCallback(() => {
+        stopAllAudio()
         if (liveClientRef.current) {
             liveClientRef.current.close()
             liveClientRef.current = null
@@ -959,13 +1128,98 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             liveAudioContextRef.current.close()
             liveAudioContextRef.current = null
         }
+        if (transcriptionTimeoutRef.current) {
+            clearTimeout(transcriptionTimeoutRef.current)
+            transcriptionTimeoutRef.current = null
+        }
         setIsLiveMode(false)
+        isLiveGeneratingRef.current = false
         setIsLiveGenerating(false)
-    }, [])
+        userIsSpeakingRef.current = false
+        setUserIsSpeaking(false)
+        suggestionsGeneratedForTurnRef.current = false
+        isUserMessageInProgressRef.current = false
+    }, [stopAllAudio])
+
+    const fetchAiSuggestions = useCallback(
+        async (lastAiMessageContent: string) => {
+            if (
+                !geminiApiKey ||
+                !enableAiSuggestions ||
+                !lastAiMessageContent.trim()
+            ) {
+                setAiGeneratedSuggestions([])
+                return
+            }
+            setAiGeneratedSuggestions([])
+
+            const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiMessageContent}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
+
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${SUGGESTION_MODEL_ID}:generateContent?key=${geminiApiKey}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: suggestionPrompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 100,
+                                stopSequences: ["\n\n"],
+                            },
+                        }),
+                    }
+                )
+
+                if (!response.ok) {
+                    setAiGeneratedSuggestions([])
+                    return
+                }
+
+                const data = await response.json()
+                const responseText =
+                    data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+
+                if (responseText) {
+                    try {
+                        const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
+                        if (jsonMatch && jsonMatch[0]) {
+                            const suggestionsArray = JSON.parse(jsonMatch[0])
+                            if (
+                                Array.isArray(suggestionsArray) &&
+                                suggestionsArray.every(
+                                    (s) => typeof s === "string"
+                                )
+                            ) {
+                                setAiGeneratedSuggestions(
+                                    suggestionsArray
+                                        .slice(0, 3)
+                                        .filter((s) => s.trim() !== "")
+                                )
+                            } else {
+                                setAiGeneratedSuggestions([])
+                            }
+                        } else {
+                            setAiGeneratedSuggestions([])
+                        }
+                    } catch (e) {
+                        setAiGeneratedSuggestions([])
+                    }
+                } else {
+                    setAiGeneratedSuggestions([])
+                }
+            } catch (e) {
+                setAiGeneratedSuggestions([])
+            }
+        },
+        [geminiApiKey, enableAiSuggestions]
+    )
 
     const startLiveSession = useCallback(async () => {
         if (!geminiApiKey) return
 
+        // UPDATED: Use the latest native audio preview model for genuine live experience
         const liveModel = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 
         try {
@@ -980,13 +1234,26 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             model: liveModel,
                             generationConfig: {
                                 responseModalities: ["AUDIO"],
+                                speechConfig: {
+                                    voiceConfig: {
+                                        prebuiltVoiceConfig: {
+                                            voiceName: "Puck"
+                                        }
+                                    }
+                                }
                             },
                             systemInstruction: {
                                 parts: [{ text: systemPrompt }],
                             },
-                            // FIX: Use empty object to enable transcription
-                            inputAudioTranscription: {},
-                            outputAudioTranscription: {},
+                            // Enable transcription - this uses Gemini's server-side native audio transcription
+                            // NOT on-device dictation. The gemini-2.5-flash-native-audio model has
+                            // significantly better transcription quality than older models
+                            inputAudioTranscription: {
+                                // Enable transcription of user input
+                            },
+                            outputAudioTranscription: {
+                                // Enable transcription of AI responses
+                            },
                         },
                     })
                 )
@@ -1005,25 +1272,62 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 liveNextPlayTimeRef.current = audioCtx.currentTime + 0.1
 
                 try {
-                    // Capture at system default rate (robust for Safari)
+                    // Capture with optimized settings for speech recognition
                     const stream = await navigator.mediaDevices.getUserMedia({
                         audio: {
+                            sampleRate: 16000, // Request 16kHz directly if possible
                             channelCount: 1,
-                            // Do NOT force sampleRate here
+                            echoCancellation: true,
+                            noiseSuppression: true, 
+                            autoGainControl: true,
+                            // Advanced constraints for better dictation quality
+                            latency: 0.01, // Low latency for real-time
                         },
                     })
                     liveInputStreamRef.current = stream
                     const source = audioCtx.createMediaStreamSource(stream)
                     liveSourceRef.current = source
 
-                    const processor = audioCtx.createScriptProcessor(4096, 1, 1)
+                    // Use larger buffer for better audio quality (8192 samples ~= 170ms at 48kHz)
+                    const processor = audioCtx.createScriptProcessor(8192, 1, 1)
                     liveProcessorRef.current = processor
+
+                    // Optional: Keep simple local VAD for UI feedback only (not for interruption control)
+                    let consecutiveSpeechFrames = 0
+                    const SPEECH_FRAMES_THRESHOLD = 2 // Reduced for faster response
 
                     processor.onaudioprocess = (e) => {
                         if (!liveClientRef.current) return
-                        const inputData = e.inputBuffer.getChannelData(0)
+                        let inputData = e.inputBuffer.getChannelData(0)
 
-                        // Downsample to 16kHz for Gemini Input
+                        // Send raw audio data - let Gemini handle noise/normalization
+                        // Browser constraints already handle basic echo cancellation and noise suppression
+
+                        // Voice Activity Detection for UI feedback only
+                        // We rely on Gemini's Server-Side VAD for actual interruption handling
+                        const isSpeaking = detectVoiceActivity(inputData, interruptionThreshold)
+                        
+                        if (isSpeaking) {
+                            consecutiveSpeechFrames++
+                            lastUserSpeechTimeRef.current = Date.now()
+                            
+                            // Update UI state to show "User is speaking"
+                            if (consecutiveSpeechFrames >= SPEECH_FRAMES_THRESHOLD && !userIsSpeakingRef.current) {
+                                userIsSpeakingRef.current = true
+                                setUserIsSpeaking(true)
+                            }
+                        } else {
+                            consecutiveSpeechFrames = 0
+                            // User stopped speaking after 500ms of silence
+                            if (userIsSpeakingRef.current && Date.now() - lastUserSpeechTimeRef.current > 500) {
+                                userIsSpeakingRef.current = false
+                                setUserIsSpeaking(false)
+                            }
+                        }
+
+                        // CRITICAL: Always stream audio to the API, even while AI is talking
+                        // This allows the API's built-in VAD to detect interruptions automatically
+                        // High-quality downsample to 16kHz for Gemini Input
                         const downsampledData = downsampleBuffer(
                             inputData,
                             audioCtx.sampleRate,
@@ -1032,6 +1336,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
                         const b64 = float32ToBase64(downsampledData)
 
+                        // Always send audio chunks - API needs continuous stream for interruption detection
                         if (ws.readyState === WebSocket.OPEN && b64.length > 0) {
                             ws.send(
                                 JSON.stringify({
@@ -1065,14 +1370,29 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         data = JSON.parse(event.data)
                     }
 
+                    if (data.serverContent?.interrupted) {
+                        console.log("🤖 Gemini Interrupted by Server")
+                        stopAllAudio()
+                        setIsLiveGenerating(false)
+                        // Clear any queued messages/audio that might be processing
+                        return
+                    }
+
                     if (data.serverContent?.modelTurn?.parts) {
+                        isLiveGeneratingRef.current = true
                         setIsLiveGenerating(true) // AI is actively generating content
+                        
+                        // Reset flags for this new AI turn
+                        suggestionsGeneratedForTurnRef.current = false
+                        isUserMessageInProgressRef.current = false // Ready for next user message
+                        
                         const parts = data.serverContent.modelTurn.parts
                         for (const part of parts) {
                             if (part.inlineData) {
                                 if (
                                     liveAudioContextRef.current &&
-                                    part.inlineData.data
+                                    part.inlineData.data &&
+                                    !data.serverContent?.turnComplete // Don't play if turn is complete (sometimes sent at end)
                                 ) {
                                     const audioCtx = liveAudioContextRef.current
                                     const float32 = base64ToFloat32Array(
@@ -1098,17 +1418,73 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     source.start(playTime)
                                     liveNextPlayTimeRef.current =
                                         playTime + buffer.duration
+                                    
+                                    // Track this source so we can stop it on interruption
+                                    activeAudioSourcesRef.current.push(source)
+                                    
+                                    // Clean up when done
+                                    source.onended = () => {
+                                        activeAudioSourcesRef.current = activeAudioSourcesRef.current.filter(s => s !== source)
+                                    }
                                 }
                             }
                         }
                     }
 
                     if (data.serverContent?.turnComplete) {
+                        isLiveGeneratingRef.current = false
                         setIsLiveGenerating(false) // Turn is complete
+                        
+                        // Clear transcription timeout since turn is officially complete
+                        if (transcriptionTimeoutRef.current) {
+                            clearTimeout(transcriptionTimeoutRef.current)
+                            transcriptionTimeoutRef.current = null
+                        }
+                        
+                        // Generate suggestions only if we haven't already from transcription timeout
+                        if (enableAiSuggestions && !suggestionsGeneratedForTurnRef.current) {
+                            setMessages((prev) => {
+                                const lastAssistantMsg = [...prev]
+                                    .reverse()
+                                    .find((m) => m.role === "assistant")
+                                
+                                if (lastAssistantMsg && typeof lastAssistantMsg.content === "string" && lastAssistantMsg.content.trim()) {
+                                    fetchAiSuggestions(lastAssistantMsg.content.trim())
+                                }
+                                return prev
+                            })
+                        }
                     }
 
                     if (data.serverContent?.outputTranscription?.text) {
                         const text = data.serverContent.outputTranscription.text
+                        
+                        // Track when transcription text arrives
+                        lastTranscriptionTimeRef.current = Date.now()
+                        
+                        // Clear existing timeout
+                        if (transcriptionTimeoutRef.current) {
+                            clearTimeout(transcriptionTimeoutRef.current)
+                        }
+                        
+                        // Set timeout to detect when transcription stops (800ms of no new text)
+                        transcriptionTimeoutRef.current = setTimeout(() => {
+                            // Transcription appears to be complete - generate suggestions now
+                            if (enableAiSuggestions && !suggestionsGeneratedForTurnRef.current) {
+                                setMessages((prev) => {
+                                    const lastAssistantMsg = [...prev]
+                                        .reverse()
+                                        .find((m) => m.role === "assistant")
+                                    
+                                    if (lastAssistantMsg && typeof lastAssistantMsg.content === "string" && lastAssistantMsg.content.trim()) {
+                                        fetchAiSuggestions(lastAssistantMsg.content.trim())
+                                        suggestionsGeneratedForTurnRef.current = true
+                                    }
+                                    return prev
+                                })
+                            }
+                        }, 800) // Wait 800ms after last text chunk to consider transcription complete
+                        
                         startTransition(() => {
                             setMessages((prev) => {
                                 const last = prev[prev.length - 1]
@@ -1132,15 +1508,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
                     if (data.serverContent?.inputTranscription?.text) {
                         const text = data.serverContent.inputTranscription.text
+                        
                         startTransition(() => {
                             setMessages((prev) => {
                                 const last = prev[prev.length - 1]
-                                // Coalesce if last message was user and content is string
-                                if (
-                                    last &&
-                                    last.role === "user" &&
-                                    typeof last.content === "string"
-                                ) {
+                                const isAppendingToExisting = last && last.role === "user" && typeof last.content === "string"
+                                
+                                // Clear suggestions when user starts NEW message (not appending)
+                                if (!isAppendingToExisting && !isUserMessageInProgressRef.current) {
+                                    setAiGeneratedSuggestions([])
+                                    isUserMessageInProgressRef.current = true
+                                }
+                                
+                                if (isAppendingToExisting) {
                                     return [
                                         ...prev.slice(0, -1),
                                         { ...last, content: last.content + text },
@@ -1166,12 +1546,14 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             }
 
             setIsLiveMode(true)
-            if (!expanded) handleExpand()
+            if (!expanded) {
+                startTransition(() => setExpanded(true))
+            }
         } catch (e) {
             console.error("Live Init Error", e)
             stopLiveSession()
         }
-    }, [geminiApiKey, model, expanded, stopLiveSession, systemPrompt])
+    }, [geminiApiKey, model, expanded, stopLiveSession, systemPrompt, interruptionThreshold, isLiveGenerating, userIsSpeaking, stopAllAudio, fetchAiSuggestions, enableAiSuggestions])
 
     const handleToggleLive = (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -1256,13 +1638,22 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
 
         if (expanded && isMobileView) {
+            // Capture current scroll position before locking
+            const scrollY = window.scrollY
             const originalBodyOverflow = document.body.style.overflow
+            const originalBodyPosition = document.body.style.position
+            const originalBodyTop = document.body.style.top
+            const originalBodyWidth = document.body.style.width
             const originalBodyTouchAction = document.body.style.touchAction
             const originalBodyPaddingRight = document.body.style.paddingRight
 
             const scrollbarWidth =
                 window.innerWidth - document.documentElement.clientWidth
 
+            // Lock body scroll by fixing position and offsetting by scroll amount
+            document.body.style.position = "fixed"
+            document.body.style.top = `-${scrollY}px`
+            document.body.style.width = "100%"
             document.body.style.overflow = "hidden"
             document.body.style.touchAction = "none"
             if (scrollbarWidth > 0) {
@@ -1270,89 +1661,21 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             }
 
             return () => {
+                // Restore original styles
+                document.body.style.position = originalBodyPosition
+                document.body.style.top = originalBodyTop
+                document.body.style.width = originalBodyWidth
                 document.body.style.overflow = originalBodyOverflow
                 document.body.style.touchAction = originalBodyTouchAction
                 if (scrollbarWidth > 0) {
                     document.body.style.paddingRight = originalBodyPaddingRight
                 }
+                
+                // Restore scroll position
+                window.scrollTo(0, scrollY)
             }
         }
     }, [expanded, isMobileView])
-
-    const fetchAiSuggestions = useCallback(
-        async (lastAiMessageContent: string) => {
-            if (
-                !geminiApiKey ||
-                !enableAiSuggestions ||
-                !lastAiMessageContent.trim()
-            ) {
-                setAiGeneratedSuggestions([])
-                return
-            }
-            setAiGeneratedSuggestions([])
-
-            const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiMessageContent}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
-
-            try {
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${SUGGESTION_MODEL_ID}:generateContent?key=${geminiApiKey}`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: suggestionPrompt }] }],
-                            generationConfig: {
-                                temperature: 0.7,
-                                maxOutputTokens: 100,
-                                stopSequences: ["\n\n"],
-                            },
-                        }),
-                    }
-                )
-
-                if (!response.ok) {
-                    setAiGeneratedSuggestions([])
-                    return
-                }
-
-                const data = await response.json()
-                const responseText =
-                    data.candidates?.[0]?.content?.parts?.[0]?.text || ""
-
-                if (responseText) {
-                    try {
-                        const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
-                        if (jsonMatch && jsonMatch[0]) {
-                            const suggestionsArray = JSON.parse(jsonMatch[0])
-                            if (
-                                Array.isArray(suggestionsArray) &&
-                                suggestionsArray.every(
-                                    (s) => typeof s === "string"
-                                )
-                            ) {
-                                setAiGeneratedSuggestions(
-                                    suggestionsArray
-                                        .slice(0, 3)
-                                        .filter((s) => s.trim() !== "")
-                                )
-                            } else {
-                                setAiGeneratedSuggestions([])
-                            }
-                        } else {
-                            setAiGeneratedSuggestions([])
-                        }
-                    } catch (e) {
-                        setAiGeneratedSuggestions([])
-                    }
-                } else {
-                    setAiGeneratedSuggestions([])
-                }
-            } catch (e) {
-                setAiGeneratedSuggestions([])
-            }
-        },
-        [geminiApiKey, enableAiSuggestions]
-    )
 
     const handleStopGeneration = useCallback(() => {
         if (abortControllerRef.current) {
@@ -1586,6 +1909,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         return () => {
             if (typeof window !== "undefined" && window.speechSynthesis) {
                 window.speechSynthesis.onvoiceschanged = null
+            }
+        }
+    }, [])
+
+    // Cleanup transcription timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (transcriptionTimeoutRef.current) {
+                clearTimeout(transcriptionTimeoutRef.current)
             }
         }
     }, [])
@@ -2408,12 +2740,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 : "14px",
     }
 
-    const staticSuggestedReplies = [
-        suggestedReply1,
-        suggestedReply2,
-        suggestedReply3,
-    ].filter((reply) => reply && reply.trim() !== "")
-
+    // Determine which suggestions to show in expanded view
     const commonSuggestionDisplayConditions =
         expanded && !isLoading && !imageFile
 
@@ -2424,7 +2751,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
     const showPropSuggestions =
         !showAiSuggestions &&
-        staticSuggestedReplies.length > 0 &&
+        allDefaultSuggestions.length > 0 &&
         messages.filter((m) => m.role === "user").length === 0 &&
         commonSuggestionDisplayConditions
 
@@ -2432,7 +2759,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     if (showAiSuggestions) {
         displayedSuggestions = aiGeneratedSuggestions
     } else if (showPropSuggestions) {
-        displayedSuggestions = staticSuggestedReplies
+        // Mobile: show all suggestions (up to 10)
+        // Desktop: show only first 3 to reduce visual clutter
+        displayedSuggestions = isMobileView 
+            ? allDefaultSuggestions 
+            : allDefaultSuggestions.slice(0, 3)
     }
 
     const showSuggestionsArea = displayedSuggestions.length > 0
@@ -2570,7 +2901,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         exit={{ opacity: 0 }}
                         transition={
                             supportsViewTransitions
-                                ? { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] }
+                                ? { duration: 0.2, ease: [0.4, 0.0, 0.2, 1] }
                                 : { duration: 0.25, ease: "easeOut" }
                         }
                         style={{
@@ -2581,7 +2912,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             bottom: 0,
                             background: "rgba(0, 0, 0, 0.7)",
                             zIndex: 999,
-                        }}
+                            viewTransitionName: "mobile-backdrop",
+                        } as CSSProperties & { viewTransitionName?: string }}
                         onClick={handleCollapse}
                     />
                 )}
@@ -3454,6 +3786,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         aria-label="Stop generation"
                                         onClick={handleStopGeneration}
                                         style={{
+                                            viewTransitionName: "send-button-morph",
                                             background: props.sendBgColor,
                                             border: "none",
                                             borderRadius: `${universalBorderRadius}px`,
@@ -3519,6 +3852,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             }
                                         }}
                                         style={{
+                                            viewTransitionName: "send-button-morph",
                                             background:
                                                 !input.trim() &&
                                                 !imageFile &&
@@ -3790,7 +4124,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             overflow: "hidden",
                                         }}
                                     >
-                                        {placeholder}
+                                        {activePlaceholder}
                                     </span>
                                 ) : (
                                     <motion.span
@@ -3907,6 +4241,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             cursor: !enableGeminiLive && !hasContent ? "not-allowed" : "pointer",
                             borderRadius: `${universalBorderRadius}px`,
                             opacity: !enableGeminiLive && !hasContent ? 0.5 : 1,
+                            viewTransitionName: "send-button-morph",
                         }}
                     >
                         {isLoading ? (
@@ -4051,6 +4386,17 @@ addPropertyControls(ChatOverlay, {
         defaultValue: true,
         description: "Enable Gemini Live voice calling. When off, call button is grayed out.",
     },
+    interruptionThreshold: {
+        type: ControlType.Number,
+        title: "Interruption Sensitivity",
+        defaultValue: 0.01,
+        min: 0.001,
+        max: 0.1,
+        step: 0.001,
+        displayStepper: true,
+        description: "Voice detection threshold for interrupting AI. Lower = more sensitive. Default: 0.01",
+        hidden: (props) => !props.enableGeminiLive,
+    },
     geminiApiKey: {
         type: ControlType.String,
         title: "Gemini API Key",
@@ -4094,30 +4440,9 @@ addPropertyControls(ChatOverlay, {
     },
     placeholder: {
         type: ControlType.String,
-        title: "Placeholder (Default)",
+        title: "Placeholder",
         defaultValue: "Ask anything",
-        description: "Initial placeholder text.",
-    },
-    additionalPlaceholders: {
-        type: ControlType.Array,
-        title: "Rotate Placeholders",
-        control: {
-            type: ControlType.String,
-            defaultValue: "New placeholder",
-        },
-        defaultValue: [],
-        maxCount: 10,
-        description: "Optional: Cycle through these additional placeholders.",
-    },
-    placeholderRotateInterval: {
-        type: ControlType.Number,
-        title: "Rotate Speed (s)",
-        defaultValue: 3,
-        min: 1,
-        max: 20,
-        step: 0.5,
-        displayStepper: true,
-        description: "Seconds between placeholder rotations.",
+        description: "Input field placeholder text.",
     },
     textFont: {
         type: ControlType.Font,
@@ -4135,32 +4460,39 @@ addPropertyControls(ChatOverlay, {
         },
         description: "Font size, weight, and style",
     },
+    rotateSuggestions: {
+        type: ControlType.Boolean,
+        title: "Rotate Suggestions",
+        defaultValue: true,
+        description: "Cycle placeholder text in collapsed view through suggestions.",
+    },
+    defaultSuggestions: {
+        type: ControlType.Array,
+        title: "Default Suggestions",
+        control: {
+            type: ControlType.String,
+            defaultValue: "New suggestion",
+        },
+        defaultValue: ["Quick facts", "Proven metrics", "Contact"],
+        maxCount: 10,
+        description: "Mobile: shows all; Desktop: shows first 3. Rotates as placeholder if enabled.",
+    },
+    suggestionRotateInterval: {
+        type: ControlType.Number,
+        title: "Rotate Speed (s)",
+        defaultValue: 3,
+        min: 1,
+        max: 20,
+        step: 0.5,
+        displayStepper: true,
+        description: "Seconds between placeholder text rotations.",
+        hidden: (props) => !props.rotateSuggestions,
+    },
     enableAiSuggestions: {
         type: ControlType.Boolean,
-        title: "Reply Suggestions",
+        title: "AI Reply Suggestions",
         defaultValue: true,
-        description: "Generate AI contextual follow-up replies.",
-    },
-    suggestedReply1: {
-        type: ControlType.String,
-        title: "Reply 1",
-        defaultValue: "Quick facts",
-        placeholder: "Enter suggestion text",
-        description: "(Optional) First static suggested reply.",
-    },
-    suggestedReply2: {
-        type: ControlType.String,
-        title: "Reply 2",
-        defaultValue: "Proven metrics",
-        placeholder: "Enter suggestion text",
-        description: "(Optional) Second static suggested reply.",
-    },
-    suggestedReply3: {
-        type: ControlType.String,
-        title: "Reply 3",
-        defaultValue: "Contact",
-        placeholder: "Enter suggestion text",
-        description: "(Optional) Third static suggested reply.",
+        description: "Generate 3 AI contextual follow-up replies.",
     },
     reasoningEffort: {
         type: ControlType.Enum,
