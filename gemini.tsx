@@ -120,6 +120,11 @@ const DEFAULT_FONT_INFO: FramerFontInfo = {
 
 const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
 const INLINE_MAX_BYTES = 20 * 1024 * 1024 // 20MB
+const MAX_INPUT_LENGTH = 1000 // Limit input characters
+const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
+const API_TIMEOUT_MS = 30000 // 30 seconds timeout
+const MAX_HISTORY_MESSAGES = 20 // Limit history context
+const DAILY_MESSAGE_LIMIT = 100 // Limit messages per day
 
 // Gemini Native Audio Output Rate
 const MODEL_OUTPUT_SAMPLE_RATE = 24000
@@ -824,7 +829,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         height: 100%;
         width: 100%;
         object-fit: cover; 
-        object-position: center; /* Keeps content centered while scaling */
+        object-position: bottom center; /* Keeps content anchored to bottom */
         overflow: clip;
       }
       
@@ -1052,6 +1057,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     const prevScrollY = useRef(
         typeof window !== "undefined" ? window.scrollY : 0
     )
+    const lastMessageTimeRef = useRef<number>(0)
 
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
@@ -1836,12 +1842,13 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             expanded &&
             (messages.length > 1 ||
                 streamed ||
-                aiGeneratedSuggestions.length > 0) &&
+                aiGeneratedSuggestions.length > 0 ||
+                error) &&
             messagesEndRef.current
         ) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
         }
-    }, [messages, streamed, expanded, aiGeneratedSuggestions])
+    }, [messages, streamed, expanded, aiGeneratedSuggestions, error])
 
     useEffect(() => {
         startTransition(() => {
@@ -1966,9 +1973,48 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
     async function sendMessage(overrideText?: string) {
         if (isLoading) return
-        setAiGeneratedSuggestions([])
 
         const textToSend = overrideText || input
+        if (textToSend.length > MAX_INPUT_LENGTH) {
+            setError(`Message too long (max ${MAX_INPUT_LENGTH} characters).`)
+            return
+        }
+
+        // Daily Limit Check
+        if (typeof window !== "undefined" && window.localStorage) {
+            try {
+                const today = new Date().toISOString().split("T")[0]
+                const stored = localStorage.getItem("gemini-daily-usage")
+                let usage = { date: today, count: 0 }
+                
+                if (stored) {
+                    const parsed = JSON.parse(stored)
+                    if (parsed.date === today) {
+                        usage = parsed
+                    }
+                }
+
+                if (usage.count >= DAILY_MESSAGE_LIMIT) {
+                    setError("Daily message limit reached. Please try again at 12AM.")
+                    return
+                }
+
+                // Increment and save (optimistically)
+                usage.count++
+                localStorage.setItem("gemini-daily-usage", JSON.stringify(usage))
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+        }
+
+        const now = Date.now()
+        if (now - lastMessageTimeRef.current < MESSAGE_RATE_LIMIT_MS) {
+            return
+        }
+        lastMessageTimeRef.current = now
+
+        setAiGeneratedSuggestions([])
+
         const imageFileToSend = overrideText ? null : imageFile
         const attachmentFileToSend = overrideText ? null : attachmentFile
         const recordedAudioBlobToSend = overrideText
@@ -2088,7 +2134,10 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
         startTransition(() => {
             setMessages((prev) => [...prev, newUserMessage])
-            setInput("")
+            // Only clear input if we did NOT use an override text (which means it came from the input bar)
+            if (!overrideText) {
+                setInput("")
+            }
 
             if (
                 overrideText ||
@@ -2125,7 +2174,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 (m) => m.role === "user" || m.role === "assistant"
             ),
             newUserMessage,
-        ]
+        ].slice(-MAX_HISTORY_MESSAGES)
 
         const geminiContents = await Promise.all(
             chatHistoryForApi.map(async (msg) => {
@@ -2332,7 +2381,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}&alt=sse`
 
-            const response = await fetch(url, {
+            const fetchPromise = fetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -2340,6 +2389,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 body: JSON.stringify(geminiPayload),
                 signal,
             })
+
+            const timeoutPromise = new Promise<Response>((_, reject) => {
+                const id = setTimeout(() => {
+                    clearTimeout(id)
+                    reject(new Error("Request timed out"))
+                }, API_TIMEOUT_MS)
+            })
+
+            const response = await Promise.race([fetchPromise, timeoutPromise])
 
             if (!response.ok) {
                 let errMsg = `API error: ${response.status}`
@@ -2707,7 +2765,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         },
         closed: {
             opacity: supportsViewTransitions ? 1 : 0,
-            y: isMobileView ? (supportsViewTransitions ? 0 : "100%") : supportsViewTransitions ? 0 : 60,
+            y: 0,
             x:
                 finalPosStylesToApply.left === "50%" && !isMobileView
                     ? "-50%"
@@ -2996,21 +3054,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         data-layer="messages-scroll-container"
                         style={messagesScrollContainerStyle}
                     >
-                        {error && (
-                            <div
-                                style={{
-                                    ...errorFontStyle,
-                                    padding: 12,
-                                    background: "rgba(255,0,0,0.1)",
-                                    color: "rgb(180,0,0)",
-                                    borderRadius: "8px",
-                                    wordWrap: "break-word",
-                                    textAlign: "left",
-                                }}
-                            >
-                                {error}
-                            </div>
-                        )}
                         {messages
                             .filter((m) => m.role !== "system")
                             .map((message, msgIndex) => {
@@ -3401,6 +3444,42 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+                        {error && (
+                            <div
+                                style={{
+                                    alignSelf: "flex-end",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-end",
+                                    maxWidth: "90%",
+                                    marginTop: 12,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        maxWidth: 336,
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        background: "rgba(255,0,0,0.1)",
+                                        borderRadius: `${universalBorderRadius}px`,
+                                        display: "inline-flex",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            ...globalFontStyles,
+                                            color: "rgb(180,0,0)",
+                                            wordWrap: "break-word",
+                                            whiteSpace: "pre-wrap",
+                                        }}
+                                    >
+                                        {error}
+                                    </div>
+                                </div>
                             </div>
                         )}
                         <div ref={messagesEndRef} style={{ height: 1 }} />
