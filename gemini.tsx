@@ -2579,7 +2579,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 video.src = url
                 video.muted = true
                 video.playsInline = true as any
-                video.currentTime = 0
                 const capture = () => {
                     const canvas = document.createElement("canvas")
                     const w = 320
@@ -2600,18 +2599,23 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 } catch {}
                             return dataUrl
                         })
-                        setImageFile(file)
-                        setAttachmentFile(null)
+                        setAttachmentFile(file)
+                        setImageFile(null)
                         setAttachmentPreview(null)
                         try {
                             URL.revokeObjectURL(url)
                         } catch {}
                     }
                 }
-                video.onloadeddata = () => capture()
+                video.onloadedmetadata = () => {
+                    // Seek to 1s to avoid black first frame
+                    video.currentTime = 1.0
+                }
+                video.onseeked = () => capture()
                 video.onerror = () => {
                     setAttachmentFile(file)
                     setAttachmentPreview({ name: file.name, type: file.type })
+                    setImagePreviewUrl("")
                     try {
                         URL.revokeObjectURL(url)
                     } catch {}
@@ -2619,6 +2623,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             } catch {
                 setAttachmentFile(file)
                 setAttachmentPreview({ name: file.name, type: file.type })
+                setImagePreviewUrl("")
             }
         } else {
             setAttachmentFile(file)
@@ -2738,6 +2743,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     const finalDesktopPosStyle: CSSProperties = {
         width: 760,
         height: 540,
+        maxHeight: "calc(100vh - 48px)",
         bottom: `${expandedViewBottomOffset}px`,
         left: "50%",
         borderRadius: `${universalBorderRadius}px`,
@@ -3563,7 +3569,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     flexGrow: 1,
                                 }}
                             >
-                                {imageFile && imagePreviewUrl && (
+                                {(imageFile || (attachmentFile && attachmentFile.type.startsWith("video/"))) &&
+                                    imagePreviewUrl && (
                                     <div
                                         data-layer="image-preview-expanded-input"
                                         style={{
@@ -3572,6 +3579,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             width: 48,
                                             height: 48,
                                             flexShrink: 0,
+                                            marginTop: 6,
+                                            marginRight: 0,
                                         }}
                                     >
                                         <img
@@ -3580,7 +3589,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             style={{
                                                 width: "100%",
                                                 height: "100%",
-                                                objectFit: "contain",
+                                                objectFit: "cover",
                                                 borderRadius: 12,
                                                 outline:
                                                     "1px solid rgba(0,0,0,0.2)",
