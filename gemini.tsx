@@ -3633,20 +3633,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 )}
                                 {!imageFile && attachmentPreview && (
                                     <div
-                                        data-layer="files"
-                                        className="Files"
+                                        data-layer="file-attachment"
+                                        className="FileAttachment"
                                         style={{
+                                            width: 240,
                                             height: 48,
-                                            paddingTop: 7,
-                                            paddingBottom: 7,
-                                            paddingRight: 12,
+                                            marginTop: 8,
+                                            padding: 0,
                                             position: "relative",
                                             background: "#EEF0F2",
                                             borderRadius: 14,
                                             justifyContent: "flex-start",
                                             alignItems: "center",
-                                            gap: 8,
-                                            display: "inline-flex",
+                                            display: "flex",
                                         }}
                                     >
                                         <div
@@ -3684,13 +3683,18 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         </div>
                                         <div
                                             data-svg-wrapper
-                                            data-layer="Frame 47412"
-                                            className="Frame47412"
-                                            style={{ position: "relative" }}
+                                            data-layer="file-icon"
+                                            className="FileIcon"
+                                            style={{
+                                                position: "relative",
+                                                width: 48,
+                                                height: 48,
+                                                flexShrink: 0,
+                                            }}
                                         >
                                             <svg
-                                                width="49"
-                                                height="49"
+                                                width="100%"
+                                                height="100%"
                                                 viewBox="0 0 49 49"
                                                 fill="none"
                                                 xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
@@ -3713,45 +3717,49 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             </svg>
                                         </div>
                                         <div
-                                            data-layer="Frame 47417"
-                                            className="Frame47417"
+                                            data-layer="file-info"
+                                            className="FileInfo"
                                             style={{
+                                                display: "flex",
                                                 flexDirection: "column",
-                                                justifyContent: "flex-start",
+                                                justifyContent: "center",
                                                 alignItems: "flex-start",
-                                                display: "inline-flex",
+                                                overflow: "hidden",
+                                                flex: 1,
+                                                paddingLeft: 12,
+                                                paddingRight: 12,
                                             }}
                                         >
                                             <div
-                                                data-layer="fileName"
-                                                className="Filename"
+                                                data-layer="file-name"
+                                                className="FileName"
                                                 style={{
-                                                    justifyContent: "center",
-                                                    display: "flex",
-                                                    flexDirection: "column",
                                                     color: "rgba(0, 0, 0, 0.95)",
-                                                    fontSize: 14,
+                                                    fontSize: 13,
                                                     fontFamily: "Inter",
-                                                    fontWeight: "400",
-                                                    lineHeight: 21,
-                                                    wordWrap: "break-word",
+                                                    fontWeight: 500,
+                                                    lineHeight: "16px",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    width: "100%",
                                                 }}
                                             >
                                                 {attachmentPreview.name}
                                             </div>
                                             <div
-                                                data-layer="fileType"
-                                                className="Filetype"
+                                                data-layer="file-type"
+                                                className="FileType"
                                                 style={{
-                                                    justifyContent: "center",
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    color: "rgba(0, 0, 0, 0.45)",
-                                                    fontSize: 14,
+                                                    color: "rgba(0, 0, 0, 0.65)",
+                                                    fontSize: 11,
                                                     fontFamily: "Inter",
-                                                    fontWeight: "400",
-                                                    lineHeight: 21,
-                                                    wordWrap: "break-word",
+                                                    fontWeight: 400,
+                                                    lineHeight: "14px",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    width: "100%",
                                                 }}
                                             >
                                                 {(
@@ -3761,46 +3769,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                     .split("/")[1]
                                                     ?.toUpperCase() || "FILE"}
                                             </div>
-                                        </div>
-                                        <div
-                                            data-svg-wrapper
-                                            data-layer="Frame 47418"
-                                            className="Frame47418"
-                                            style={{
-                                                left: 145,
-                                                top: -6,
-                                                position: "absolute",
-                                            }}
-                                        >
-                                            <svg
-                                                width="23"
-                                                height="23"
-                                                viewBox="0 0 23 23"
-                                                fill="none"
-                                                xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"
-                                            >
-                                                <rect
-                                                    x="2.3125"
-                                                    y="2.17773"
-                                                    width="19"
-                                                    height="19"
-                                                    rx="9.5"
-                                                    fill="black"
-                                                />
-                                                <rect
-                                                    x="2.3125"
-                                                    y="2.17773"
-                                                    width="19"
-                                                    height="19"
-                                                    rx="9.5"
-                                                    stroke="white"
-                                                    strokeWidth="3"
-                                                />
-                                                <path
-                                                    d="M10.9556 11.7253C10.9819 11.699 10.9819 11.6564 10.9556 11.6301L8.9801 9.65459C8.75663 9.43112 8.75663 9.06881 8.9801 8.84534C9.20357 8.62187 9.56589 8.62187 9.78936 8.84534L11.7649 10.8209C11.7912 10.8472 11.8338 10.8472 11.8601 10.8209L13.8356 8.84534C14.0591 8.62187 14.4214 8.62187 14.6449 8.84534C14.8684 9.06881 14.8684 9.43112 14.6449 9.65459L12.6694 11.6301C12.6431 11.6564 12.6431 11.699 12.6694 11.7253L14.6449 13.7009C14.8684 13.9243 14.8684 14.2867 14.6449 14.5101C14.4214 14.7336 14.0591 14.7336 13.8356 14.5101L11.8601 12.5346C11.8338 12.5083 11.7912 12.5083 11.7649 12.5346L9.78936 14.5101C9.56589 14.7336 9.20357 14.7336 8.9801 14.5101C8.75663 14.2867 8.75663 13.9243 8.9801 13.7009L10.9556 11.7253Z"
-                                                    fill="white"
-                                                />
-                                            </svg>
                                         </div>
                                     </div>
                                 )}
