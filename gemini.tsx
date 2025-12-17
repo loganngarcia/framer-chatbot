@@ -820,6 +820,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         overflow: hidden;
         border-radius: ${universalBorderRadius}px;
+        z-index: 10;
       }
 
       /* 2. The Content Snapshots (Pill vs Card) */
@@ -829,16 +830,17 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         height: 100%;
         width: 100%;
         object-fit: cover; 
-        object-position: bottom center; /* Keeps content anchored to bottom */
+        object-position: center; /* Keeps content centered while scaling */
         overflow: clip;
+        mix-blend-mode: plus-lighter;
       }
       
       /* 3. Animation Timing - Overlap them to prevent "empty/clipped" look */
       
       /* Old content (Disappearing) */
       ::view-transition-old(chat-overlay-morph) {
-        /* Fade out faster to match total duration */
-        animation: 0.1s ease-out both fade-out;
+        /* Fade out matching the new content fade in to maintain opacity via plus-lighter */
+        animation: 0.2s ease-out both fade-out;
       }
 
       /* New content (Appearing) */
@@ -847,24 +849,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         animation: 0.2s ease-out both fade-in;
       }
       
-      /* --- Mobile Backdrop Transition --- */
-      ::view-transition-group(mobile-backdrop) {
-        animation-duration: 0.2s;
-        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      
-      ::view-transition-new(mobile-backdrop) {
-        animation: 0.2s ease-out both fade-in;
-      }
-      
-      ::view-transition-old(mobile-backdrop) {
-        animation: 0.2s ease-out both fade-out;
-      }
-
       /* --- Send/Call Button Morph --- */
       ::view-transition-group(send-button-morph) {
         animation-duration: 0.2s;
         animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 20;
       }
 
       ::view-transition-new(send-button-morph),
@@ -1028,6 +1017,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             ? window.innerWidth < DESKTOP_BREAKPOINT
             : false
     )
+
+    // Enable view transitions if supported
+    const supportsViewTransitions =
+        typeof document !== "undefined" &&
+        "startViewTransition" in document
     const [selectedVoice, setSelectedVoice] =
         useState<SpeechSynthesisVoice | null>(null)
 
@@ -1553,7 +1547,32 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
             setIsLiveMode(true)
             if (!expanded) {
-                startTransition(() => setExpanded(true))
+                // Calculate expanded offset logic (copied from handleExpand)
+                if (inputBarRef.current && typeof window !== "undefined") {
+                    const rect = inputBarRef.current.getBoundingClientRect()
+                    const distanceFromViewportBottom =
+                        window.innerHeight - rect.bottom
+                    setExpandedViewBottomOffset(
+                        Math.max(distanceFromViewportBottom, 16)
+                    )
+                } else {
+                    setExpandedViewBottomOffset(DEFAULT_EXPANDED_BOTTOM_OFFSET)
+                }
+
+                // Use View Transitions API if available
+                if (
+                    typeof document !== "undefined" &&
+                    "startViewTransition" in document &&
+                    supportsViewTransitions
+                ) {
+                    ;(document as any).startViewTransition(() => {
+                        flushSync(() => {
+                            setExpanded(true)
+                        })
+                    })
+                } else {
+                    startTransition(() => setExpanded(true))
+                }
             }
         } catch (e) {
             console.error("Live Init Error", e)
@@ -1702,10 +1721,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         }
 
         // Check for browser support
-        if (
-            typeof document !== "undefined" &&
-            "startViewTransition" in document
-        ) {
+        if (supportsViewTransitions) {
             ;(document as any).startViewTransition(() => {
                 // FORCE synchronous update so browser captures the new state immediately
                 flushSync(() => {
@@ -1730,10 +1746,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             setExpandedViewBottomOffset(DEFAULT_EXPANDED_BOTTOM_OFFSET)
         }
 
-        if (
-            typeof document !== "undefined" &&
-            "startViewTransition" in document
-        ) {
+        if (supportsViewTransitions) {
             ;(document as any).startViewTransition(() => {
                 flushSync(() => {
                     setExpanded(true)
@@ -2748,9 +2761,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     else if (alpha <= 0.84) backdropBlurValue = "24px"
     else if (alpha <= 0.94) backdropBlurValue = "16px"
 
-    const supportsViewTransitions =
-        typeof document !== "undefined" && "startViewTransition" in document
-
     const overlayVariants = {
         open: {
             opacity: 1,
@@ -2765,7 +2775,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         },
         closed: {
             opacity: supportsViewTransitions ? 1 : 0,
-            y: 0,
+            y: isMobileView ? (supportsViewTransitions ? 0 : "100%") : supportsViewTransitions ? 0 : 60,
             x:
                 finalPosStylesToApply.left === "50%" && !isMobileView
                     ? "-50%"
@@ -2949,7 +2959,17 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
     if (expanded) {
         return (
-            <Fragment>
+            <div
+                style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 99999,
+                    pointerEvents: "none",
+                }}
+            >
                 <style>{markdownStyles}</style>
                 {isMobileView && (
                     <motion.div
@@ -2963,15 +2983,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 : { duration: 0.25, ease: "easeOut" }
                         }
                         style={{
-                            position: "fixed",
+                            position: "absolute",
                             top: 0,
                             left: 0,
                             right: 0,
                             bottom: 0,
                             background: "rgba(0, 0, 0, 0.7)",
-                            zIndex: 999,
-                            viewTransitionName: "mobile-backdrop",
-                        } as CSSProperties & { viewTransitionName?: string }}
+                            zIndex: 1,
+                            pointerEvents: "auto",
+                        }}
                         onClick={handleCollapse}
                     />
                 )}
@@ -2979,7 +2999,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                     ref={expandedOverlayRef}
                     data-layer="expanded-chat-overlay-root"
                     variants={overlayVariants}
-                    initial="closed"
+                    initial={
+                        isMobileView
+                            ? { opacity: 1, y: 12, x: "0%" }
+                            : "closed"
+                    }
                     animate={expanded ? "open" : "closed"}
                     drag="y"
                     dragControls={dragControls}
@@ -2998,8 +3022,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                     }}
                     style={{
                         ...finalPosStylesToApply,
-                        position: "fixed",
-                        zIndex: 1000,
+                        position: "absolute",
+                        zIndex: 2,
+                        pointerEvents: "auto",
                         display: "flex",
                         flexDirection: "column",
                         background: chatAreaBackground,
@@ -3010,7 +3035,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             : "none",
                         overflow: "hidden",
                         maxWidth: "100vw",
-                        viewTransitionName: "chat-overlay-morph",
+                        viewTransitionName: supportsViewTransitions
+                            ? "chat-overlay-morph"
+                            : undefined,
                     } as CSSProperties & { viewTransitionName?: string }}
                 >
                     <div
@@ -3865,7 +3892,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         aria-label="Stop generation"
                                         onClick={handleStopGeneration}
                                         style={{
-                                            viewTransitionName: "send-button-morph",
+                                            viewTransitionName: supportsViewTransitions ? "send-button-morph" : undefined,
                                             background: props.sendBgColor,
                                             border: "none",
                                             borderRadius: `${universalBorderRadius}px`,
@@ -3931,7 +3958,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             }
                                         }}
                                         style={{
-                                            viewTransitionName: "send-button-morph",
+                                            viewTransitionName: supportsViewTransitions ? "send-button-morph" : undefined,
                                             background:
                                                 !input.trim() &&
                                                 !imageFile &&
@@ -4065,7 +4092,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                       [data-layer="text-image-input-area"]::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
                   `}</style>
                 </motion.div>
-            </Fragment>
+            </div>
         )
     }
 
@@ -4123,9 +4150,10 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         : supportsViewTransitions
                           ? "opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)"
                           : "opacity 0.25s ease-out",
-                    viewTransitionName: expanded
-                        ? "none"
-                        : "chat-overlay-morph",
+                    viewTransitionName:
+                        !expanded && supportsViewTransitions
+                            ? "chat-overlay-morph"
+                            : "none",
                     ...style,
                 } as CSSProperties & { viewTransitionName?: string }}
                 onClick={(e) => {
@@ -4320,7 +4348,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             cursor: !enableGeminiLive && !hasContent ? "not-allowed" : "pointer",
                             borderRadius: `${universalBorderRadius}px`,
                             opacity: !enableGeminiLive && !hasContent ? 0.5 : 1,
-                            viewTransitionName: "send-button-morph",
+                            viewTransitionName: supportsViewTransitions ? "send-button-morph" : undefined,
                         }}
                     >
                         {isLoading ? (
