@@ -75,6 +75,9 @@ interface ChatOverlayProps {
     enableScrollReveal?: boolean
     enableGeminiLive?: boolean
     interruptionThreshold?: number
+    allowImages?: boolean
+    allowVideos?: boolean
+    allowDocuments?: boolean
 }
 
 interface Message {
@@ -86,7 +89,11 @@ interface Message {
               | { type: "image_url"; image_url: { url: string } }
               | {
                     type: "inline_data"
-                    inline_data: { mimeType: string; data: string }
+                    inline_data: {
+                        mimeType: string
+                        data: string
+                        name?: string // Persist name for UI
+                    }
                 }
               | {
                     type: "file"
@@ -118,6 +125,8 @@ const DEFAULT_FONT_INFO: FramerFontInfo = {
     textAlign: "left",
 }
 
+// User abuse guardrails
+// These are designed to prevent abuse and ensure the API is used responsibly
 const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
 const INLINE_MAX_BYTES = 20 * 1024 * 1024 // 20MB
 const MAX_INPUT_LENGTH = 1000 // Limit input characters
@@ -125,6 +134,7 @@ const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
 const API_TIMEOUT_MS = 30000 // 30 seconds timeout
 const MAX_HISTORY_MESSAGES = 20 // Limit history context
 const DAILY_MESSAGE_LIMIT = 100 // Limit messages per day
+const MAX_UPLOAD_SIZE_MB = 10 // Max upload size in MB
 
 // Gemini Native Audio Output Rate
 const MODEL_OUTPUT_SAMPLE_RATE = 24000
@@ -726,6 +736,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         enableScrollReveal = true,
         enableGeminiLive = true,
         interruptionThreshold = 0.01,
+        allowImages = true,
+        allowVideos = false,
+        allowDocuments = false,
     } = props
 
     const baseFontSize =
@@ -943,6 +956,29 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     }
 
     const [input, setInput] = useState<string>("")
+
+    const acceptedFileTypes = [
+        ...(allowImages ? ["image/*"] : []),
+        ...(allowVideos ? ["video/*"] : []),
+        ...(allowDocuments
+            ? [
+                  "audio/*",
+                  ".pdf",
+                  ".txt",
+                  ".md",
+                  ".doc",
+                  ".docx",
+                  ".ppt",
+                  ".pptx",
+                  ".csv",
+                  ".json",
+                  ".xml",
+                  "application/*",
+              ]
+            : []),
+    ].join(",")
+
+    const showAttachmentButton = allowImages || allowVideos || allowDocuments
     const [expanded, setExpanded] = useState<boolean>(false)
     const [messages, setMessages] = useState<Message[]>(() => {
         const initialMessages: Message[] = [
@@ -2138,7 +2174,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             userContentForState = textToSend
         }
 
-        const newUserMessage: Message = {
+        const optimisticUserMessage: Message = {
             role: "user",
             content: userContentForState,
         }
@@ -2146,7 +2182,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         const currentMessagesSnapshot = messages
 
         startTransition(() => {
-            setMessages((prev) => [...prev, newUserMessage])
+            setMessages((prev) => [...prev, optimisticUserMessage])
             // Only clear input if we did NOT use an override text (which means it came from the input bar)
             if (!overrideText) {
                 setInput("")
@@ -2159,7 +2195,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                 recordedAudioBlobToSend
             ) {
                 setImageFile(null)
+                setImagePreviewUrl("")
                 setAttachmentFile(null)
+                setAttachmentPreview(null)
                 if (recordedAudioUrl) {
                     try {
                         URL.revokeObjectURL(recordedAudioUrl)
@@ -2177,6 +2215,137 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                     })
             }, 0)
         })
+
+        // Resolve attachments/audio for persistence and API
+        let finalContent = userContentForState
+        if (attachmentFileToSend) {
+            try {
+                if (attachmentFileToSend.size <= INLINE_MAX_BYTES) {
+                    const b64 = await new Promise<string>((resolve, reject) => {
+                        const fr = new FileReader()
+                        fr.onload = () => {
+                            const res = fr.result as string
+                            resolve(res.substring(res.indexOf(",") + 1))
+                        }
+                        fr.onerror = reject
+                        fr.readAsDataURL(attachmentFileToSend)
+                    })
+                    finalContent = (userContentForState as any[]).map((p) => {
+                        if (
+                            p.type === "file" &&
+                            p.file.uri === "local:attachment"
+                        ) {
+                            return {
+                                type: "inline_data",
+                                inline_data: {
+                                    mimeType:
+                                        attachmentFileToSend.type ||
+                                        "application/octet-stream",
+                                    data: b64,
+                                    name: attachmentFileToSend.name,
+                                },
+                            }
+                        }
+                        return p
+                    })
+                } else {
+                    const uploaded =
+                        await uploadFileToGemini(attachmentFileToSend)
+                    if (uploaded?.uri) {
+                        finalContent = (userContentForState as any[]).map(
+                            (p) => {
+                                if (
+                                    p.type === "file" &&
+                                    p.file.uri === "local:attachment"
+                                ) {
+                                    return {
+                                        type: "file",
+                                        file: {
+                                            uri: uploaded.uri,
+                                            mimeType:
+                                                uploaded.mimeType ||
+                                                attachmentFileToSend.type,
+                                            name: uploaded.name,
+                                        },
+                                    }
+                                }
+                                return p
+                            }
+                        )
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to resolve attachment", e)
+            }
+        } else if (recordedAudioBlobToSend) {
+            try {
+                if (recordedAudioBlobToSend.size <= INLINE_MAX_BYTES) {
+                    const arrayBuf = await recordedAudioBlobToSend.arrayBuffer()
+                    const b64 = btoa(
+                        String.fromCharCode(...new Uint8Array(arrayBuf))
+                    )
+                    finalContent = (userContentForState as any[]).map((p) => {
+                        if (
+                            p.type === "file" &&
+                            p.file.uri === "local:recording"
+                        ) {
+                            return {
+                                type: "inline_data",
+                                inline_data: {
+                                    mimeType: "audio/webm",
+                                    data: b64,
+                                    name: "recording.webm",
+                                },
+                            }
+                        }
+                        return p
+                    })
+                } else {
+                    const f = new File(
+                        [recordedAudioBlobToSend],
+                        "recording.webm",
+                        { type: "audio/webm" }
+                    )
+                    const uploaded = await uploadFileToGemini(f)
+                    if (uploaded?.uri) {
+                        finalContent = (userContentForState as any[]).map(
+                            (p) => {
+                                if (
+                                    p.type === "file" &&
+                                    p.file.uri === "local:recording"
+                                ) {
+                                    return {
+                                        type: "file",
+                                        file: {
+                                            uri: uploaded.uri,
+                                            mimeType: "audio/webm",
+                                        },
+                                    }
+                                }
+                                return p
+                            }
+                        )
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to resolve recording", e)
+            }
+        }
+
+        const newUserMessage: Message = {
+            role: "user",
+            content: finalContent,
+        }
+
+        if (finalContent !== userContentForState) {
+            startTransition(() => {
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m === optimisticUserMessage ? newUserMessage : m
+                    )
+                )
+            })
+        }
 
         const systemInstructionMessage = currentMessagesSnapshot.find(
             (msg) => msg.role === "system"
@@ -2199,6 +2368,14 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         msg.content.map(async (part) => {
                             if (part.type === "text") {
                                 return { text: part.text }
+                            }
+                            if (part.type === "inline_data") {
+                                return {
+                                    inlineData: {
+                                        mimeType: part.inline_data.mimeType,
+                                        data: part.inline_data.data,
+                                    },
+                                }
                             }
                             if (
                                 part.type === "image_url" &&
@@ -2566,6 +2743,31 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             setImageFile(null)
             setAttachmentFile(null)
             setAttachmentPreview(null)
+            return
+        }
+
+        const isImage = file.type.startsWith("image/")
+        const isVideo = file.type.startsWith("video/")
+
+        if (isImage && !allowImages) {
+            setError("Images are not allowed.")
+            if (fileInputRef.current) fileInputRef.current.value = ""
+            return
+        }
+        if (isVideo && !allowVideos) {
+            setError("Videos are not allowed.")
+            if (fileInputRef.current) fileInputRef.current.value = ""
+            return
+        }
+        if (!isImage && !isVideo && !allowDocuments) {
+            setError("Documents are not allowed.")
+            if (fileInputRef.current) fileInputRef.current.value = ""
+            return
+        }
+
+        if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+            setError(`File size exceeds ${MAX_UPLOAD_SIZE_MB}MB limit.`)
+            if (fileInputRef.current) fileInputRef.current.value = ""
             return
         }
         if (file.type.startsWith("image/")) {
@@ -3116,6 +3318,43 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                             | undefined
                                     )?.image_url.url
 
+                                    const userFile = userContentParts.find(
+                                        (item) =>
+                                            item.type === "file" ||
+                                            item.type === "inline_data"
+                                    ) as
+                                        | {
+                                              type: "file"
+                                              file: {
+                                                  uri: string
+                                                  name?: string
+                                                  mimeType?: string
+                                              }
+                                          }
+                                        | {
+                                              type: "inline_data"
+                                              inline_data: {
+                                                  mimeType: string
+                                                  data: string
+                                                  name?: string
+                                              }
+                                          }
+                                        | undefined
+
+                                    const fileName =
+                                        userFile?.type === "file"
+                                            ? userFile.file.name
+                                            : userFile?.type === "inline_data"
+                                              ? userFile.inline_data.name
+                                              : undefined
+
+                                    const fileMimeType =
+                                        userFile?.type === "file"
+                                            ? userFile.file.mimeType
+                                            : userFile?.type === "inline_data"
+                                              ? userFile.inline_data.mimeType
+                                              : undefined
+
                                     const userTextContent =
                                         (
                                             userContentParts.find(
@@ -3153,6 +3392,119 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                     src={userImageURL}
                                                     alt="User upload"
                                                 />
+                                            )}
+                                            {userFile && (
+                                                <div
+                                                    data-layer="user-sent-file"
+                                                    className="FileAttachment"
+                                                    style={{
+                                                        width: 240,
+                                                        height: 48,
+                                                        padding: 0,
+                                                        position: "relative",
+                                                        background: "#EEF0F2",
+                                                        borderRadius: 14,
+                                                        justifyContent: "flex-start",
+                                                        alignItems: "center",
+                                                        display: "flex",
+                                                    }}
+                                                >
+                                                    <div
+                                                        data-svg-wrapper
+                                                        data-layer="file-icon"
+                                                        className="FileIcon"
+                                                        style={{
+                                                            position: "relative",
+                                                            width: 48,
+                                                            height: 48,
+                                                            flexShrink: 0,
+                                                        }}
+                                                    >
+                                                        <svg
+                                                            width="100%"
+                                                            height="100%"
+                                                            viewBox="0 0 49 49"
+                                                            fill="none"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <path
+                                                                d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z"
+                                                                fill="#6AA4FB"
+                                                            />
+                                                            <path
+                                                                d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z"
+                                                                fill="white"
+                                                                fillOpacity="0.95"
+                                                            />
+                                                            <path
+                                                                d="M23.8125 30.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 23.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 16.5127C33.4559 16.5127 33.9775 17.0343 33.9775 17.6777C33.9775 18.3211 33.4559 18.8428 32.8125 18.8428H16.8125C16.1691 18.8428 15.6475 18.3211 15.6475 17.6777C15.6475 17.0343 16.1691 16.5127 16.8125 16.5127H32.8125Z"
+                                                                stroke="white"
+                                                                strokeOpacity="0.95"
+                                                                strokeWidth="0.33"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div
+                                                        data-layer="file-info"
+                                                        className="FileInfo"
+                                                        style={{
+                                                            display: "flex",
+                                                            flexDirection: "column",
+                                                            justifyContent: "center",
+                                                            alignItems: "flex-start",
+                                                            overflow: "hidden",
+                                                            flex: 1,
+                                                            paddingLeft: 12,
+                                                            paddingRight: 12,
+                                                        }}
+                                                    >
+                                                        <div
+                                                            data-layer="file-name"
+                                                            className="FileName"
+                                                            style={{
+                                                                color: "rgba(0, 0, 0, 0.95)",
+                                                                fontSize: 13,
+                                                                fontFamily: "Inter",
+                                                                fontWeight: 500,
+                                                                lineHeight: "16px",
+                                                                whiteSpace: "nowrap",
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis",
+                                                                width: "100%",
+                                                            }}
+                                                        >
+                                                            {fileName || "File"}
+                                                        </div>
+                                                        <div
+                                                            data-layer="file-type"
+                                                            className="FileType"
+                                                            style={{
+                                                                color: "rgba(0, 0, 0, 0.65)",
+                                                                fontSize: 11,
+                                                                fontFamily: "Inter",
+                                                                fontWeight: 400,
+                                                                lineHeight: "14px",
+                                                                whiteSpace: "nowrap",
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis",
+                                                                width: "100%",
+                                                            }}
+                                                        >
+                                                            {fileName
+                                                                ? fileName
+                                                                      .split(".")
+                                                                      .pop()
+                                                                      ?.toUpperCase()
+                                                                : (
+                                                                      fileMimeType ||
+                                                                      "FILE"
+                                                                  )
+                                                                      .split("/")[1]
+                                                                      ?.toUpperCase() ||
+                                                                  "FILE"}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             )}
                                             {userTextContent && (
                                                 <div
@@ -3762,12 +4114,18 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                                     width: "100%",
                                                 }}
                                             >
-                                                {(
-                                                    attachmentPreview.type ||
-                                                    "FILE"
-                                                )
-                                                    .split("/")[1]
-                                                    ?.toUpperCase() || "FILE"}
+                                                {attachmentPreview.name
+                                                    ? attachmentPreview.name
+                                                          .split(".")
+                                                          .pop()
+                                                          ?.toUpperCase()
+                                                    : (
+                                                          attachmentPreview.type ||
+                                                          "FILE"
+                                                      )
+                                                          .split("/")[1]
+                                                          ?.toUpperCase() ||
+                                                      "FILE"}
                                             </div>
                                         </div>
                                     </div>
@@ -3802,7 +4160,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 data-layer="input-action-buttons"
                                 style={{
                                     alignSelf: "stretch",
-                                    justifyContent: "space-between",
+                                    justifyContent: showAttachmentButton
+                                        ? "space-between"
+                                        : "flex-end",
                                     alignItems: "center",
                                     display: "flex",
                                     flexShrink: 0,
@@ -3821,7 +4181,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                         borderRadius: `${universalBorderRadius}px`,
                                         width: 36,
                                         height: 36,
-                                        display: "flex",
+                                        display: showAttachmentButton
+                                            ? "flex"
+                                            : "none",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         cursor: "pointer",
@@ -3831,7 +4193,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/*,audio/*,video/*,.pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.csv,.json,.xml,application/*"
+                                        accept={acceptedFileTypes}
                                         style={{ display: "none" }}
                                         onChange={handleImageChange}
                                         disabled={isLoading}
@@ -4548,18 +4910,18 @@ addPropertyControls(ChatOverlay, {
         type: ControlType.Boolean,
         title: "Rotate Suggestions",
         defaultValue: true,
-        description: "Cycle placeholder text in collapsed view through suggestions.",
+        description: "Cycle placeholder text through suggestions.",
     },
     defaultSuggestions: {
         type: ControlType.Array,
-        title: "Default Suggestions",
+        title: "Suggestions",
         control: {
             type: ControlType.String,
             defaultValue: "New suggestion",
         },
         defaultValue: ["Quick facts", "Proven metrics", "Contact"],
         maxCount: 10,
-        description: "Mobile: shows all; Desktop: shows first 3. Rotates as placeholder if enabled.",
+        description: "(Optional) Mobile: shows all; Desktop: shows first 3.",
     },
     suggestionRotateInterval: {
         type: ControlType.Number,
@@ -4574,7 +4936,7 @@ addPropertyControls(ChatOverlay, {
     },
     enableAiSuggestions: {
         type: ControlType.Boolean,
-        title: "AI Reply Suggestions",
+        title: "AI Suggested Replies",
         defaultValue: true,
         description: "Generate 3 AI contextual follow-up replies.",
     },
@@ -4584,7 +4946,25 @@ addPropertyControls(ChatOverlay, {
         options: ["none", "low", "medium", "high"],
         optionTitles: ["None (Default)", "Low", "Medium", "High"],
         defaultValue: "none",
-        description: "Makes Gemini's slower but smarter.",
+        description: "Makes Gemini slower but smarter.",
+    },
+    allowImages: {
+        type: ControlType.Boolean,
+        title: "Image Upload",
+        defaultValue: true,
+        description: "Allow uploading images.",
+    },
+    allowVideos: {
+        type: ControlType.Boolean,
+        title: "Video Upload",
+        defaultValue: false,
+        description: "Allow uploading videos.",
+    },
+    allowDocuments: {
+        type: ControlType.Boolean,
+        title: "File Upload",
+        defaultValue: false,
+        description: "Allow uploading PDFs/PPTX/DOCX/etc.",
     },
     enableScrollReveal: {
         type: ControlType.Boolean,
@@ -4663,12 +5043,12 @@ addPropertyControls(ChatOverlay, {
         type: ControlType.ResponsiveImage,
         title: "Send Icon Override",
         description:
-            "Replaces send button's arrow/stop icons. Ideal: transparent BG, square. Approx 18x18px.",
+            "Replaces send button's arrow/stop icons. Ideal: transparent BG, square. Approx 32x32px.",
     },
     loadingIconOverrideUrl: {
         type: ControlType.ResponsiveImage,
         title: "Loading Icon Override",
         description:
-            "Replaces default loading icon. Ideal: transparent BG, square. Approx 18x18px.",
+            "Replaces default loading icon. Ideal: transparent BG, square. Approx 32x32px.",
     },
 })
