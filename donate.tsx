@@ -4,6 +4,7 @@
  * A high-fidelity recreation of the requested donation form UI.
  * Now integrated with Stripe Payment Links via Property Controls.
  *
+ * @framerIntrinsicWidth 480
  * @framerSupportedLayoutWidth fixed
  * @framerSupportedLayoutHeight auto
  */
@@ -13,29 +14,31 @@ import { motion, AnimatePresence } from "framer-motion"
 
 export default function DonationForm(props) {
     const {
-        linkOneTime5,
-        linkOneTime25,
-        linkOneTime100,
-        linkOneTimeOther,
-        linkMonthly5,
-        linkMonthly25,
-        linkMonthly100,
-        linkMonthlyOther,
+        baseStripeUrl,
         accentColor,
         backgroundColor,
         inputBackgroundColor,
         textColor,
         subtitleColor,
         placeholderColor,
+        selectedBackgroundColor = "#FFFFFF",
+        selectedTextColor = "#000000",
+        selectedShadow = "0px 1px 2px 0px rgba(0, 0, 0, 0.1)",
         containerRadius,
         elementRadius,
         donateButtonRadius,
         font,
         buttonFont,
         titleFont,
-        showFeeCoverage = false,
         padding = "16px",
         gap = 24,
+        enableGlare = true,
+        glareColor = "rgba(255, 255, 255, 0.08)",
+        donateTitle = "Donate",
+        amountTitle = "Amount",
+        donateButtonLabel = "Donate",
+        customAmountPlaceholder = "Enter amount",
+        style,
     } = props
 
     const uniqueId = useMemo(
@@ -46,13 +49,11 @@ export default function DonationForm(props) {
     const [frequency, setFrequency] = useState("One-time")
     const [amount, setAmount] = useState("$5")
     const [customAmount, setCustomAmount] = useState("")
-    const [selectedMonth, setSelectedMonth] = useState("Month")
-    const [selectedDay, setSelectedDay] = useState("Day")
-    const [isFeeCovered, setIsFeeCovered] = useState(false)
     const [focusedField, setFocusedField] = useState<string | null>(null)
 
     // Styles
     const containerStyle: CSSProperties = {
+        ...style,
         width: "100%",
         padding,
         backgroundColor: backgroundColor,
@@ -65,7 +66,7 @@ export default function DonationForm(props) {
         ...font,
         color: textColor,
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
     }
 
     const labelStyle: CSSProperties = {
@@ -74,12 +75,6 @@ export default function DonationForm(props) {
         display: "block",
         color: subtitleColor,
         ...titleFont,
-    }
-
-    const rowStyle: CSSProperties = {
-        display: "flex",
-        gap: 8,
-        width: "100%",
     }
 
     const inputStyle = (name: string): CSSProperties => ({
@@ -113,7 +108,7 @@ export default function DonationForm(props) {
         borderRadius: elementRadius,
         border: "none",
         backgroundColor: "transparent",
-        color: isSelected ? "#000000" : textColor,
+        color: isSelected ? selectedTextColor : textColor,
         cursor: "pointer",
         fontSize: 14,
         fontWeight: 500,
@@ -128,20 +123,22 @@ export default function DonationForm(props) {
         padding: "12px 0",
         borderRadius: elementRadius,
         border: "none",
-        backgroundColor: amount === val ? "#FFFFFF" : inputBackgroundColor,
-        color: amount === val ? textColor : placeholderColor,
+        backgroundColor: inputBackgroundColor,
+        color: amount === val ? selectedTextColor : placeholderColor,
         cursor: "pointer",
         fontSize: 15,
         fontWeight: 500,
-        transition: "all 0.2s ease",
+        transition: "color 0.2s ease",
         ...font,
+        position: "relative",
+        isolation: "isolate",
     })
 
     return (
         <div id={uniqueId} style={containerStyle}>
             {/* Frequency Section */}
             <div>
-                <span style={labelStyle}>Donate</span>
+                <span style={labelStyle}>{donateTitle}</span>
                 {/* Segmented Control */}
                 <div style={buttonGroupStyle}>
                     {["One-time", "Monthly"].map((opt) => {
@@ -161,11 +158,10 @@ export default function DonationForm(props) {
                                             left: 0,
                                             right: 0,
                                             bottom: 0,
-                                            backgroundColor: "#FFFFFF",
+                                            backgroundColor: selectedBackgroundColor,
                                             borderRadius: elementRadius,
                                             zIndex: -1,
-                                            boxShadow:
-                                                "0 1px 2px rgba(0,0,0,0.1)",
+                                            boxShadow: selectedShadow,
                                         }}
                                         transition={{
                                             type: "spring",
@@ -187,7 +183,7 @@ export default function DonationForm(props) {
 
             {/* Amount Section */}
             <div>
-                <span style={labelStyle}>Amount</span>
+                <span style={labelStyle}>{amountTitle}</span>
                 <div style={{ display: "flex", gap: 8 }}>
                     {["$5", "$25", "$100", "Other"].map((val) => (
                         <button
@@ -195,7 +191,28 @@ export default function DonationForm(props) {
                             style={amountButtonStyle(val)}
                             onClick={() => setAmount(val)}
                         >
-                            {val}
+                            {amount === val && (
+                                <motion.div
+                                    layoutId="amount-bg"
+                                    style={{
+                                        position: "absolute",
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        backgroundColor: selectedBackgroundColor,
+                                        borderRadius: elementRadius,
+                                        zIndex: -1,
+                                        boxShadow: selectedShadow,
+                                    }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 300,
+                                        damping: 35,
+                                    }}
+                                />
+                            )}
+                            <span style={{ position: "relative", zIndex: 1 }}>{val}</span>
                         </button>
                     ))}
                 </div>
@@ -222,11 +239,16 @@ export default function DonationForm(props) {
                             >
                                 <input
                                     style={inputStyle("customAmount")}
-                                    placeholder="Enter amount"
+                                    placeholder={customAmountPlaceholder}
                                     value={customAmount}
-                                    onChange={(e) =>
-                                        setCustomAmount(e.target.value)
-                                    }
+                                    onChange={(e) => {
+                                        const val = e.target.value
+                                        // Strictly allow only numbers and a single decimal point
+                                        if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                            setCustomAmount(val)
+                                        }
+                                    }}
+                                    inputMode="decimal"
                                     onFocus={() =>
                                         setFocusedField("customAmount")
                                     }
@@ -238,213 +260,37 @@ export default function DonationForm(props) {
                 </AnimatePresence>
             </div>
 
-            {/* Billing Address Section */}
-            <div>
-                <span style={labelStyle}>Billing Address</span>
-                <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                    <div style={rowStyle}>
-                        <input
-                            style={inputStyle("firstName")}
-                            placeholder="First name*"
-                            autoComplete="given-name"
-                            onFocus={() => setFocusedField("firstName")}
-                            onBlur={() => setFocusedField(null)}
-                        />
-                        <input
-                            style={inputStyle("lastName")}
-                            placeholder="Last name*"
-                            autoComplete="family-name"
-                            onFocus={() => setFocusedField("lastName")}
-                            onBlur={() => setFocusedField(null)}
-                        />
-                    </div>
-                    <input
-                        style={inputStyle("address")}
-                        placeholder="Address*"
-                        autoComplete="street-address"
-                        onFocus={() => setFocusedField("address")}
-                        onBlur={() => setFocusedField(null)}
-                    />
-                    <input
-                        style={inputStyle("email")}
-                        placeholder="Email*"
-                        type="email"
-                        autoComplete="email"
-                        onFocus={() => setFocusedField("email")}
-                        onBlur={() => setFocusedField(null)}
-                    />
-                    <input
-                        style={inputStyle("phone")}
-                        placeholder="Phone"
-                        type="tel"
-                        autoComplete="tel"
-                        onFocus={() => setFocusedField("phone")}
-                        onBlur={() => setFocusedField(null)}
-                    />
-                </div>
-            </div>
-
-            {/* Payment Section */}
-            <div>
-                <span style={labelStyle}>Payment</span>
-                <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                    <input
-                        style={inputStyle("card")}
-                        placeholder="Credit card number*"
-                        autoComplete="cc-number"
-                        onFocus={() => setFocusedField("card")}
-                        onBlur={() => setFocusedField(null)}
-                    />
-                    <div style={rowStyle}>
-                        <div style={{ position: "relative", flex: 1 }}>
-                            <select
-                                value={selectedMonth}
-                                onChange={(e) =>
-                                    setSelectedMonth(e.target.value)
-                                }
-                                style={{
-                                    ...inputStyle("month"),
-                                    appearance: "none",
-                                    cursor: "pointer",
-                                    color:
-                                        selectedMonth === "Month"
-                                            ? placeholderColor
-                                            : textColor,
-                                }}
-                                autoComplete="cc-exp-month"
-                                onFocus={() => setFocusedField("month")}
-                                onBlur={() => setFocusedField(null)}
-                            >
-                                <option value="Month">Month</option>
-                                {Array.from({ length: 12 }, (_, i) => (
-                                    <option key={i} value={i + 1}>
-                                        {i + 1}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown color={textColor} />
-                        </div>
-                        <div style={{ position: "relative", flex: 1 }}>
-                            <select
-                                value={selectedDay}
-                                onChange={(e) => setSelectedDay(e.target.value)}
-                                style={{
-                                    ...inputStyle("day"),
-                                    appearance: "none",
-                                    cursor: "pointer",
-                                    color:
-                                        selectedDay === "Day"
-                                            ? placeholderColor
-                                            : textColor,
-                                }}
-                                onFocus={() => setFocusedField("day")}
-                                onBlur={() => setFocusedField(null)}
-                            >
-                                <option value="Day">Day</option>
-                                {Array.from({ length: 31 }, (_, i) => (
-                                    <option key={i} value={i + 1}>
-                                        {i + 1}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown color={textColor} />
-                        </div>
-                        <input
-                            style={{ ...inputStyle("cvv"), flex: 1 }}
-                            placeholder="CVV*"
-                            maxLength={4}
-                            autoComplete="cc-csc"
-                            onFocus={() => setFocusedField("cvv")}
-                            onBlur={() => setFocusedField(null)}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Fee Coverage Checkbox */}
-            {showFeeCoverage && (
-                <div
-                    style={{
-                        display: "flex",
-                        gap: 12,
-                        alignItems: "flex-start",
-                        cursor: "pointer",
-                    }}
-                    onClick={() => setIsFeeCovered(!isFeeCovered)}
-                >
-                    <div
-                        style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: 4,
-                            border: `1px solid ${textColor}`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginTop: 2,
-                            flexShrink: 0,
-                            backgroundColor: isFeeCovered
-                                ? accentColor
-                                : "transparent",
-                            borderColor: isFeeCovered
-                                ? accentColor
-                                : "rgba(255,255,255,0.3)",
-                        }}
-                    >
-                        {isFeeCovered && (
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 12 12"
-                                fill="none"
-                            >
-                                <path
-                                    d="M10 3L4.5 8.5L2 6"
-                                    stroke="white"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                        )}
-                    </div>
-                    <span
-                        style={{
-                            fontSize: 13,
-                            lineHeight: "1.4em",
-                            opacity: 0.9,
-                        }}
-                    >
-                        I will cover the 5% processing fee so 100% of my
-                        donation goes to helping kids.
-                    </span>
-                </div>
-            )}
-
             {/* Donate Button */}
             <motion.button
                 onClick={() => {
-                    let url = ""
-                    if (frequency === "One-time") {
-                        if (amount === "$5") url = linkOneTime5
-                        else if (amount === "$25") url = linkOneTime25
-                        else if (amount === "$100") url = linkOneTime100
-                        else if (amount === "Other") url = linkOneTimeOther
-                    } else {
-                        if (amount === "$5") url = linkMonthly5
-                        else if (amount === "$25") url = linkMonthly25
-                        else if (amount === "$100") url = linkMonthly100
-                        else if (amount === "Other") url = linkMonthlyOther
+                    if (!baseStripeUrl) {
+                        alert("Please configure the Stripe URL in property controls.")
+                        return
                     }
 
-                    if (url) {
-                        window.open(url, "_blank")
-                    } else {
-                        alert("Payment link not configured for this option.")
+                    let cents = 0
+                    if (amount === "$5") cents = 500
+                    else if (amount === "$25") cents = 2500
+                    else if (amount === "$100") cents = 10000
+                    else if (amount === "Other") {
+                         // Parse custom amount. Remove currency symbols and non-numeric except decimal
+                         const cleaned = customAmount.replace(/[^0-9.]/g, "")
+                         const val = parseFloat(cleaned)
+                         if (isNaN(val) || val <= 0) {
+                             alert("Please enter a valid amount")
+                             return
+                         }
+                         cents = Math.round(val * 100)
+                    }
+
+                    // Construct URL
+                    try {
+                        const url = new URL(baseStripeUrl)
+                        url.searchParams.set("__prefilled_amount", cents.toString())
+                        window.open(url.toString(), "_blank")
+                    } catch (e) {
+                        console.error("Invalid URL:", baseStripeUrl)
+                        alert("Invalid Stripe URL configuration")
                     }
                 }}
                 whileHover={{ scale: 1.02 }}
@@ -460,10 +306,33 @@ export default function DonationForm(props) {
                     fontWeight: 600,
                     cursor: "pointer",
                     marginTop: 8,
+                    position: "relative",
+                    overflow: "hidden",
                     ...buttonFont,
                 }}
             >
-                Donate
+                <span style={{ position: "relative", zIndex: 1 }}>{donateButtonLabel}</span>
+                {enableGlare && (
+                    <motion.div
+                        initial={{ x: "-150%" }}
+                        animate={{ x: "250%" }}
+                        transition={{
+                            repeat: Infinity,
+                            repeatDelay: 2,
+                            duration: 1,
+                            ease: "linear",
+                        }}
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            left: 0,
+                            width: "50%",
+                            background: `linear-gradient(90deg, transparent, ${glareColor}, transparent)`,
+                            zIndex: 0,
+                        }}
+                    />
+                )}
             </motion.button>
 
             {/* Placeholder Styles Injection */}
@@ -483,32 +352,13 @@ export default function DonationForm(props) {
     )
 }
 
-function ChevronDown({ color }) {
-    return (
-        <div
-            style={{
-                position: "absolute",
-                right: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-            }}
-        >
-            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                <path
-                    d="M1 1.5L6 6.5L11 1.5"
-                    stroke={color}
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity="0.5"
-                />
-            </svg>
-        </div>
-    )
-}
-
 addPropertyControls(DonationForm, {
+    baseStripeUrl: {
+        type: ControlType.String,
+        title: "Stripe URL",
+        defaultValue: "https://donate.stripe.com/6oUcN5bIJ3hTc0F366b7y00",
+        description: "Base Stripe Donate URL (without query params)"
+    },
     accentColor: {
         type: ControlType.Color,
         title: "Accent",
@@ -538,6 +388,21 @@ addPropertyControls(DonationForm, {
         type: ControlType.Color,
         title: "Placeholder",
         defaultValue: "rgba(0, 0, 0, 0.65)",
+    },
+    selectedBackgroundColor: {
+        type: ControlType.Color,
+        title: "Selected Bg",
+        defaultValue: "#FFFFFF",
+    },
+    selectedTextColor: {
+        type: ControlType.Color,
+        title: "Selected Txt",
+        defaultValue: "#000000",
+    },
+    selectedShadow: {
+        type: ControlType.BoxShadow,
+        title: "Active Shadow",
+        defaultValue: "0px 1px 2px 0px rgba(0, 0, 0, 0.1)",
     },
     containerRadius: {
         type: ControlType.Number,
@@ -572,13 +437,6 @@ addPropertyControls(DonationForm, {
         min: 0,
         max: 50,
     },
-    showFeeCoverage: {
-        type: ControlType.Boolean,
-        title: "Fee Coverage",
-        defaultValue: false,
-        enabledTitle: "Show",
-        disabledTitle: "Hide",
-    },
     titleFont: {
         type: ControlType.Font,
         title: "Label Font",
@@ -612,49 +470,34 @@ addPropertyControls(DonationForm, {
         controls: "extended",
         defaultFontType: "sans-serif",
     },
-    linkOneTime5: {
+    donateTitle: {
         type: ControlType.String,
-        title: "$5 One-time Link",
-        defaultValue: "https://buy.stripe.com/test_cNicN79mwclV75z2Ay1Fe02",
+        title: "Title",
+        defaultValue: "Donate",
     },
-    linkOneTime25: {
+    amountTitle: {
         type: ControlType.String,
-        title: "$25 One-time Link",
-        defaultValue: "https://buy.stripe.com/test_4gM5kF42cgCbdtXa301Fe01",
+        title: "Amt Label",
+        defaultValue: "Amount",
     },
-    linkOneTime100: {
+    donateButtonLabel: {
         type: ControlType.String,
-        title: "$100 One-time Link",
-        defaultValue: "https://buy.stripe.com/test_8x28wRaqAadNey1dfc1Fe00",
+        title: "CTA Label",
+        defaultValue: "Donate",
     },
-    linkOneTimeOther: {
+    customAmountPlaceholder: {
         type: ControlType.String,
-        title: "Other One-time Link",
-        defaultValue: "",
-        placeholder: "https://buy.stripe.com/...",
+        title: "Input Text",
+        defaultValue: "Enter amount",
     },
-    linkMonthly5: {
-        type: ControlType.String,
-        title: "$5 Monthly Link",
-        defaultValue: "",
-        placeholder: "https://buy.stripe.com/...",
+    enableGlare: {
+        type: ControlType.Boolean,
+        title: "Enable Glare",
+        defaultValue: true,
     },
-    linkMonthly25: {
-        type: ControlType.String,
-        title: "$25 Monthly Link",
-        defaultValue: "",
-        placeholder: "https://buy.stripe.com/...",
-    },
-    linkMonthly100: {
-        type: ControlType.String,
-        title: "$100 Monthly Link",
-        defaultValue: "",
-        placeholder: "https://buy.stripe.com/...",
-    },
-    linkMonthlyOther: {
-        type: ControlType.String,
-        title: "Other Monthly Link",
-        defaultValue: "",
-        placeholder: "https://buy.stripe.com/...",
+    glareColor: {
+        type: ControlType.Color,
+        title: "Glare Color",
+        defaultValue: "rgba(255, 255, 255, 0.08)",
     },
 })
