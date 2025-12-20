@@ -379,6 +379,10 @@ const PEER_SCRIPT = "https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"
 const MQTT_SERVER = "wss://broker.emqx.io:8084/mqtt"
 const TOPIC_LOBBY = "framer-hybrid-lobby-v1"
 
+// Upload limits
+const MAX_UPLOAD_SIZE_MB = 10
+const INLINE_MAX_BYTES = 2 * 1024 * 1024 // 2MB inline limit
+
 // --- INTERFACES ---
 interface Props {
     geminiApiKey: string
@@ -387,17 +391,42 @@ interface Props {
     model: string
 }
 
+interface Message {
+    role: string
+    text: string
+    imageUrl?: string
+    attachmentName?: string
+    attachmentType?: string
+}
+
 // --- HELPER COMPONENT: CHAT INPUT BAR ---
 interface ChatInputProps {
     value: string
     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
     onSend: () => void
     onEndCall: () => void
+    onFileSelect: () => void
     placeholder?: string
     showEndCall?: boolean
+    imagePreviewUrl?: string
+    attachmentPreview?: { name: string; type: string } | null
+    onRemoveAttachment?: () => void
+    isLoading?: boolean
 }
 
-function ChatInput({ value, onChange, onSend, onEndCall, placeholder = "Ask anything", showEndCall = true }: ChatInputProps) {
+function ChatInput({ 
+    value, 
+    onChange, 
+    onSend, 
+    onEndCall, 
+    onFileSelect, 
+    placeholder = "Ask anything", 
+    showEndCall = true,
+    imagePreviewUrl = "",
+    attachmentPreview = null,
+    onRemoveAttachment,
+    isLoading = false
+}: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
     // Auto-resize logic to mimic Gemini's behavior
@@ -410,61 +439,188 @@ function ChatInput({ value, onChange, onSend, onEndCall, placeholder = "Ask anyt
         }
     }, [value])
 
+    const hasContent = value.trim() || imagePreviewUrl || attachmentPreview
+
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box"}}>
           <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: 'linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, #212121 35%)', justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
             
             {/* INPUT BOX */}
-            <div data-layer="input-box" className="InputBox" style={{flex: '1 1 0', minHeight: 56, maxHeight: 384, padding: 10, background: '#303030', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-end', alignItems: 'flex-end', gap: 4, display: 'flex', pointerEvents: "auto"}}>
+            <div data-layer="input-box" className="InputBox" style={{
+                flex: '1 1 0', 
+                minHeight: 56, 
+                maxHeight: 384, 
+                padding: 10, 
+                background: '#303030', 
+                overflow: 'visible',
+                borderRadius: 28, 
+                display: 'flex', 
+                flexDirection: 'column', // Stack attachments above input row
+                justifyContent: 'flex-end',
+                gap: 8,
+                pointerEvents: "auto"
+            }}>
               
-              {/* UPLOAD ICON */}
-              <div data-svg-wrapper data-layer="upload-button" className="UploadButton" style={{cursor: "pointer", opacity: 0.5}}>
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <g opacity="0.5">
-                <path d="M17.3039 24.8039V18.6961H11.1961C10.8117 18.6961 10.5 18.3845 10.5 18C10.5 17.6156 10.8117 17.3039 11.1961 17.3039H17.3039V11.1961C17.3039 10.8117 17.6156 10.5 18 10.5C18.3845 10.5 18.6961 10.8117 18.6961 11.1961V17.3039H24.8039L24.944 17.3182C25.2612 17.383 25.5 17.6636 25.5 18C25.5 18.3364 25.2612 18.617 24.944 18.6819L24.8039 18.6961H18.6961V24.8039C18.6961 25.1884 18.3845 25.5 18 25.5C17.6156 25.5 17.3039 25.1884 17.3039 24.8039Z" fill="white" fillOpacity="0.95"/>
-                </g>
-                </svg>
-              </div>
+              {/* ATTACHMENTS ROW */}
+              {(imagePreviewUrl || attachmentPreview) && (
+                  <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      paddingTop: 8, // Space for close button
+                      paddingLeft: 0, // Aligned with start of input box content
+                      width: '100%'
+                  }}>
+                      <div style={{
+                            position: 'relative',
+                            width: 48,
+                            height: 48,
+                            flexShrink: 0,
+                            borderRadius: 12, // More rounded for chip look
+                            overflow: 'visible',
+                            display: 'flex',
+                            background: imagePreviewUrl ? 'transparent' : 'rgba(255,255,255,0.1)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: imagePreviewUrl ? 'none' : '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                            {/* Remove Button */}
+                            <div 
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    if(onRemoveAttachment) onRemoveAttachment()
+                                }}
+                                style={{
+                                    position: "absolute",
+                                    right: -6,
+                                    top: -6,
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: 10,
+                                    background: "#303030", // Match input bg
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    border: "1.5px solid #555", // Distinct border
+                                    zIndex: 10
+                                }}
+                            >
+                                <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1 1L9 9M9 1L1 9" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
 
-              {/* TEXT INPUT */}
-              <div data-layer="textarea-wrapper" className="TextAreaWrapper" style={{flex: '1 1 0', alignSelf: 'stretch', paddingTop: 6, paddingBottom: 6, justifyContent: 'flex-start', alignItems: 'center', gap: 18, display: 'flex'}}>
-                <textarea
-                    ref={textareaRef}
-                    value={value}
-                    onChange={onChange}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            onSend()
-                        }
-                    }}
-                    placeholder={placeholder}
-                    className="ChatTextInput" 
+                            {/* Thumbnail / Icon */}
+                            {imagePreviewUrl ? (
+                                <img 
+                                    src={imagePreviewUrl} 
+                                    alt="Preview" 
+                                    style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: 12,
+                                        objectFit: 'cover',
+                                        display: 'block'
+                                    }}
+                                />
+                            ) : (
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="rgba(255,255,255,0.2)"/>
+                                    <path d="M14 2V8H20" fill="rgba(255,255,255,0.4)"/>
+                                </svg>
+                            )}
+                        </div>
+                  </div>
+              )}
+
+              {/* INPUT ROW: [Plus] [Text] [Send] */}
+              <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: 12,
+                  width: '100%'
+              }}>
+                  {/* UPLOAD ICON */}
+                  <div 
+                    data-svg-wrapper 
+                    data-layer="upload-button" 
+                    className="UploadButton" 
+                    onClick={onFileSelect}
                     style={{
-                        flex: '1 1 0', 
-                        color: 'white', 
-                        fontSize: 16, 
-                        fontFamily: 'Inter', 
-                        fontWeight: '400', 
-                        lineHeight: '24px', 
-                        background: 'transparent', 
-                        border: 'none', 
-                        outline: 'none', 
-                        resize: 'none',
-                        height: 24,
-                        padding: 0, 
-                        margin: 0
+                      cursor: isLoading ? "not-allowed" : "pointer", 
+                      opacity: isLoading ? 0.3 : 0.65,
+                      pointerEvents: isLoading ? "none" : "auto",
+                      width: 36,
+                      height: 36,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 0 // Aligned with send button
                     }}
-                />
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+
+                  {/* TEXT INPUT */}
+                  <div data-layer="textarea-wrapper" className="TextAreaWrapper" style={{flex: '1 1 0', alignSelf: 'stretch', display: 'flex', alignItems: 'center', paddingTop: 6, paddingBottom: 6}}>
+                    <textarea
+                        ref={textareaRef}
+                        value={value}
+                        onChange={onChange}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault()
+                                if (hasContent && !isLoading) onSend()
+                            }
+                        }}
+                        placeholder={placeholder}
+                        disabled={isLoading}
+                        className="ChatTextInput" 
+                        style={{
+                            flex: '1 1 0', 
+                            color: 'white', 
+                            fontSize: 16, 
+                            fontFamily: 'Inter', 
+                            fontWeight: '400', 
+                            lineHeight: '24px', 
+                            background: 'transparent', 
+                            border: 'none', 
+                            outline: 'none', 
+                            resize: 'none',
+                            height: 24,
+                            padding: 0, 
+                            margin: 0,
+                            width: '100%'
+                        }}
+                    />
+                  </div>
+
+                  {/* SEND BUTTON */}
+                  <div 
+                    data-svg-wrapper 
+                    data-layer="send-button" 
+                    className="SendButton" 
+                    onClick={() => {
+                      if (hasContent && !isLoading) onSend()
+                    }}
+                    style={{
+                      cursor: (hasContent && !isLoading) ? "pointer" : "not-allowed", 
+                      display: hasContent ? "block" : "none",
+                      opacity: isLoading ? 0.5 : 1,
+                      width: 36,
+                      height: 36
+                    }}
+                  >
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
+                    <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill="black" fillOpacity="0.95"/>
+                    </svg>
+                  </div>
               </div>
 
-              {/* SEND BUTTON */}
-              <div data-svg-wrapper data-layer="send-button" className="SendButton" onClick={onSend} style={{cursor: "pointer", display: value.trim() ? "block" : "none"}}>
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill="black" fillOpacity="0.95"/>
-                </svg>
-              </div>
             </div>
 
             {/* END CALL BUTTON */}
@@ -501,8 +657,10 @@ export default function OmegleMentorshipUI(props: Props) {
      * student: "Get free help" user seeking guidance.
      * mentor:  "Volunteer" user providing guidance.
      */
-    const [role, setRole] = React.useState<"student" | "mentor" | null>(null) 
-    
+    const [role, setRole] = React.useState<"student" | "mentor" | null>(null)
+    const roleRef = React.useRef(role)
+    React.useEffect(() => { roleRef.current = role }, [role])
+
     // --- REFS: DOM & PERSISTENT OBJECTS ---
     const localVideoRef = React.useRef<HTMLVideoElement>(null)
     const remoteVideoRef = React.useRef<HTMLVideoElement>(null)
@@ -510,14 +668,26 @@ export default function OmegleMentorshipUI(props: Props) {
     const mqttClient = React.useRef<any>(null)
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null)
+    const statusRef = React.useRef(status)
+    React.useEffect(() => { statusRef.current = status }, [status])
     
     // Unique session ID for the user
     const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
 
     // --- STATE: AI CHAT (GEMINI) ---
-    const [messages, setMessages] = React.useState<{ role: string; text: string }[]>([])
+    const [messages, setMessages] = React.useState<Message[]>([])
     const [inputText, setInputText] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
+
+    // --- STATE: FILE UPLOADS ---
+    const [imageFile, setImageFile] = React.useState<File | null>(null)
+    const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string>("")
+    const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null)
+    const [attachmentPreview, setAttachmentPreview] = React.useState<{
+        name: string
+        type: string
+    } | null>(null)
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
     // --- STATE: RESPONSIVE UI ---
     const [chatHeight, setChatHeight] = React.useState(300) // Height of the chat drawer
@@ -532,6 +702,24 @@ export default function OmegleMentorshipUI(props: Props) {
     const log = (msg: string) => {
         console.log(`[Curastem Mentorship] ${msg}`)
     }
+
+    // Detect mobile for capture attribute
+    const isMobile = React.useMemo(() => {
+        if (typeof window === "undefined") return false
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    }, [])
+
+    // --- EFFECT: HANDLE IMAGE PREVIEW ---
+    React.useEffect(() => {
+        if (imageFile && typeof window !== "undefined" && imageFile.type && imageFile.type.startsWith("image/")) {
+            const objectUrl = URL.createObjectURL(imageFile)
+            setImagePreviewUrl(objectUrl)
+            return () => URL.revokeObjectURL(objectUrl)
+        } else {
+            const isVideoSelected = !!(attachmentFile && attachmentFile.type.startsWith("video/"))
+            if (!isVideoSelected) setImagePreviewUrl("")
+        }
+    }, [imageFile, attachmentFile])
 
     // --- EFFECT: RESPONSIVE LAYOUT ENGINE ---
     // Uses ResizeObserver to track container dimensions for aspect-ratio calculations.
@@ -550,34 +738,44 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [])
 
     // --- EFFECT: CALCULATE MAXIMUM CHAT HEIGHT ---
-    // When the first message arrives, set chat height to maximum so videos fill width at top
+    // When the first message arrives, set chat height to maximum so items (cards or videos) fill width at top
     React.useEffect(() => {
         if (containerSize.width === 0 || containerSize.height === 0) return
         if (messages.length === 0) return
         
         const isMobile = containerSize.width < 768
         
-        // Calculate video dimensions based on available width
+        // Calculate item dimensions based on available width
         const availableWidth = isMobile 
             ? (containerSize.width - 32) 
             : (containerSize.width - 32 - 8) / 2
         const targetRatio = 1.55
-        const videoHeight = availableWidth / targetRatio
+        const itemHeight = availableWidth / targetRatio
         
-        // Calculate total video area height
-        const totalVideoHeight = isMobile 
-            ? (videoHeight * 2) + 8  // 2 videos stacked with 8px gap
-            : videoHeight              // videos side by side
+        // Calculate total item area height
+        const totalItemHeight = isMobile 
+            ? (itemHeight * 2) + 8  // 2 items stacked with 8px gap
+            : itemHeight              // items side by side
         
         // Calculate maximum chat height
-        // Total height - top padding - video height - drag bar height
-        const maxChatHeight = containerSize.height - 16 - totalVideoHeight - 24
+        // Total height - top padding - item height - drag bar height
+        const maxChatHeight = containerSize.height - 16 - totalItemHeight - 24
         
-        // Set initial chat height to maximum when first message appears
+        // Only auto-maximize if we haven't manually resized yet (heuristic: chatHeight is default 300)
+        // AND if we are in the "cards" mode (no role yet), OR if we want it to happen for videos too (which is now requested)
         if (chatHeight === 300) {
-            setChatHeight(Math.max(100, maxChatHeight))
+             setChatHeight(Math.max(100, maxChatHeight))
         }
-    }, [messages.length, containerSize])
+    }, [messages.length, containerSize, role])
+
+    const handleRoleSelect = (selectedRole: "student" | "mentor") => {
+        if (typeof window !== "undefined") {
+            window.location.hash = `#${selectedRole}`
+        }
+        setRole(selectedRole)
+        // Smoothly transition chat height to normal video view size
+        setChatHeight(300)
+    }
 
     // --- EFFECT: DETECT URL HASH AND SET ROLE ---
     /**
@@ -660,6 +858,10 @@ export default function OmegleMentorshipUI(props: Props) {
      * Initializes the user's camera/microphone and starts the PeerJS session.
      */
     const startChat = async () => {
+        if (!role) {
+            log("Cannot start chat without a role.")
+            return
+        }
         setStatus("searching")
         log("Requesting media permissions...")
 
@@ -698,7 +900,7 @@ export default function OmegleMentorshipUI(props: Props) {
         })
 
         peer.on("call", (call: any) => {
-            if (status === "connected") return
+            if (statusRef.current === "connected") return
             log("Incoming call detected. Auto-answering...")
             call.answer(localStreamRef.current)
             handleCall(call)
@@ -737,12 +939,12 @@ export default function OmegleMentorshipUI(props: Props) {
         mqttClient.current = client
 
         client.on("connect", () => {
-            log(`Connected to lobby as ${role || "unspecified"}. Searching for ${role === "student" ? "mentor" : role === "mentor" ? "student" : "partner"}...`)
+            log(`Connected to lobby as ${roleRef.current || "unspecified"}. Searching for ${roleRef.current === "student" ? "mentor" : roleRef.current === "mentor" ? "student" : "partner"}...`)
             client.subscribe(TOPIC_LOBBY)
 
             // Periodic heartbeat to broadcast presence to other users
             const heartbeat = setInterval(() => {
-                if (status === "connected" || !client.connected) {
+                if (statusRef.current === "connected" || !client.connected) {
                     clearInterval(heartbeat)
                     return
                 }
@@ -750,21 +952,26 @@ export default function OmegleMentorshipUI(props: Props) {
                     TOPIC_LOBBY,
                     JSON.stringify({ 
                         id: myId.current,
-                        role: role // Include role in broadcast
+                        role: roleRef.current // Include role in broadcast
                     })
                 )
             }, 2000)
         })
 
         client.on("message", (topic: string, msg: any) => {
-            if (status === "connected") return
+            if (statusRef.current === "connected") return
 
             const data = JSON.parse(msg.toString())
             if (data.id === myId.current) return
 
             // Role-based matching: only connect with opposite roles
-            if (role && data.role) {
-                const oppositeRole = role === "student" ? "mentor" : "student"
+            const currentRole = roleRef.current
+            if (currentRole) {
+                if (!data.role) {
+                    log(`Skipping peer ${data.id} (peer has no role)`)
+                    return
+                }
+                const oppositeRole = currentRole === "student" ? "mentor" : "student"
                 if (data.role !== oppositeRole) {
                     log(`Skipping peer ${data.id} (incompatible role: ${data.role})`)
                     return
@@ -785,25 +992,185 @@ export default function OmegleMentorshipUI(props: Props) {
         })
     }
 
+    // --- FILE UPLOAD HANDLERS ---
+
+    const handleFileSelect = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click()
+        }
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files && e.target.files[0]
+        if (!file) {
+            setImageFile(null)
+            setAttachmentFile(null)
+            setAttachmentPreview(null)
+            return
+        }
+
+        if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+            alert(`File size exceeds ${MAX_UPLOAD_SIZE_MB}MB limit.`)
+            if (fileInputRef.current) fileInputRef.current.value = ""
+            return
+        }
+
+        const isImage = file.type.startsWith("image/")
+        const isVideo = file.type.startsWith("video/")
+
+        if (isImage) {
+            setImageFile(file)
+            setAttachmentFile(null)
+            setAttachmentPreview(null)
+        } else if (isVideo) {
+            // Generate video thumbnail
+            try {
+                const url = URL.createObjectURL(file)
+                const video = document.createElement("video")
+                video.src = url
+                video.muted = true
+                video.playsInline = true as any
+                const capture = () => {
+                    const canvas = document.createElement("canvas")
+                    const w = 320
+                    const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w))
+                    canvas.width = w
+                    canvas.height = h
+                    const ctx = canvas.getContext("2d")
+                    if (ctx) {
+                        ctx.drawImage(video, 0, 0, w, h)
+                        const dataUrl = canvas.toDataURL("image/jpeg", 0.8)
+                        setImagePreviewUrl(dataUrl)
+                        setAttachmentFile(file)
+                        setImageFile(null)
+                        setAttachmentPreview(null)
+                        try {
+                            URL.revokeObjectURL(url)
+                        } catch {}
+                    }
+                }
+                video.onloadedmetadata = () => {
+                    video.currentTime = 1.0
+                }
+                video.onseeked = () => capture()
+                video.onerror = () => {
+                    setAttachmentFile(file)
+                    setAttachmentPreview({ name: file.name, type: file.type })
+                    setImagePreviewUrl("")
+                    try {
+                        URL.revokeObjectURL(url)
+                    } catch {}
+                }
+            } catch {
+                setAttachmentFile(file)
+                setAttachmentPreview({ name: file.name, type: file.type })
+                setImagePreviewUrl("")
+            }
+        } else {
+            setAttachmentFile(file)
+            setAttachmentPreview({ name: file.name, type: file.type })
+            setImageFile(null)
+            setImagePreviewUrl("")
+        }
+    }
+
+    const handleRemoveAttachment = () => {
+        setImageFile(null)
+        setAttachmentFile(null)
+        setAttachmentPreview(null)
+        setImagePreviewUrl("")
+        if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+
     // --- AI CHAT (GEMINI) LOGIC ---
 
     /**
      * Handles message delivery to the Google Gemini API.
      */
     const handleSendMessage = async () => {
-        if (!inputText.trim()) return
+        if (!inputText.trim() && !imageFile && !attachmentFile) return
         if (!geminiApiKey) {
             setMessages(prev => [...prev, { role: "model", text: "Please provide a Gemini API Key in the properties panel." }])
             return
         }
 
-        const userMsg = { role: "user", text: inputText }
+        const textToSend = inputText
+        const imageFileToSend = imageFile
+        const attachmentFileToSend = attachmentFile
+
+        // Build user message for display
+        const userMsg: Message = { 
+            role: "user", 
+            text: textToSend,
+            imageUrl: imagePreviewUrl || undefined,
+            attachmentName: attachmentFileToSend?.name || undefined,
+            attachmentType: attachmentFileToSend?.type || undefined
+        }
         setMessages(prev => [...prev, userMsg])
         setInputText("")
+        setImageFile(null)
+        setAttachmentFile(null)
+        setAttachmentPreview(null)
+        setImagePreviewUrl("")
+        if (fileInputRef.current) fileInputRef.current.value = ""
         setIsLoading(true)
 
         try {
-            // Construct conversation history strictly following User/Model turns
+            // Build API payload
+            let userContent: any = []
+
+            if (textToSend.trim()) {
+                userContent.push({ text: textToSend })
+            }
+
+            // Handle image
+            if (imageFileToSend) {
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    if (typeof window !== "undefined" && window.FileReader) {
+                        const reader = new window.FileReader()
+                        reader.onload = () => {
+                            const result = reader.result as string
+                            if (typeof result === "string") {
+                                const base64str = result.substring(result.indexOf(",") + 1)
+                                resolve(base64str)
+                            } else {
+                                reject(new Error("Failed to read image as base64 string"))
+                            }
+                        }
+                        reader.onerror = reject
+                        reader.readAsDataURL(imageFileToSend)
+                    } else {
+                        reject(new Error("FileReader API not available"))
+                    }
+                })
+                userContent.push({
+                    inlineData: {
+                        mimeType: imageFileToSend.type,
+                        data: base64
+                    }
+                })
+            }
+
+            // Handle attachment (video or file)
+            if (attachmentFileToSend) {
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                        const result = reader.result as string
+                        resolve(result.substring(result.indexOf(",") + 1))
+                    }
+                    reader.onerror = reject
+                    reader.readAsDataURL(attachmentFileToSend)
+                })
+                userContent.push({
+                    inlineData: {
+                        mimeType: attachmentFileToSend.type || "application/octet-stream",
+                        data: base64
+                    }
+                })
+            }
+
+            // Construct conversation history
             const history = messages.map(m => ({
                 role: m.role === "user" ? "user" : "model",
                 parts: [{ text: m.text }]
@@ -812,7 +1179,7 @@ export default function OmegleMentorshipUI(props: Props) {
             const payload: any = {
                 contents: [
                     ...history,
-                    { role: "user", parts: [{ text: userMsg.text }] }
+                    { role: "user", parts: userContent }
                 ]
             }
 
@@ -901,7 +1268,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const currentChatHeight = hasMessages ? chatHeight : 0
     
     // Detect mobile vs desktop based on container width
-    const isMobile = containerSize.width < 768
+    const isMobileLayout = containerSize.width < 768
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
     const videoSectionHeight = containerSize.height - currentChatHeight - (hasMessages ? 40 : 120)
@@ -910,7 +1277,7 @@ export default function OmegleMentorshipUI(props: Props) {
     let finalWidth = 0
     let finalHeight = 0
     
-    if (isMobile) {
+    if (isMobileLayout) {
         // MOBILE: Vertical layout - videos stacked, each takes full width
         const availableWidth = containerSize.width - 32 // 16px padding on each side
         const videoHeight = availableWidth / targetRatio
@@ -1012,146 +1379,105 @@ export default function OmegleMentorshipUI(props: Props) {
                 position: "relative"
             }}
         >
-            {/* 1. VIDEO RENDERING LAYER */}
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                capture={isMobile ? "environment" : undefined}
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+            />
+
+            {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
             <div
                 style={{
                     flex: "1 1 0",
                     width: "100%",
                     display: "flex",
-                    flexDirection: isMobile ? "column" : "row",
+                    flexDirection: isMobileLayout ? "column" : "row",
                     gap: 8,
                     paddingTop: 16,
                     paddingLeft: 16,
                     paddingRight: 16,
                     paddingBottom: hasMessages ? 0 : 100,
-                    alignItems: (hasMessages && !isMobile) ? "flex-end" : "center", 
+                    alignItems: (hasMessages && !isMobileLayout) ? "flex-end" : "center", 
                     justifyContent: "center",
                     position: "relative",
                     minHeight: 0,
                     flexWrap: "nowrap",
-                    transition: "padding-bottom 0.3s ease",
                     overflow: "hidden",
                     boxSizing: "border-box"
                 }}
             >
-                {/* 1A. ROLE SELECTION CARDS (Shown when no role is active) */}
-                {!role && status === "idle" ? (
-                    <div data-layer="role-selection-container" className="RoleSelectionContainer" style={{alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center', gap: 9, display: 'inline-flex'}}>
-                        <div 
-                            data-layer="student-card" 
-                            className="StudentCard" 
-                            onClick={() => {
-                                // student = get free help
-                                if (typeof window !== "undefined") {
-                                    window.location.hash = "#student"
-                                }
-                                setRole("student")
-                                startChat()
-                            }}
-                            style={{width: 440, height: 240, maxWidth: 492.71, maxHeight: 320, padding: 48, background: '#0B87DA', overflow: 'hidden', borderRadius: 48, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', cursor: 'pointer'}}
-                        >
-                            <div data-layer="student-card-title" className="StudentCardTitle" style={{alignSelf: 'stretch', color: 'rgba(255, 255, 255, 0.95)', fontSize: '28px', fontFamily: 'Inter', fontWeight: '600', lineHeight: '42px', wordWrap: 'break-word'}}>Get free help</div>
-                            <div data-layer="student-card-description" className="StudentCardDescription" style={{alignSelf: 'stretch', color: 'rgba(255, 255, 255, 0.95)', fontSize: '17px', fontFamily: 'Inter', fontWeight: '400', lineHeight: '25.5px', wordWrap: 'break-word'}}>I'm a student looking for a mentor</div>
+                {/* ITEM 1: Student Card OR Left Video */}
+                <div
+                    style={{
+                        width: finalWidth,
+                        height: finalHeight,
+                        borderRadius: 32,
+                        background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
+                        overflow: "hidden",
+                        position: "relative",
+                        flexShrink: 0,
+                        cursor: (!role && status === "idle") ? "pointer" : "default",
+                        display: "flex",
+                        flexDirection: "column",
+                    }}
+                    onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
+                >
+                    {(!role && status === "idle") ? (
+                        <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Get free help</div>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I'm a student looking for a mentor</div>
                         </div>
-                        <div 
-                            data-layer="mentor-card" 
-                            className="MentorCard" 
-                            onClick={() => {
-                                // mentor = volunteer
-                                if (typeof window !== "undefined") {
-                                    window.location.hash = "#mentor"
-                                }
-                                setRole("mentor")
-                                startChat()
-                            }}
-                            style={{width: 440, height: 240, maxWidth: 492.71, maxHeight: 320, padding: 48, background: '#2E2E2E', overflow: 'hidden', borderRadius: 48, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', cursor: 'pointer'}}
-                        >
-                            <div data-layer="mentor-card-title" className="MentorCardTitle" style={{alignSelf: 'stretch', color: 'rgba(255, 255, 255, 0.95)', fontSize: '28px', fontFamily: 'Inter', fontWeight: '600', lineHeight: '42px', wordWrap: 'break-word'}}>Volunteer</div>
-                            <div data-layer="mentor-card-description" className="MentorCardDescription" style={{alignSelf: 'stretch', color: 'rgba(255, 255, 255, 0.95)', fontSize: '17px', fontFamily: 'Inter', fontWeight: '400', lineHeight: '25.5px', wordWrap: 'break-word'}}>I have a job or am a college graduate looking to offer free advice and support</div>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {/* 1B. VIDEO RENDERING (Active when role selected) */}
-                        
-                        {/* LEFT VIDEO (Always Student: Local if you are student, Remote if you are mentor) */}
-                        <div
-                            style={{
-                                width: finalWidth,
-                                height: finalHeight,
-                                borderRadius: 32,
-                                background: "#2E2E2E",
-                                overflow: "hidden",
-                                position: "relative",
-                                flexShrink: 0,
-                            }}
-                        >
-                            {role === "student" ? (
-                                // Local student video
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
-                                />
+                    ) : (
+                        role === "student" ? (
+                            <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+                        ) : (
+                            status === "connected" ? (
+                                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
-                                // Remote student video (if mentor is viewing)
-                                status === "connected" ? (
-                                    <video
-                                        ref={remoteVideoRef}
-                                        autoPlay
-                                        playsInline
-                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                    />
-                                ) : (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>
-                                        Searching for student...
-                                    </div>
-                                )
-                            )}
-                        </div>
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for student...</div>
+                            )
+                        )
+                    )}
+                </div>
 
-                        {/* RIGHT VIDEO (Always Mentor: Local if you are mentor, Remote if you are student) */}
-                        <div
-                            style={{
-                                width: finalWidth,
-                                height: finalHeight,
-                                borderRadius: 32,
-                                background: "#2E2E2E",
-                                overflow: "hidden",
-                                position: "relative",
-                                flexShrink: 0,
-                            }}
-                        >
-                            {role === "mentor" ? (
-                                // Local mentor video
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
-                                />
-                            ) : (
-                                // Remote mentor video (if student is viewing)
-                                status === "connected" ? (
-                                    <video
-                                        ref={remoteVideoRef}
-                                        autoPlay
-                                        playsInline
-                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                    />
-                                ) : (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>
-                                        Searching for mentor...
-                                    </div>
-                                )
-                            )}
+                {/* ITEM 2: Mentor Card OR Right Video */}
+                <div
+                    style={{
+                        width: finalWidth,
+                        height: finalHeight,
+                        borderRadius: 32,
+                        background: "#2E2E2E",
+                        overflow: "hidden",
+                        position: "relative",
+                        flexShrink: 0,
+                        cursor: (!role && status === "idle") ? "pointer" : "default",
+                        display: "flex",
+                        flexDirection: "column",
+                    }}
+                    onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
+                >
+                    {(!role && status === "idle") ? (
+                        <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Volunteer</div>
+                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I want to offer free advice</div>
                         </div>
-                    </>
-                )}
+                    ) : (
+                        role === "mentor" ? (
+                            <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+                        ) : (
+                            status === "connected" ? (
+                                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for mentor...</div>
+                            )
+                        )
+                    )}
+                </div>
             </div>
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
@@ -1216,21 +1542,98 @@ export default function OmegleMentorshipUI(props: Props) {
                              <div style={{ 
                                  maxWidth: msg.role === "user" ? "80%" : "100%", 
                                  width: msg.role === "user" ? "auto" : "100%",
-                                 padding: msg.role === "user" ? "10px 16px" : "0", 
-                                 borderRadius: msg.role === "user" ? 20 : 0,
-                                 background: msg.role === "user" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                                 color: "rgba(255,255,255,0.95)",
-                                 lineHeight: 1.5,
-                                 fontSize: 14
+                                 display: "flex",
+                                 flexDirection: "column",
+                                 gap: 8,
+                                 alignItems: msg.role === "user" ? "flex-end" : "flex-start"
                              }}>
-                                {msg.role === "user" 
-                                    ? msg.text 
-                                    : renderSimpleMarkdown(
-                                        msg.text, 
-                                        { fontSize: 14, color: "rgba(255,255,255,0.95)", lineHeight: 1.5 },
-                                        { color: "#4DA6FF", textDecoration: "underline" }
-                                      )
-                                }
+                                {/* Display attachment/image preview in message */}
+                                {msg.role === "user" && (msg.imageUrl || msg.attachmentName) && (
+                                    <div style={{ 
+                                        marginBottom: 4,
+                                        width: "100%",
+                                        display: "flex",
+                                        justifyContent: "flex-end"
+                                    }}>
+                                        {msg.imageUrl ? (
+                                            <img 
+                                                src={msg.imageUrl} 
+                                                alt="Uploaded" 
+                                                style={{
+                                                    maxHeight: 128,
+                                                    width: "auto",
+                                                    maxWidth: "100%",
+                                                    borderRadius: 16, // Matches Gemini's radius
+                                                    display: 'block',
+                                                    objectFit: "contain"
+                                                }}
+                                            />
+                                        ) : msg.attachmentName ? (
+                                            <div style={{
+                                                padding: '12px 16px',
+                                                background: 'rgba(255, 255, 255, 0.1)',
+                                                borderRadius: 16,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 12,
+                                                width: "auto"
+                                            }}>
+                                                <div style={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    flexShrink: 0
+                                                }}>
+                                                    <svg width="100%" height="100%" viewBox="0 0 49 49" fill="none">
+                                                        <path d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z" fill="#6AA4FB"/>
+                                                        <path d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z" fill="white" fillOpacity="0.95"/>
+                                                    </svg>
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <div style={{
+                                                        color: 'rgba(255,255,255,0.95)',
+                                                        fontSize: 13,
+                                                        fontWeight: 500,
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        maxWidth: 200
+                                                    }}>
+                                                        {msg.attachmentName}
+                                                    </div>
+                                                    <div style={{
+                                                        color: 'rgba(255,255,255,0.65)',
+                                                        fontSize: 11,
+                                                        fontWeight: 400
+                                                    }}>
+                                                        {msg.attachmentType?.split('/')[1]?.toUpperCase() || 'FILE'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
+                                
+                                {/* Text content */}
+                                {msg.text && (
+                                    <div style={{ 
+                                        padding: msg.role === "user" ? "10px 16px" : "0", 
+                                        borderRadius: msg.role === "user" ? 20 : 0,
+                                        background: msg.role === "user" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                                        color: "rgba(255,255,255,0.95)",
+                                        lineHeight: 1.5,
+                                        fontSize: 14,
+                                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
+                                    }}>
+                                        {msg.role === "user" 
+                                            ? msg.text 
+                                            : renderSimpleMarkdown(
+                                                msg.text, 
+                                                { fontSize: 14, color: "rgba(255,255,255,0.95)", lineHeight: 1.5 },
+                                                { color: "#4DA6FF", textDecoration: "underline" }
+                                              )
+                                        }
+                                    </div>
+                                )}
                              </div>
                          </div>
                     ))}
@@ -1256,8 +1659,13 @@ export default function OmegleMentorshipUI(props: Props) {
                         onChange={(e) => setInputText(e.target.value)}
                         onSend={handleSendMessage}
                         onEndCall={cleanup}
+                        onFileSelect={handleFileSelect}
                         placeholder="Ask anything"
                         showEndCall={status !== "idle"}
+                        imagePreviewUrl={imagePreviewUrl}
+                        attachmentPreview={attachmentPreview}
+                        onRemoveAttachment={handleRemoveAttachment}
+                        isLoading={isLoading}
                     />
                 </div>
             </div>
@@ -1282,8 +1690,13 @@ export default function OmegleMentorshipUI(props: Props) {
                         onChange={(e) => setInputText(e.target.value)}
                         onSend={handleSendMessage}
                         onEndCall={cleanup}
+                        onFileSelect={handleFileSelect}
                         placeholder="Ask anything"
                         showEndCall={status !== "idle"}
+                        imagePreviewUrl={imagePreviewUrl}
+                        attachmentPreview={attachmentPreview}
+                        onRemoveAttachment={handleRemoveAttachment}
+                        isLoading={isLoading}
                     />
                 </div>
             )}
