@@ -391,12 +391,134 @@ interface Props {
     model: string
 }
 
+interface Attachment {
+    id: string
+    file: File
+    type: 'image' | 'video' | 'file'
+    previewUrl?: string
+    name: string
+    mimeType: string
+}
+
 interface Message {
     role: string
     text: string
-    imageUrl?: string
-    attachmentName?: string
-    attachmentType?: string
+    attachments?: {
+        type: 'image' | 'video' | 'file'
+        url?: string
+        name?: string
+        mimeType?: string
+    }[]
+}
+
+interface FileAttachmentProps {
+    name: string
+    type: string
+    onRemove?: () => void
+}
+
+function FileAttachment({ name, type, onRemove }: FileAttachmentProps) {
+    const getIconColor = (fileName: string, fileType: string) => {
+        const n = (fileName || "").toLowerCase()
+        const t = (fileType || "").toLowerCase()
+        if (n.endsWith('.pdf') || t.includes('pdf')) return "#EA4335"
+        if (n.endsWith('.xls') || n.endsWith('.xlsx') || n.endsWith('.csv') || t.includes('excel') || t.includes('spreadsheet') || t.includes('csv')) return "#34A853"
+        if (n.endsWith('.ppt') || n.endsWith('.pptx') || t.includes('presentation') || t.includes('powerpoint')) return "#FBBC04"
+        return "#4285F4"
+    }
+
+    return (
+        <div
+            style={{
+                width: 296,
+                height: 56,
+                padding: 0,
+                position: "relative",
+                background: "#3D3D3D",
+                borderRadius: 14,
+                justifyContent: "flex-start",
+                alignItems: "center",
+                display: "flex",
+                overflow: "hidden"
+            }}
+        >
+            <div style={{ position: "relative", width: 56, height: 56, flexShrink: 0 }}>
+                <svg width="100%" height="100%" viewBox="0 0 49 49" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z" 
+                        fill={getIconColor(name, type)}
+                    />
+                    <path d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z" fill="white" fillOpacity="0.95"/>
+                    <path d="M23.8125 30.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 23.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 16.5127C33.4559 16.5127 33.9775 17.0343 33.9775 17.6777C33.9775 18.3211 33.4559 18.8428 32.8125 18.8428H16.8125C16.1691 18.8428 15.6475 18.3211 15.6475 17.6777C15.6475 17.0343 16.1691 16.5127 16.8125 16.5127H32.8125Z" stroke="white" strokeOpacity="0.95" strokeWidth="0.33"/>
+                </svg>
+            </div>
+            {onRemove && (
+                <div
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onRemove()
+                    }}
+                    style={{
+                        position: "absolute",
+                        right: 8,
+                        top: 8,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        background: "#F6F6F6",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        border: "none",
+                        zIndex: 10
+                    }}
+                >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L9 9M9 1L1 9" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                </div>
+            )}
+            <div style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "flex-start",
+                overflow: "hidden",
+                flex: 1,
+                paddingLeft: 12,
+                paddingRight: 12,
+                gap: 2
+            }}>
+                <div style={{
+                    color: "rgba(255, 255, 255, 0.95)",
+                    fontSize: 13,
+                    fontFamily: "Inter",
+                    fontWeight: 500,
+                    lineHeight: "16px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    width: "100%",
+                    maxWidth: 190
+                }}>
+                    {name}
+                </div>
+                <div style={{
+                    color: "rgba(255, 255, 255, 0.65)",
+                    fontSize: 11,
+                    fontFamily: "Inter",
+                    fontWeight: 400,
+                    lineHeight: "14px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    width: "100%",
+                }}>
+                    {name.split('.').pop()?.toUpperCase() || 'FILE'}
+                </div>
+            </div>
+        </div>
+    )
 }
 
 // --- HELPER COMPONENT: CHAT INPUT BAR ---
@@ -408,9 +530,8 @@ interface ChatInputProps {
     onFileSelect: () => void
     placeholder?: string
     showEndCall?: boolean
-    imagePreviewUrl?: string
-    attachmentPreview?: { name: string; type: string } | null
-    onRemoveAttachment?: () => void
+    attachments: Attachment[]
+    onRemoveAttachment: (id: string) => void
     isLoading?: boolean
 }
 
@@ -422,8 +543,7 @@ function ChatInput({
     onFileSelect, 
     placeholder = "Ask anything", 
     showEndCall = true,
-    imagePreviewUrl = "",
-    attachmentPreview = null,
+    attachments = [],
     onRemoveAttachment,
     isLoading = false
 }: ChatInputProps) {
@@ -439,7 +559,7 @@ function ChatInput({
         }
     }, [value])
 
-    const hasContent = value.trim() || imagePreviewUrl || attachmentPreview
+    const hasContent = value.trim() || attachments.length > 0
 
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box"}}>
@@ -457,80 +577,84 @@ function ChatInput({
                 display: 'flex', 
                 flexDirection: 'column', // Stack attachments above input row
                 justifyContent: 'flex-end',
-                gap: 8,
+                gap: 16,
                 pointerEvents: "auto"
             }}>
               
               {/* ATTACHMENTS ROW */}
-              {(imagePreviewUrl || attachmentPreview) && (
+              {attachments.length > 0 && (
                   <div style={{
                       display: 'flex',
                       flexWrap: 'wrap',
                       gap: 8,
-                      paddingTop: 8, // Space for close button
-                      paddingLeft: 0, // Aligned with start of input box content
                       width: '100%'
                   }}>
-                      <div style={{
-                            position: 'relative',
-                            width: 48,
-                            height: 48,
-                            flexShrink: 0,
-                            borderRadius: 12, // More rounded for chip look
-                            overflow: 'visible',
-                            display: 'flex',
-                            background: imagePreviewUrl ? 'transparent' : 'rgba(255,255,255,0.1)',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: imagePreviewUrl ? 'none' : '1px solid rgba(255,255,255,0.1)'
-                        }}>
-                            {/* Remove Button */}
-                            <div 
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    if(onRemoveAttachment) onRemoveAttachment()
-                                }}
-                                style={{
-                                    position: "absolute",
-                                    right: -6,
-                                    top: -6,
-                                    width: 20,
-                                    height: 20,
-                                    borderRadius: 10,
-                                    background: "#303030", // Match input bg
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: "pointer",
-                                    border: "1.5px solid #555", // Distinct border
-                                    zIndex: 10
-                                }}
-                            >
-                                <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M1 1L9 9M9 1L1 9" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
+                      {attachments.map((att) => (
+                          <React.Fragment key={att.id}>
+                              {att.type === 'image' || att.type === 'video' ? (
+                                <div style={{
+                                    position: 'relative',
+                                    width: 56,
+                                    height: 56,
+                                    flexShrink: 0,
+                                    borderRadius: 12, 
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    background: 'transparent',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                    {/* Remove Button */}
+                                    <div 
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            if(onRemoveAttachment) onRemoveAttachment(att.id)
+                                        }}
+                                        style={{
+                                            position: "absolute",
+                                            right: 3,
+                                            top: 3,
+                                            width: 18,
+                                            height: 18,
+                                            borderRadius: 9,
+                                            background: "#FFFFFF", 
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            cursor: "pointer",
+                                            border: "none",
+                                            zIndex: 10
+                                        }}
+                                    >
+                                        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M1 1L9 9M9 1L1 9" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
 
-                            {/* Thumbnail / Icon */}
-                            {imagePreviewUrl ? (
-                                <img 
-                                    src={imagePreviewUrl} 
-                                    alt="Preview" 
-                                    style={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: 12,
-                                        objectFit: 'cover',
-                                        display: 'block'
-                                    }}
-                                />
-                            ) : (
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="rgba(255,255,255,0.2)"/>
-                                    <path d="M14 2V8H20" fill="rgba(255,255,255,0.4)"/>
-                                </svg>
-                            )}
-                        </div>
+                                    {/* Thumbnail / Icon */}
+                                    {att.previewUrl && (
+                                        <img 
+                                            src={att.previewUrl} 
+                                            alt={att.name}
+                                            style={{
+                                                width: 56,
+                                                height: 56,
+                                                borderRadius: 12,
+                                                objectFit: 'cover',
+                                                display: 'block'
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                              ) : (
+                                   <FileAttachment 
+                                        name={att.name} 
+                                        type={att.mimeType} 
+                                        onRemove={() => onRemoveAttachment && onRemoveAttachment(att.id)}
+                                   />
+                              )}
+                          </React.Fragment>
+                      ))}
                   </div>
               )}
 
@@ -548,9 +672,9 @@ function ChatInput({
                     className="UploadButton" 
                     onClick={onFileSelect}
                     style={{
-                      cursor: isLoading ? "not-allowed" : "pointer", 
-                      opacity: isLoading ? 0.3 : 0.65,
-                      pointerEvents: isLoading ? "none" : "auto",
+                      cursor: (isLoading || attachments.length >= 10) ? "not-allowed" : "pointer", 
+                      opacity: (isLoading || attachments.length >= 10) ? 0.3 : 0.65,
+                      pointerEvents: (isLoading || attachments.length >= 10) ? "none" : "auto",
                       width: 36,
                       height: 36,
                       display: 'flex',
@@ -680,23 +804,33 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isLoading, setIsLoading] = React.useState(false)
 
     // --- STATE: FILE UPLOADS ---
-    const [imageFile, setImageFile] = React.useState<File | null>(null)
-    const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string>("")
-    const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null)
-    const [attachmentPreview, setAttachmentPreview] = React.useState<{
-        name: string
-        type: string
-    } | null>(null)
+    const [attachments, setAttachments] = React.useState<Attachment[]>([])
     const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
     // --- STATE: RESPONSIVE UI ---
-    const [chatHeight, setChatHeight] = React.useState(300) // Height of the chat drawer
+    // Initialize height from localStorage if available, else default to 300 (will be auto-sized for new users)
+    const [chatHeight, setChatHeight] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("omeg_chat_height")
+            if (saved) return Number(saved)
+        }
+        return 300
+    })
+    
+    // Save height preference whenever it changes
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("omeg_chat_height", String(chatHeight))
+        }
+    }, [chatHeight])
+
     const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 })
     const isDragging = React.useRef(false)
     const dragStartY = React.useRef(0)
     const dragStartHeight = React.useRef(0)
     const containerRef = React.useRef<HTMLDivElement>(null)
     const rafRef = React.useRef<number | null>(null)
+    const hasInitialResized = React.useRef(false)
 
     // Helper for standardized console logging
     const log = (msg: string) => {
@@ -709,17 +843,41 @@ export default function OmegleMentorshipUI(props: Props) {
         return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
     }, [])
 
-    // --- EFFECT: HANDLE IMAGE PREVIEW ---
-    React.useEffect(() => {
-        if (imageFile && typeof window !== "undefined" && imageFile.type && imageFile.type.startsWith("image/")) {
-            const objectUrl = URL.createObjectURL(imageFile)
-            setImagePreviewUrl(objectUrl)
-            return () => URL.revokeObjectURL(objectUrl)
-        } else {
-            const isVideoSelected = !!(attachmentFile && attachmentFile.type.startsWith("video/"))
-            if (!isVideoSelected) setImagePreviewUrl("")
-        }
-    }, [imageFile, attachmentFile])
+    const generateVideoThumbnail = async (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            try {
+                const url = URL.createObjectURL(file)
+                const video = document.createElement("video")
+                video.src = url
+                video.muted = true
+                video.playsInline = true as any
+                const capture = () => {
+                    const canvas = document.createElement("canvas")
+                    const w = 320
+                    const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w))
+                    canvas.width = w
+                    canvas.height = h
+                    const ctx = canvas.getContext("2d")
+                    if (ctx) {
+                        ctx.drawImage(video, 0, 0, w, h)
+                        const dataUrl = canvas.toDataURL("image/jpeg", 0.8)
+                        try { URL.revokeObjectURL(url) } catch {}
+                        resolve(dataUrl)
+                    } else {
+                        resolve("")
+                    }
+                }
+                video.onloadedmetadata = () => { video.currentTime = 1.0 }
+                video.onseeked = () => capture()
+                video.onerror = () => {
+                    try { URL.revokeObjectURL(url) } catch {}
+                    resolve("")
+                }
+            } catch {
+                resolve("")
+            }
+        })
+    }
 
     // --- EFFECT: RESPONSIVE LAYOUT ENGINE ---
     // Uses ResizeObserver to track container dimensions for aspect-ratio calculations.
@@ -738,11 +896,15 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [])
 
     // --- EFFECT: CALCULATE MAXIMUM CHAT HEIGHT ---
-    // When the first message arrives, set chat height to maximum so items (cards or videos) fill width at top
+    // For new users (no localStorage history), maximize chat height so videos/cards are at the top.
     React.useEffect(() => {
         if (containerSize.width === 0 || containerSize.height === 0) return
-        if (messages.length === 0) return
         
+        // Check if we already have a saved preference (Returning User)
+        const hasSavedPreference = typeof window !== "undefined" && localStorage.getItem("omeg_chat_height")
+        
+        if (hasSavedPreference || hasInitialResized.current) return
+
         const isMobile = containerSize.width < 768
         
         // Calculate item dimensions based on available width
@@ -761,20 +923,18 @@ export default function OmegleMentorshipUI(props: Props) {
         // Total height - top padding - item height - drag bar height
         const maxChatHeight = containerSize.height - 16 - totalItemHeight - 24
         
-        // Only auto-maximize if we haven't manually resized yet (heuristic: chatHeight is default 300)
-        // AND if we are in the "cards" mode (no role yet), OR if we want it to happen for videos too (which is now requested)
-        if (chatHeight === 300) {
-             setChatHeight(Math.max(100, maxChatHeight))
-        }
-    }, [messages.length, containerSize, role])
+        // Auto-maximize for new users
+        setChatHeight(Math.max(100, maxChatHeight))
+        hasInitialResized.current = true
+        
+    }, [containerSize])
 
     const handleRoleSelect = (selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
             window.location.hash = `#${selectedRole}`
         }
         setRole(selectedRole)
-        // Smoothly transition chat height to normal video view size
-        setChatHeight(300)
+        // Removed setChatHeight(300) to persist user preference
     }
 
     // --- EFFECT: DETECT URL HASH AND SET ROLE ---
@@ -1000,85 +1160,64 @@ export default function OmegleMentorshipUI(props: Props) {
         }
     }
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files && e.target.files[0]
-        if (!file) {
-            setImageFile(null)
-            setAttachmentFile(null)
-            setAttachmentPreview(null)
-            return
-        }
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || [])
+        if (files.length === 0) return
 
-        if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
-            alert(`File size exceeds ${MAX_UPLOAD_SIZE_MB}MB limit.`)
+        if (attachments.length + files.length > 10) {
+            alert("Maximum 10 attachments allowed.")
             if (fileInputRef.current) fileInputRef.current.value = ""
             return
         }
 
-        const isImage = file.type.startsWith("image/")
-        const isVideo = file.type.startsWith("video/")
+        const newAttachments: Attachment[] = []
 
-        if (isImage) {
-            setImageFile(file)
-            setAttachmentFile(null)
-            setAttachmentPreview(null)
-        } else if (isVideo) {
-            // Generate video thumbnail
-            try {
-                const url = URL.createObjectURL(file)
-                const video = document.createElement("video")
-                video.src = url
-                video.muted = true
-                video.playsInline = true as any
-                const capture = () => {
-                    const canvas = document.createElement("canvas")
-                    const w = 320
-                    const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w))
-                    canvas.width = w
-                    canvas.height = h
-                    const ctx = canvas.getContext("2d")
-                    if (ctx) {
-                        ctx.drawImage(video, 0, 0, w, h)
-                        const dataUrl = canvas.toDataURL("image/jpeg", 0.8)
-                        setImagePreviewUrl(dataUrl)
-                        setAttachmentFile(file)
-                        setImageFile(null)
-                        setAttachmentPreview(null)
-                        try {
-                            URL.revokeObjectURL(url)
-                        } catch {}
-                    }
-                }
-                video.onloadedmetadata = () => {
-                    video.currentTime = 1.0
-                }
-                video.onseeked = () => capture()
-                video.onerror = () => {
-                    setAttachmentFile(file)
-                    setAttachmentPreview({ name: file.name, type: file.type })
-                    setImagePreviewUrl("")
-                    try {
-                        URL.revokeObjectURL(url)
-                    } catch {}
-                }
-            } catch {
-                setAttachmentFile(file)
-                setAttachmentPreview({ name: file.name, type: file.type })
-                setImagePreviewUrl("")
+        for (const file of files) {
+            if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+                alert(`File ${file.name} exceeds ${MAX_UPLOAD_SIZE_MB}MB limit.`)
+                continue
             }
-        } else {
-            setAttachmentFile(file)
-            setAttachmentPreview({ name: file.name, type: file.type })
-            setImageFile(null)
-            setImagePreviewUrl("")
+
+            const id = Math.random().toString(36).substr(2, 9)
+            const type = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "file"
+            
+            let previewUrl = ""
+            if (type === "image") {
+                previewUrl = URL.createObjectURL(file)
+            }
+
+            newAttachments.push({
+                id,
+                file,
+                type,
+                previewUrl,
+                name: file.name,
+                mimeType: file.type
+            })
         }
+        
+        setAttachments(prev => [...prev, ...newAttachments])
+        
+        if (fileInputRef.current) fileInputRef.current.value = ""
+        
+        // Handle video thumbnails
+        newAttachments.forEach(att => {
+            if (att.type === 'video') {
+                generateVideoThumbnail(att.file).then(url => {
+                    setAttachments(prev => prev.map(p => p.id === att.id ? { ...p, previewUrl: url } : p))
+                })
+            }
+        })
     }
 
-    const handleRemoveAttachment = () => {
-        setImageFile(null)
-        setAttachmentFile(null)
-        setAttachmentPreview(null)
-        setImagePreviewUrl("")
+    const handleRemoveAttachment = (id: string) => {
+        setAttachments(prev => {
+            const att = prev.find(a => a.id === id)
+            if (att && att.previewUrl && att.type === 'image') {
+                URL.revokeObjectURL(att.previewUrl)
+            }
+            return prev.filter(a => a.id !== id)
+        })
         if (fileInputRef.current) fileInputRef.current.value = ""
     }
 
@@ -1088,30 +1227,29 @@ export default function OmegleMentorshipUI(props: Props) {
      * Handles message delivery to the Google Gemini API.
      */
     const handleSendMessage = async () => {
-        if (!inputText.trim() && !imageFile && !attachmentFile) return
+        if (!inputText.trim() && attachments.length === 0) return
         if (!geminiApiKey) {
             setMessages(prev => [...prev, { role: "model", text: "Please provide a Gemini API Key in the properties panel." }])
             return
         }
 
         const textToSend = inputText
-        const imageFileToSend = imageFile
-        const attachmentFileToSend = attachmentFile
+        const attachmentsToSend = [...attachments]
 
         // Build user message for display
         const userMsg: Message = { 
             role: "user", 
             text: textToSend,
-            imageUrl: imagePreviewUrl || undefined,
-            attachmentName: attachmentFileToSend?.name || undefined,
-            attachmentType: attachmentFileToSend?.type || undefined
+            attachments: attachmentsToSend.map(a => ({
+                type: a.type,
+                url: a.previewUrl, // For images/videos
+                name: a.name,
+                mimeType: a.mimeType
+            }))
         }
         setMessages(prev => [...prev, userMsg])
         setInputText("")
-        setImageFile(null)
-        setAttachmentFile(null)
-        setAttachmentPreview(null)
-        setImagePreviewUrl("")
+        setAttachments([])
         if (fileInputRef.current) fileInputRef.current.value = ""
         setIsLoading(true)
 
@@ -1123,36 +1261,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 userContent.push({ text: textToSend })
             }
 
-            // Handle image
-            if (imageFileToSend) {
-                const base64 = await new Promise<string>((resolve, reject) => {
-                    if (typeof window !== "undefined" && window.FileReader) {
-                        const reader = new window.FileReader()
-                        reader.onload = () => {
-                            const result = reader.result as string
-                            if (typeof result === "string") {
-                                const base64str = result.substring(result.indexOf(",") + 1)
-                                resolve(base64str)
-                            } else {
-                                reject(new Error("Failed to read image as base64 string"))
-                            }
-                        }
-                        reader.onerror = reject
-                        reader.readAsDataURL(imageFileToSend)
-                    } else {
-                        reject(new Error("FileReader API not available"))
-                    }
-                })
-                userContent.push({
-                    inlineData: {
-                        mimeType: imageFileToSend.type,
-                        data: base64
-                    }
-                })
-            }
-
-            // Handle attachment (video or file)
-            if (attachmentFileToSend) {
+            for (const att of attachmentsToSend) {
                 const base64 = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader()
                     reader.onload = () => {
@@ -1160,11 +1269,12 @@ export default function OmegleMentorshipUI(props: Props) {
                         resolve(result.substring(result.indexOf(",") + 1))
                     }
                     reader.onerror = reject
-                    reader.readAsDataURL(attachmentFileToSend)
+                    reader.readAsDataURL(att.file)
                 })
+
                 userContent.push({
                     inlineData: {
-                        mimeType: attachmentFileToSend.type || "application/octet-stream",
+                        mimeType: att.file.type || "application/octet-stream",
                         data: base64
                     }
                 })
@@ -1264,14 +1374,12 @@ export default function OmegleMentorshipUI(props: Props) {
     }
 
     // --- UI DIMENSION CALCULATIONS ---
-    const hasMessages = messages.length > 0
-    const currentChatHeight = hasMessages ? chatHeight : 0
     
     // Detect mobile vs desktop based on container width
     const isMobileLayout = containerSize.width < 768
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
-    const videoSectionHeight = containerSize.height - currentChatHeight - (hasMessages ? 40 : 120)
+    const videoSectionHeight = containerSize.height - chatHeight - 40
     const targetRatio = 1.55
     
     let finalWidth = 0
@@ -1317,7 +1425,7 @@ export default function OmegleMentorshipUI(props: Props) {
             width: 100%;
             border-collapse: collapse;
             margin: 1em 0;
-            font-size: 14px;
+            font-size: 16px;
         }
         .chat-markdown-table th,
         .chat-markdown-table td {
@@ -1337,7 +1445,7 @@ export default function OmegleMentorshipUI(props: Props) {
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85em;
+            font-size: 0.9em;
             margin: 1em 0;
             white-space: pre;
         }
@@ -1361,6 +1469,11 @@ export default function OmegleMentorshipUI(props: Props) {
             height: 1px;
             background: rgba(255,255,255,0.1);
             margin: 1.5em 0;
+        }
+        @keyframes pulseStar {
+            0% { opacity: 0.5; transform: scale(0.85); }
+            50% { opacity: 1; transform: scale(1.0); }
+            100% { opacity: 0.5; transform: scale(0.85); }
         }
     `
 
@@ -1401,8 +1514,8 @@ export default function OmegleMentorshipUI(props: Props) {
                     paddingTop: 16,
                     paddingLeft: 16,
                     paddingRight: 16,
-                    paddingBottom: hasMessages ? 0 : 100,
-                    alignItems: (hasMessages && !isMobileLayout) ? "flex-end" : "center", 
+                    paddingBottom: 0,
+                    alignItems: (!isMobileLayout) ? "flex-end" : "center", 
                     justifyContent: "center",
                     position: "relative",
                     minHeight: 0,
@@ -1481,43 +1594,41 @@ export default function OmegleMentorshipUI(props: Props) {
             </div>
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
-            {hasMessages && (
+            <div
+                onPointerDown={handlePointerDown}
+                style={{
+                    height: 24,
+                    width: "100%",
+                    maxWidth: 728,
+                    margin: "0 auto",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "ns-resize",
+                    flexShrink: 0,
+                    touchAction: "none",
+                    zIndex: 25,
+                }}
+            >
                 <div
-                    onPointerDown={handlePointerDown}
                     style={{
-                        height: 24,
-                        width: "100%",
-                        maxWidth: 728,
-                        margin: "0 auto",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "ns-resize",
-                        flexShrink: 0,
-                        touchAction: "none",
-                        zIndex: 25,
+                        width: 32,
+                        height: 4,
+                        borderRadius: 2,
+                        background: "rgba(255,255,255,0.2)"
                     }}
-                >
-                    <div
-                        style={{
-                            width: 32,
-                            height: 4,
-                            borderRadius: 2,
-                            background: "rgba(255,255,255,0.2)"
-                        }}
-                    />
-                </div>
-            )}
+                />
+            </div>
 
             {/* 3. AI CHAT HISTORY LAYER */}
             <div 
                 style={{
-                    height: currentChatHeight,
+                    height: chatHeight,
                     width: "100%",
                     maxWidth: 728,
                     margin: "0 auto",
                     position: "relative",
-                    display: hasMessages ? "flex" : "none",
+                    display: "flex",
                     flexDirection: "column",
                 }}
             >
@@ -1548,68 +1659,40 @@ export default function OmegleMentorshipUI(props: Props) {
                                  alignItems: msg.role === "user" ? "flex-end" : "flex-start"
                              }}>
                                 {/* Display attachment/image preview in message */}
-                                {msg.role === "user" && (msg.imageUrl || msg.attachmentName) && (
+                                {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (
                                     <div style={{ 
-                                        marginBottom: 4,
                                         width: "100%",
                                         display: "flex",
-                                        justifyContent: "flex-end"
+                                        flexDirection: "column",
+                                        alignItems: "flex-end",
+                                        gap: 8,
+                                        marginBottom: 4
                                     }}>
-                                        {msg.imageUrl ? (
-                                            <img 
-                                                src={msg.imageUrl} 
-                                                alt="Uploaded" 
-                                                style={{
-                                                    maxHeight: 128,
-                                                    width: "auto",
-                                                    maxWidth: "100%",
-                                                    borderRadius: 16, // Matches Gemini's radius
-                                                    display: 'block',
-                                                    objectFit: "contain"
-                                                }}
-                                            />
-                                        ) : msg.attachmentName ? (
-                                            <div style={{
-                                                padding: '12px 16px',
-                                                background: 'rgba(255, 255, 255, 0.1)',
-                                                borderRadius: 16,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 12,
-                                                width: "auto"
-                                            }}>
-                                                <div style={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    flexShrink: 0
-                                                }}>
-                                                    <svg width="100%" height="100%" viewBox="0 0 49 49" fill="none">
-                                                        <path d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z" fill="#6AA4FB"/>
-                                                        <path d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z" fill="white" fillOpacity="0.95"/>
-                                                    </svg>
-                                                </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                    <div style={{
-                                                        color: 'rgba(255,255,255,0.95)',
-                                                        fontSize: 13,
-                                                        fontWeight: 500,
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        maxWidth: 200
-                                                    }}>
-                                                        {msg.attachmentName}
-                                                    </div>
-                                                    <div style={{
-                                                        color: 'rgba(255,255,255,0.65)',
-                                                        fontSize: 11,
-                                                        fontWeight: 400
-                                                    }}>
-                                                        {msg.attachmentType?.split('/')[1]?.toUpperCase() || 'FILE'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ) : null}
+                                        {msg.attachments.map((att, i) => (
+                                            <React.Fragment key={i}>
+                                                {att.type === 'image' || att.type === 'video' ? (
+                                                    att.url ? (
+                                                        <img 
+                                                            src={att.url} 
+                                                            alt="Uploaded" 
+                                                            style={{
+                                                                maxHeight: 128,
+                                                                width: "auto",
+                                                                maxWidth: "100%",
+                                                                borderRadius: 16, 
+                                                                display: 'block',
+                                                                objectFit: "contain"
+                                                            }}
+                                                        />
+                                                    ) : null
+                                                ) : (
+                                                    <FileAttachment 
+                                                        name={att.name || "File"} 
+                                                        type={att.mimeType || ""} 
+                                                    />
+                                                )}
+                                            </React.Fragment>
+                                        ))}
                                     </div>
                                 )}
                                 
@@ -1620,15 +1703,15 @@ export default function OmegleMentorshipUI(props: Props) {
                                         borderRadius: msg.role === "user" ? 20 : 0,
                                         background: msg.role === "user" ? "rgba(255, 255, 255, 0.08)" : "transparent",
                                         color: "rgba(255,255,255,0.95)",
-                                        lineHeight: 1.5,
-                                        fontSize: 14,
+                                        lineHeight: 1.6,
+                                        fontSize: 16,
                                         alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
                                     }}>
                                         {msg.role === "user" 
                                             ? msg.text 
                                             : renderSimpleMarkdown(
                                                 msg.text, 
-                                                { fontSize: 14, color: "rgba(255,255,255,0.95)", lineHeight: 1.5 },
+                                                { fontSize: 16, color: "rgba(255,255,255,0.95)", lineHeight: 1.6 },
                                                 { color: "#4DA6FF", textDecoration: "underline" }
                                               )
                                         }
@@ -1637,7 +1720,35 @@ export default function OmegleMentorshipUI(props: Props) {
                              </div>
                          </div>
                     ))}
-                    {isLoading && <div style={{ opacity: 0.5, fontSize: 12, paddingLeft: 8 }}>Mentor assistant is thinking...</div>}
+                    {isLoading && (
+                        <div style={{ paddingLeft: 8, paddingBottom: 8 }}>
+                            <div style={{ animation: "pulseStar 1.5s infinite ease-in-out", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <g clipPath="url(#clipLoadAnimMentorship)">
+                                        <path
+                                            d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                            fill="white"
+                                        />
+                                    </g>
+                                    <defs>
+                                        <clipPath id="clipLoadAnimMentorship">
+                                            <rect
+                                                width="20"
+                                                height="20"
+                                                fill="white"
+                                            />
+                                        </clipPath>
+                                    </defs>
+                                </svg>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* 4. CHAT INPUT INTERFACE */}
@@ -1662,44 +1773,12 @@ export default function OmegleMentorshipUI(props: Props) {
                         onFileSelect={handleFileSelect}
                         placeholder="Ask anything"
                         showEndCall={status !== "idle"}
-                        imagePreviewUrl={imagePreviewUrl}
-                        attachmentPreview={attachmentPreview}
+                        attachments={attachments}
                         onRemoveAttachment={handleRemoveAttachment}
                         isLoading={isLoading}
                     />
                 </div>
             </div>
-
-            {/* INITIAL STATE INPUT (Visible when history is empty) */}
-            {!hasMessages && (
-                <div
-                    style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        width: "100%",
-                        display: "flex",
-                        justifyContent: "center",
-                        zIndex: 20,
-                        pointerEvents: "none",
-                    }}
-                >
-                    <ChatInput 
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        onSend={handleSendMessage}
-                        onEndCall={cleanup}
-                        onFileSelect={handleFileSelect}
-                        placeholder="Ask anything"
-                        showEndCall={status !== "idle"}
-                        imagePreviewUrl={imagePreviewUrl}
-                        attachmentPreview={attachmentPreview}
-                        onRemoveAttachment={handleRemoveAttachment}
-                        isLoading={isLoading}
-                    />
-                </div>
-            )}
 
         </div>
     )
