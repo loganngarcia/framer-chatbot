@@ -526,6 +526,7 @@ interface ChatInputProps {
     value: string
     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
     onSend: () => void
+    onStop?: () => void
     onEndCall: () => void
     onFileSelect: () => void
     placeholder?: string
@@ -539,6 +540,7 @@ function ChatInput({
     value, 
     onChange, 
     onSend, 
+    onStop,
     onEndCall, 
     onFileSelect, 
     placeholder = "Ask anything", 
@@ -670,11 +672,13 @@ function ChatInput({
                     data-svg-wrapper 
                     data-layer="upload-button" 
                     className="UploadButton" 
-                    onClick={onFileSelect}
+                    onClick={() => {
+                        if (attachments.length < 10) onFileSelect()
+                    }}
                     style={{
-                      cursor: (isLoading || attachments.length >= 10) ? "not-allowed" : "pointer", 
-                      opacity: (isLoading || attachments.length >= 10) ? 0.3 : 0.65,
-                      pointerEvents: (isLoading || attachments.length >= 10) ? "none" : "auto",
+                      cursor: (attachments.length >= 10) ? "not-allowed" : "pointer", 
+                      opacity: (attachments.length >= 10) ? 0.3 : 0.65,
+                      pointerEvents: (attachments.length >= 10) ? "none" : "auto",
                       width: 36,
                       height: 36,
                       display: 'flex',
@@ -701,7 +705,7 @@ function ChatInput({
                             }
                         }}
                         placeholder={placeholder}
-                        disabled={isLoading}
+                        disabled={false}
                         className="ChatTextInput" 
                         style={{
                             flex: '1 1 0', 
@@ -722,26 +726,37 @@ function ChatInput({
                     />
                   </div>
 
-                  {/* SEND BUTTON */}
+                  {/* SEND / STOP BUTTON */}
                   <div 
                     data-svg-wrapper 
                     data-layer="send-button" 
                     className="SendButton" 
                     onClick={() => {
-                      if (hasContent && !isLoading) onSend()
+                        if (isLoading && onStop) {
+                            onStop()
+                        } else if (hasContent) {
+                            onSend()
+                        }
                     }}
                     style={{
-                      cursor: (hasContent && !isLoading) ? "pointer" : "not-allowed", 
+                      cursor: "pointer", 
                       display: hasContent ? "block" : "none",
-                      opacity: isLoading ? 0.5 : 1,
+                      opacity: 1,
                       width: 36,
                       height: 36
                     }}
                   >
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
-                    <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill="black" fillOpacity="0.95"/>
-                    </svg>
+                    {isLoading ? (
+                        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
+                            <rect x="12" y="12" width="12" height="12" rx="2" fill="black" fillOpacity="0.95"/>
+                        </svg>
+                    ) : (
+                        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill="black" fillOpacity="0.95"/>
+                        </svg>
+                    )}
                   </div>
               </div>
 
@@ -802,6 +817,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const [messages, setMessages] = React.useState<Message[]>([])
     const [inputText, setInputText] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
+    const abortControllerRef = React.useRef<AbortController | null>(null)
 
     // --- STATE: FILE UPLOADS ---
     const [attachments, setAttachments] = React.useState<Attachment[]>([])
@@ -1222,6 +1238,14 @@ export default function OmegleMentorshipUI(props: Props) {
     }
 
     // --- AI CHAT (GEMINI) LOGIC ---
+    
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+            abortControllerRef.current = null
+        }
+        setIsLoading(false)
+    }
 
     /**
      * Handles message delivery to the Google Gemini API.
@@ -1252,6 +1276,13 @@ export default function OmegleMentorshipUI(props: Props) {
         setAttachments([])
         if (fileInputRef.current) fileInputRef.current.value = ""
         setIsLoading(true)
+
+        // Abort previous if any
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+        const controller = new AbortController()
+        abortControllerRef.current = controller
 
         try {
             // Build API payload
@@ -1305,7 +1336,8 @@ export default function OmegleMentorshipUI(props: Props) {
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 }
             )
 
@@ -1325,10 +1357,14 @@ export default function OmegleMentorshipUI(props: Props) {
                 setMessages(prev => [...prev, { role: "model", text: "Error: No response from Gemini." }])
             }
         } catch (error: any) {
+            if (error.name === 'AbortError') {
+                return // Request cancelled
+            }
             console.error("Network Error:", error)
             setMessages(prev => [...prev, { role: "model", text: `Error connecting to Gemini: ${error.message}` }])
         } finally {
             setIsLoading(false)
+            abortControllerRef.current = null
         }
     }
 
@@ -1823,6 +1859,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onSend={handleSendMessage}
+                        onStop={handleStop}
                         onEndCall={cleanup}
                         onFileSelect={handleFileSelect}
                         placeholder="Ask anything"
