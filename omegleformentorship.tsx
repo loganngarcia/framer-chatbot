@@ -1496,6 +1496,7 @@ export default function OmegleMentorshipUI(props: Props) {
             <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
                 capture={isMobile ? "environment" : undefined}
                 style={{ display: "none" }}
@@ -1658,43 +1659,96 @@ export default function OmegleMentorshipUI(props: Props) {
                                  gap: 8,
                                  alignItems: msg.role === "user" ? "flex-end" : "flex-start"
                              }}>
-                                {/* Display attachment/image preview in message */}
-                                {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (
-                                    <div style={{ 
-                                        width: "100%",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "flex-end",
-                                        gap: 8,
-                                        marginBottom: 4
-                                    }}>
-                                        {msg.attachments.map((att, i) => (
-                                            <React.Fragment key={i}>
-                                                {att.type === 'image' || att.type === 'video' ? (
-                                                    att.url ? (
-                                                        <img 
-                                                            src={att.url} 
-                                                            alt="Uploaded" 
-                                                            style={{
-                                                                maxHeight: 128,
-                                                                width: "auto",
-                                                                maxWidth: "100%",
-                                                                borderRadius: 16, 
-                                                                display: 'block',
-                                                                objectFit: "contain"
-                                                            }}
+                                {/* Attachments rendering */}
+                                {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (() => {
+                                    const mediaAttachments = msg.attachments.filter(a => a.type === 'image' || a.type === 'video')
+                                    const fileAttachments = msg.attachments.filter(a => a.type !== 'image' && a.type !== 'video')
+
+                                    return (
+                                        <>
+                                            {/* 1. Media Grid (Images/Videos) */}
+                                            {mediaAttachments.length > 0 && (
+                                                <div style={{ 
+                                                    marginBottom: 4,
+                                                    width: "100%",
+                                                    display: mediaAttachments.length === 1 ? "flex" : "grid",
+                                                    justifyContent: "flex-end",
+                                                    gridTemplateColumns: mediaAttachments.length === 1 
+                                                        ? "none"
+                                                        : (mediaAttachments.length === 2 || mediaAttachments.length === 4) 
+                                                            ? "repeat(2, 96px)" 
+                                                            : "repeat(3, 96px)",
+                                                    gap: 8,
+                                                }}>
+                                                    {mediaAttachments.map((att, i) => (
+                                                        <React.Fragment key={i}>
+                                                            {mediaAttachments.length === 1 ? (
+                                                                // Single Item: specialized display
+                                                                att.url ? (
+                                                                    <img 
+                                                                        src={att.url} 
+                                                                        alt="Uploaded" 
+                                                                        style={{
+                                                                            maxHeight: 128,
+                                                                            width: "auto",
+                                                                            maxWidth: "100%",
+                                                                            borderRadius: 16, 
+                                                                            display: 'block',
+                                                                            objectFit: "contain"
+                                                                        }}
+                                                                    />
+                                                                ) : null
+                                                            ) : (
+                                                                // Grid Item: 96x96 square
+                                                                <div style={{
+                                                                    width: 96,
+                                                                    height: 96,
+                                                                    borderRadius: 12,
+                                                                    overflow: "hidden",
+                                                                    position: "relative",
+                                                                    background: "rgba(255,255,255,0.05)"
+                                                                }}>
+                                                                    {att.url && (
+                                                                        <img 
+                                                                            src={att.url} 
+                                                                            alt="Uploaded" 
+                                                                            style={{
+                                                                                width: "100%",
+                                                                                height: "100%",
+                                                                                objectFit: "cover",
+                                                                                display: "block"
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* 2. File Stack (Always Vertical) */}
+                                            {fileAttachments.length > 0 && (
+                                                <div style={{ 
+                                                    width: "100%",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    alignItems: "flex-end",
+                                                    gap: 8,
+                                                    marginBottom: 4
+                                                }}>
+                                                    {fileAttachments.map((att, i) => (
+                                                        <FileAttachment 
+                                                            key={i}
+                                                            name={att.name || "File"} 
+                                                            type={att.mimeType || ""} 
                                                         />
-                                                    ) : null
-                                                ) : (
-                                                    <FileAttachment 
-                                                        name={att.name || "File"} 
-                                                        type={att.mimeType || ""} 
-                                                    />
-                                                )}
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
-                                )}
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )
+                                })()}
                                 
                                 {/* Text content */}
                                 {msg.text && (
