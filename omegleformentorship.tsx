@@ -1,5 +1,6 @@
 import * as React from "react"
 import { addPropertyControls, ControlType } from "framer"
+import { motion, AnimatePresence } from "framer-motion"
 
 // --- MARKDOWN & PARSING UTILITIES ---
 
@@ -1000,6 +1001,166 @@ function DebugConsole({ logs }: { logs: string[] }) {
     )
 }
 
+// --- HELPER COMPONENT: REPORT MODAL ---
+interface ReportModalProps {
+    isOpen: boolean
+    onClose: () => void
+    onSubmit: (reason: string) => void
+}
+
+function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
+    const [selected, setSelected] = React.useState<string | null>(null)
+    
+    const reasons = [
+        "Violence & self-harm",
+        "Sexual exploitation & abuse",
+        "Child/teen exploitation",
+        "Bullying & harassment",
+        "Spam, fraud & deception",
+        "Privacy violation",
+        "Intellectual property",
+        "Age-inappropriate content",
+        "Something else"
+    ]
+
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) onClose()
+    }
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0, 0, 0, 0.7)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10000,
+                        padding: 24,
+                    }}
+                    onClick={handleBackdropClick}
+                >
+                    <motion.div
+                        initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                        style={{
+                            width: "100%",
+                            maxWidth: 400,
+                            background: "#1E1E1E",
+                            borderRadius: 28,
+                            padding: "24px 24px 16px 24px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 16,
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                            border: "1px solid rgba(255,255,255,0.05)"
+                        }}
+                    >
+                        {/* Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                            <div style={{ color: "white", fontSize: 20, fontWeight: "600", letterSpacing: "-0.2px" }}>Report a message</div>
+                            <button 
+                                onClick={onClose}
+                                style={{ 
+                                    background: "transparent", 
+                                    border: "none", 
+                                    color: "white", 
+                                    cursor: "pointer", 
+                                    padding: 0,
+                                    opacity: 0.7,
+                                    marginTop: -4
+                                }}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div style={{ color: "white", fontSize: 16, fontWeight: "500", marginTop: 4 }}>Why are you reporting this message?</div>
+
+                        {/* Options List */}
+                        <div style={{ display: "flex", flexDirection: "column", marginTop: 4 }}>
+                            {reasons.map((reason) => (
+                                <div 
+                                    key={reason}
+                                    onClick={() => setSelected(reason)}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 14,
+                                        padding: "10px 0",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: "50%",
+                                        border: `2px solid ${selected === reason ? "white" : "rgba(255,255,255,0.4)"}`,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        transition: "all 0.15s ease-out",
+                                        boxSizing: "border-box"
+                                    }}>
+                                        {selected === reason && (
+                                            <div style={{ 
+                                                width: 10, 
+                                                height: 10, 
+                                                borderRadius: "50%", 
+                                                background: "white" 
+                                            }} />
+                                        )}
+                                    </div>
+                                    <div style={{ 
+                                        color: "white", 
+                                        fontSize: 16, 
+                                        fontWeight: "400",
+                                        opacity: selected === reason ? 1 : 0.9 
+                                    }}>{reason}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Footer / Submit */}
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                            <button 
+                                disabled={!selected}
+                                onClick={() => selected && onSubmit(selected)}
+                                style={{
+                                    padding: "10px 24px",
+                                    borderRadius: 999,
+                                    background: selected ? "white" : "#3A3A3A",
+                                    color: selected ? "black" : "rgba(255,255,255,0.4)",
+                                    border: "none",
+                                    fontSize: 16,
+                                    fontWeight: "600",
+                                    cursor: selected ? "pointer" : "default",
+                                    transition: "all 0.2s ease",
+                                    boxSizing: "border-box"
+                                }}
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    )
+}
+
 /**
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
@@ -1019,6 +1180,7 @@ export default function OmegleMentorshipUI(props: Props) {
     // Toggle this via the 'Debug Mode' property in Framer to see on-screen logs.
     // Useful for mobile debugging where browser console isn't easily accessible.
     const [logs, setLogs] = React.useState<string[]>([])
+    const [showReportModal, setShowReportModal] = React.useState(false)
     
     // Helper for standardized console logging
     // Use this wrapper instead of console.log to ensure output appears in the UI debug console
@@ -1345,8 +1507,13 @@ export default function OmegleMentorshipUI(props: Props) {
     }
 
     const handleReport = () => {
-        // Just close the menu for now
-        // alert("Report feature is not yet implemented.")
+        setShowReportModal(true)
+    }
+
+    const onSubmitReport = (reason: string) => {
+        log(`Report submitted: ${reason}`)
+        setShowReportModal(false)
+        // You could add logic here to send the report to a backend or AI
     }
 
     const getCurrentStream = () => {
@@ -2380,6 +2547,12 @@ export default function OmegleMentorshipUI(props: Props) {
                 </div>
             </div>
 
+            {/* REPORT MODAL */}
+            <ReportModal 
+                isOpen={showReportModal} 
+                onClose={() => setShowReportModal(false)} 
+                onSubmit={onSubmitReport} 
+            />
         </div>
     )
 }
