@@ -671,7 +671,7 @@ function ChatInput({
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box", pointerEvents: "auto"}}>
             {/* CONVERSATION ACTIONS MENU */}
             {showMenu && (
-                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 24, marginBottom: -16, zIndex: 100 }}>
+                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 28, marginBottom: -28, zIndex: 100 }}>
                     <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'inline-flex'}}>
                         
                         {/* Add files & photos */}
@@ -732,7 +732,7 @@ function ChatInput({
                                 setShowMenu(false)
                             }}
                             style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.04)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
                             <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
