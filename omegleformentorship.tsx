@@ -1063,7 +1063,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
             >
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ color: "white", fontSize: 20, fontWeight: "600", letterSpacing: "-0.2px" }}>Report a message</div>
+                    <div style={{ color: "white", fontSize: 20, fontWeight: "600", letterSpacing: "-0.2px" }}>Report user</div>
                     <button 
                         onClick={onClose}
                         style={{ 
@@ -1082,7 +1082,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                     </button>
                 </div>
 
-                <div style={{ color: "white", fontSize: 16, fontWeight: "500", marginTop: 4 }}>Why are you reporting this message?</div>
+                <div style={{ color: "white", fontSize: 16, fontWeight: "500", marginTop: 4 }}>Why are you reporting this user?</div>
 
                 {/* Options List */}
                 <div style={{ display: "flex", flexDirection: "column", marginTop: 4 }}>
@@ -1123,7 +1123,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                             </div>
                             <div style={{ 
                                 color: "white", 
-                                fontSize: 16, 
+                                fontSize: 15, 
                                 fontWeight: "400",
                                 opacity: 0.9 
                             }}>{reason}</div>
@@ -1142,8 +1142,8 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                             background: selected ? "white" : "#3A3A3A",
                             color: selected ? "black" : "rgba(255,255,255,0.4)",
                             border: "none",
-                            fontSize: 16,
-                            fontWeight: "400",
+                            fontSize: 15,
+                            fontWeight: "500",
                             cursor: selected ? "pointer" : "default",
                             transition: "all 0.2s ease",
                             boxSizing: "border-box"
