@@ -709,7 +709,7 @@ function ChatInput({
                                 onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
                                 onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
                             >
-                                <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
                                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke="white" strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
                                     </svg>
@@ -735,7 +735,7 @@ function ChatInput({
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
-                            <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                            <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
                                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
