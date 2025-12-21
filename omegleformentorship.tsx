@@ -720,7 +720,7 @@ function ChatInput({
                             </div>
                         )}
 
-                        <div data-layer="separator" className="Separator" style={{width: 156, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
+                        <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
 
                         {/* Report */}
                         <div 
