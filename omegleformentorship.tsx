@@ -683,7 +683,7 @@ function ChatInput({
                                 onFileSelect()
                                 setShowMenu(false)
                             }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
@@ -705,7 +705,7 @@ function ChatInput({
                                     if (onScreenShare) onScreenShare()
                                     setShowMenu(false)
                                 }}
-                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                                 onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
                                 onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
                             >
@@ -731,7 +731,7 @@ function ChatInput({
                                 if (onReport) onReport()
                                 setShowMenu(false)
                             }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
