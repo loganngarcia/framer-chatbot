@@ -389,6 +389,7 @@ interface Props {
     systemPrompt: string
     accentColor: string
     model: string
+    debugMode?: boolean
 }
 
 interface Attachment {
@@ -521,6 +522,72 @@ function FileAttachment({ name, type, onRemove }: FileAttachmentProps) {
     )
 }
 
+// --- HELPER COMPONENT: VIDEO PLAYER ---
+function VideoPlayer({ 
+    stream, 
+    isMirrored = false, 
+    style = {}, 
+    muted = false,
+    onVideoSize
+}: { 
+    stream: MediaStream | null, 
+    isMirrored?: boolean, 
+    style?: React.CSSProperties, 
+    muted?: boolean,
+    onVideoSize?: (width: number, height: number) => void
+}) {
+    const videoRef = React.useRef<HTMLVideoElement>(null)
+    
+    React.useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream
+        } else if (videoRef.current) {
+            videoRef.current.srcObject = null
+        }
+    }, [stream])
+    
+    // Monitor video dimensions
+    React.useEffect(() => {
+        const video = videoRef.current
+        if (!video || !onVideoSize) return
+
+        const handleResize = () => {
+            if (video.videoWidth && video.videoHeight) {
+                onVideoSize(video.videoWidth, video.videoHeight)
+            }
+        }
+
+        video.addEventListener("loadedmetadata", handleResize)
+        video.addEventListener("resize", handleResize)
+        
+        // Polling in case resize event doesn't fire on stream changes
+        const interval = setInterval(handleResize, 1000)
+
+        return () => {
+            video.removeEventListener("loadedmetadata", handleResize)
+            video.removeEventListener("resize", handleResize)
+            clearInterval(interval)
+        }
+    }, [stream, onVideoSize])
+
+    return (
+        <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted={muted} 
+            style={{ 
+                width: "100%", 
+                height: "100%", 
+                objectFit: "cover", 
+                transform: isMirrored ? "scaleX(-1)" : "none", 
+                backgroundColor: "#000",
+                ...style 
+            }} 
+        />
+    )
+}
+
 // --- HELPER COMPONENT: CHAT INPUT BAR ---
 interface ChatInputProps {
     value: string
@@ -529,11 +596,14 @@ interface ChatInputProps {
     onStop?: () => void
     onEndCall: () => void
     onFileSelect: () => void
+    onScreenShare?: () => void
+    onReport?: () => void
     placeholder?: string
     showEndCall?: boolean
     attachments: Attachment[]
     onRemoveAttachment: (id: string) => void
     isLoading?: boolean
+    isScreenSharing?: boolean
 }
 
 function ChatInput({ 
@@ -543,13 +613,27 @@ function ChatInput({
     onStop,
     onEndCall, 
     onFileSelect, 
+    onScreenShare,
+    onReport,
     placeholder = "Ask anything", 
     showEndCall = true,
     attachments = [],
     onRemoveAttachment,
-    isLoading = false
+    isLoading = false,
+    isScreenSharing = false
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+    const [showMenu, setShowMenu] = React.useState(false)
+    const menuRef = React.useRef<HTMLDivElement>(null)
+    const [canShareScreen, setCanShareScreen] = React.useState(false)
+
+    React.useEffect(() => {
+        // Check if screen sharing is supported
+        // @ts-ignore
+        if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+            setCanShareScreen(true)
+        }
+    }, [])
 
     // Auto-resize logic to mimic Gemini's behavior
     React.useEffect(() => {
@@ -561,10 +645,108 @@ function ChatInput({
         }
     }, [value])
 
+    // Close menu when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                // Check if the click was on the upload button (to prevent immediate toggle off)
+                const uploadBtn = document.getElementById("upload-trigger-btn")
+                if (uploadBtn && uploadBtn.contains(event.target as Node)) {
+                    return
+                }
+                setShowMenu(false)
+            }
+        }
+        if (showMenu) {
+            document.addEventListener("mousedown", handleClickOutside)
+        }
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside)
+        }
+    }, [showMenu])
+
     const hasContent = value.trim() || attachments.length > 0
 
     return (
-        <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box"}}>
+        <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box", pointerEvents: "auto"}}>
+            {/* CONVERSATION ACTIONS MENU */}
+            {showMenu && (
+                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 24, marginBottom: 8, zIndex: 100 }}>
+                    <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'inline-flex'}}>
+                        
+                        {/* Add files & photos */}
+                        <div 
+                            data-layer="add files/photos" 
+                            className="AddFilesPhotos" 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onFileSelect()
+                                setShowMenu(false)
+                            }}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                        >
+                            <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                <svg width="15" height="20" viewBox="0 0 15 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1.93164 5.93275L2.06777 13.2728C2.19283 20.22 13.1986 20.7001 13.069 13.4695L12.9062 4.36756C12.8215 -0.346883 5.35316 -0.672557 5.4411 4.23404L5.60198 13.205C5.64692 15.686 9.5765 15.8573 9.5309 13.2754L9.37197 5.84873" stroke="white" strokeWidth="1.38172" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div data-layer="Add files & photos..." className="AddFilesPhotosText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Add files & photos</div>
+                        </div>
+
+                        {/* Share screen */}
+                        {canShareScreen && (
+                            <div 
+                                data-layer="share screen" 
+                                className="ShareScreen" 
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (onScreenShare) onScreenShare()
+                                    setShowMenu(false)
+                                }}
+                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                                onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                                onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
+                            >
+                                <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
+                                    <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M0.703125 11.4881V12.4219C0.703125 13.1678 0.999441 13.8832 1.52689 14.4106C2.05433 14.9381 2.7697 15.2344 3.51562 15.2344H12.8906C13.6365 15.2344 14.3519 14.9381 14.8794 14.4106C15.4068 13.8832 15.7031 13.1678 15.7031 12.4219V11.4844M8.20312 11.0156V0.703125M8.20312 0.703125L11.4844 3.98438M8.20312 0.703125L4.92188 3.98438" stroke="white" strokeWidth="1.40625" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                </div>
+                                <div data-layer="Share screen..." className="ShareScreenText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                                    {isScreenSharing ? "Stop sharing" : "Share screen"}
+                                </div>
+                            </div>
+                        )}
+
+                        <div data-layer="separator" className="Separator" style={{width: 156, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
+
+                        {/* Report */}
+                        <div 
+                            data-layer="report." 
+                            className="Report" 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (onReport) onReport()
+                                setShowMenu(false)
+                            }}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                        >
+                            <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
+                                <svg width="17" height="19" viewBox="0 0 17 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M0.703125 17.5785V12.5976M0.703125 12.5976C6.1575 8.33194 10.2488 16.8632 15.7031 12.5976V1.93444C10.2488 6.20007 6.1575 -2.33118 0.703125 1.93444V12.5976Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.40625" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report</div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
           <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: 'linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, #212121 35%)', justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
             
             {/* INPUT BOX */}
@@ -667,13 +849,17 @@ function ChatInput({
                   gap: 12,
                   width: '100%'
               }}>
-                  {/* UPLOAD ICON */}
+                  {/* UPLOAD ICON (Now toggles Menu) */}
                   <div 
+                    id="upload-trigger-btn"
                     data-svg-wrapper 
                     data-layer="upload-button" 
                     className="UploadButton" 
-                    onClick={() => {
-                        if (attachments.length < 10) onFileSelect()
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (attachments.length < 10) {
+                             setShowMenu(prev => !prev)
+                        }
                     }}
                     style={{
                       cursor: (attachments.length >= 10) ? "not-allowed" : "pointer", 
@@ -779,18 +965,70 @@ function ChatInput({
     )
 }
 
+// --- HELPER COMPONENT: DEBUG CONSOLE ---
+function DebugConsole({ logs }: { logs: string[] }) {
+    const scrollRef = React.useRef<HTMLDivElement>(null)
+
+    React.useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+    }, [logs])
+
+    return (
+        <div style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            right: 10,
+            height: 150,
+            background: "rgba(0,0,0,0.8)",
+            color: "#0f0",
+            fontFamily: "monospace",
+            fontSize: 12,
+            padding: 8,
+            overflowY: "auto",
+            zIndex: 9999,
+            pointerEvents: "none",
+            borderRadius: 8,
+            border: "1px solid rgba(255,255,255,0.2)"
+        }} ref={scrollRef}>
+            {logs.map((log, i) => (
+                <div key={i} style={{ marginBottom: 4 }}>{log}</div>
+            ))}
+        </div>
+    )
+}
+
 /**
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
  */
 export default function OmegleMentorshipUI(props: Props) {
-    const { geminiApiKey, systemPrompt, accentColor, model = "gemini-2.5-flash-lite" } = props
+    const { geminiApiKey, systemPrompt, accentColor, model = "gemini-2.5-flash-lite", debugMode = false } = props
 
     // --- STATE: WEBRTC & CONNECTIVITY ---
     // status: tracks the lifecycle of the connection (idle -> searching -> connected)
     const [status, setStatus] = React.useState("idle")
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
+    const [isScreenSharing, setIsScreenSharing] = React.useState(false)
+    const isScreenSharingRef = React.useRef(false)
+    React.useEffect(() => { isScreenSharingRef.current = isScreenSharing }, [isScreenSharing])
+
+    // --- STATE: DEBUGGING ---
+    // Toggle this via the 'Debug Mode' property in Framer to see on-screen logs.
+    // Useful for mobile debugging where browser console isn't easily accessible.
+    const [logs, setLogs] = React.useState<string[]>([])
     
+    // Helper for standardized console logging
+    // Use this wrapper instead of console.log to ensure output appears in the UI debug console
+    const log = (msg: string) => {
+        console.log(`[Curastem Mentorship] ${msg}`)
+        if (debugMode) {
+            setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`])
+        }
+    }
+
     /**
      * User's session role.
      * student: "Get free help" user seeking guidance.
@@ -801,9 +1039,13 @@ export default function OmegleMentorshipUI(props: Props) {
     React.useEffect(() => { roleRef.current = role }, [role])
 
     // --- REFS: DOM & PERSISTENT OBJECTS ---
-    const localVideoRef = React.useRef<HTMLVideoElement>(null)
-    const remoteVideoRef = React.useRef<HTMLVideoElement>(null)
-    const localStreamRef = React.useRef<MediaStream | null>(null)
+    const [localStream, setLocalStream] = React.useState<MediaStream | null>(null)
+    const [remoteStream, setRemoteStream] = React.useState<MediaStream | null>(null)
+    const localStreamRef = React.useRef<MediaStream | null>(null) // Keep ref for PeerJS calls
+    const screenStreamRef = React.useRef<MediaStream | null>(null)
+    const remoteStreamRef = React.useRef<MediaStream | null>(null)
+    const [remoteScreenStream, setRemoteScreenStream] = React.useState<MediaStream | null>(null)
+    const screenCallRef = React.useRef<any>(null)
     const mqttClient = React.useRef<any>(null)
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null)
@@ -841,17 +1083,13 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [chatHeight])
 
     const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 })
+    const [sharedScreenSize, setSharedScreenSize] = React.useState<{ width: number, height: number } | null>(null)
     const isDragging = React.useRef(false)
     const dragStartY = React.useRef(0)
     const dragStartHeight = React.useRef(0)
     const containerRef = React.useRef<HTMLDivElement>(null)
     const rafRef = React.useRef<number | null>(null)
     const hasInitialResized = React.useRef(false)
-
-    // Helper for standardized console logging
-    const log = (msg: string) => {
-        console.log(`[Curastem Mentorship] ${msg}`)
-    }
 
     // Detect mobile for capture attribute
     const isMobile = React.useMemo(() => {
@@ -1018,14 +1256,102 @@ export default function OmegleMentorshipUI(props: Props) {
     const cleanup = () => {
         if (localStreamRef.current)
             localStreamRef.current.getTracks().forEach((t) => t.stop())
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach((t) => t.stop())
+            screenStreamRef.current = null
+        }
         if (activeCall.current) activeCall.current.close()
+        if (screenCallRef.current) {
+            screenCallRef.current.close()
+            screenCallRef.current = null
+        }
         if (peerInstance.current) peerInstance.current.destroy()
         if (mqttClient.current) mqttClient.current.end()
         setStatus("idle")
         setRole(null)
+        setIsScreenSharing(false)
+        setLocalStream(null)
+        setRemoteStream(null)
+        setRemoteScreenStream(null)
         if (typeof window !== "undefined") {
             window.location.hash = ""
         }
+    }
+
+    // --- SCREEN SHARING LOGIC ---
+    
+    const toggleScreenShare = async () => {
+        if (isScreenSharing) {
+            // STOP SHARING
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach(t => t.stop())
+                screenStreamRef.current = null
+            }
+            if (screenCallRef.current) {
+                screenCallRef.current.close()
+                screenCallRef.current = null
+            }
+            setIsScreenSharing(false)
+        } else {
+            // START SHARING
+            try {
+                // Check if screen sharing is supported
+                // @ts-ignore
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    alert("Screen sharing is not supported on this device or browser.")
+                    return
+                }
+
+                // @ts-ignore
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true,
+                    audio: false // Screen audio is tricky on mobile, keeping it simple for now
+                })
+                screenStreamRef.current = screenStream
+                const screenTrack = screenStream.getVideoTracks()[0]
+
+                // Handle system stop (e.g. browser "Stop sharing" button)
+                screenTrack.onended = () => {
+                     setIsScreenSharing(false)
+                     screenStreamRef.current = null
+                     if (screenCallRef.current) {
+                        screenCallRef.current.close()
+                        screenCallRef.current = null
+                     }
+                }
+
+                // If connected, start a second call for the screen
+                if (activeCall.current && activeCall.current.peer) {
+                     // PeerJS call object has .peer property which is the remote ID
+                     const peerId = activeCall.current.peer
+                     log(`Starting screen share call to ${peerId}...`)
+                     const call = peerInstance.current.call(peerId, screenStream, {
+                        metadata: { type: 'screen' }
+                     })
+                     call.on('error', (err: any) => log(`Sender Screen Call Error: ${err}`))
+                     screenCallRef.current = call
+                }
+                
+                setIsScreenSharing(true)
+            } catch (err: any) {
+                console.error("Screen share error:", err)
+                if (err.name === 'NotAllowedError') {
+                    // User cancelled or permission denied
+                } else {
+                    alert(`Screen share failed: ${err.message || err}`)
+                }
+            }
+        }
+    }
+
+    const handleReport = () => {
+        // Just close the menu for now
+        // alert("Report feature is not yet implemented.")
+    }
+
+    const getCurrentStream = () => {
+        // Deprecated helper in favor of dual-call strategy
+        return localStreamRef.current
     }
 
     // --- WEBRTC CORE LOGIC ---
@@ -1047,10 +1373,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 audio: true,
             })
             localStreamRef.current = stream
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream
-                localVideoRef.current.muted = true
-            }
+            setLocalStream(stream)
 
             initPeerJS()
         } catch (err: any) {
@@ -1076,7 +1399,36 @@ export default function OmegleMentorshipUI(props: Props) {
         })
 
         peer.on("call", (call: any) => {
-            if (statusRef.current === "connected") return
+            const incomingPeerId = call.peer
+            const activePeerId = activeCall.current?.peer
+
+            // Check for screen share metadata OR if we are already connected to this peer (assume secondary stream)
+            // Note: Mobile browsers might strip metadata or handle connections differently, so we also rely on ID matching.
+            const isScreenShare = 
+                (call.metadata && call.metadata.type === 'screen') || 
+                (statusRef.current === "connected" && incomingPeerId && activePeerId && incomingPeerId === activePeerId)
+
+            if (isScreenShare) {
+                log(`Incoming SCREEN SHARE detected from ${incomingPeerId} (Metadata: ${JSON.stringify(call.metadata)})`)
+                call.answer() // Answer without sending a stream back
+                
+                call.on("stream", (remoteStream: any) => {
+                    log("Screen share stream received")
+                    setRemoteScreenStream(remoteStream)
+                })
+                call.on("close", () => {
+                    log("Screen share ended")
+                    setRemoteScreenStream(null)
+                })
+                call.on("error", (e: any) => log(`Screen Call Error: ${e}`))
+                return
+            }
+
+            if (statusRef.current === "connected") {
+                log(`Rejecting incoming call from ${incomingPeerId} while connected to ${activePeerId}`)
+                return
+            }
+            
             log("Incoming call detected. Auto-answering...")
             call.answer(localStreamRef.current)
             handleCall(call)
@@ -1093,10 +1445,10 @@ export default function OmegleMentorshipUI(props: Props) {
         setStatus("connected")
         if (mqttClient.current) mqttClient.current.end() // Stop signaling once connected
 
-        call.on("stream", (remoteStream: any) => {
+        call.on("stream", (remoteStreamIn: any) => {
             log("Remote stream received. Synchronizing video...")
-            if (remoteVideoRef.current)
-                remoteVideoRef.current.srcObject = remoteStream
+            remoteStreamRef.current = remoteStreamIn
+            setRemoteStream(remoteStreamIn)
         })
 
         call.on("close", () => {
@@ -1177,7 +1529,7 @@ export default function OmegleMentorshipUI(props: Props) {
     }
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || [])
+        const files: File[] = Array.from(e.target.files || [])
         if (files.length === 0) return
 
         if (attachments.length + files.length > 10) {
@@ -1393,7 +1745,18 @@ export default function OmegleMentorshipUI(props: Props) {
             
             const containerHeight = containerRef.current?.clientHeight || window.innerHeight
             const minHeight = 100 
-            const maxHeight = containerHeight - 100 // Maintain visibility for the video area
+            
+            // Calculate dynamic max height based on content
+            let maxHeight = containerHeight - 100 // Default: leave 100px for video
+
+            // If screen sharing is active, constrain chat height more aggressively
+            // to ensure video remains visible and usable
+            if (isScreenSharing || !!remoteScreenStream) {
+                const topRowHeight = isMobileLayout ? 100 : 140
+                const chromeHeight = 24 + 16 + topRowHeight + 8 // Handle, Pads, TopRow, Gap
+                const minVideoHeight = 200 // Ensure at least 200px vertical space for screen share
+                maxHeight = containerHeight - chromeHeight - minVideoHeight
+            }
 
             setChatHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
         })
@@ -1413,6 +1776,41 @@ export default function OmegleMentorshipUI(props: Props) {
     
     // Detect mobile vs desktop based on container width
     const isMobileLayout = containerSize.width < 768
+
+    // Calculate dynamic size for screen share container to match aspect ratio
+    const screenShareContainerStyle = React.useMemo(() => {
+        if (!sharedScreenSize || containerSize.width === 0 || containerSize.height === 0) {
+            return { flex: 1, width: "100%" }
+        }
+
+        // Available space calculation
+        // Total Height - Chat - DragHandle(24) - Pads(Top 16 + Bottom 0) - TopRow(100/140) - Gap(8)
+        const topRowHeight = isMobileLayout ? 100 : 140
+        const chromeHeight = chatHeight + 24 + 16 + topRowHeight + 8
+        const availableHeight = Math.max(100, containerSize.height - chromeHeight)
+        const availableWidth = Math.max(100, containerSize.width - 32) // 16px padding on each side
+
+        const videoRatio = sharedScreenSize.width / sharedScreenSize.height
+        const containerRatio = availableWidth / availableHeight
+
+        let finalW, finalH
+
+        if (containerRatio > videoRatio) {
+            // Container is wider than video -> constrain by height
+            finalH = availableHeight
+            finalW = availableHeight * videoRatio
+        } else {
+            // Container is taller than video -> constrain by width
+            finalW = availableWidth
+            finalH = availableWidth / videoRatio
+        }
+
+        return {
+            width: finalW,
+            height: finalH,
+            flex: "none" // Disable flex growing to enforce size
+        }
+    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize])
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
     const videoSectionHeight = containerSize.height - chatHeight - 40
@@ -1534,101 +1932,209 @@ export default function OmegleMentorshipUI(props: Props) {
                 type="file"
                 multiple
                 accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                capture={isMobile ? "environment" : undefined}
                 style={{ display: "none" }}
                 onChange={handleFileChange}
             />
 
+            {/* DEBUG CONSOLE OVERLAY */}
+            {debugMode && <DebugConsole logs={logs} />}
+
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            <div
-                style={{
+            {(isScreenSharing || !!remoteScreenStream) ? (
+                // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
+                <div style={{
                     flex: "1 1 0",
                     width: "100%",
                     display: "flex",
-                    flexDirection: isMobileLayout ? "column" : "row",
-                    gap: 8,
-                    paddingTop: 16,
+                    flexDirection: "column",
+                    gap: 8, // Reduced gap
+                    paddingTop: 16, 
                     paddingLeft: 16,
                     paddingRight: 16,
                     paddingBottom: 0,
-                    alignItems: (!isMobileLayout) ? "flex-end" : "center", 
-                    justifyContent: "center",
-                    position: "relative",
+                    boxSizing: "border-box",
                     minHeight: 0,
-                    flexWrap: "nowrap",
-                    overflow: "hidden",
-                    boxSizing: "border-box"
-                }}
-            >
-                {/* ITEM 1: Student Card OR Left Video */}
-                <div
-                    style={{
-                        width: finalWidth,
-                        height: finalHeight,
-                        borderRadius: 32,
-                        background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
-                        overflow: "hidden",
-                        position: "relative",
-                        flexShrink: 0,
-                        cursor: (!role && status === "idle") ? "pointer" : "default",
+                    alignItems: "center",
+                    justifyContent: "flex-start" // Anchor cameras to top
+                }}>
+                    {/* TOP ROW: CAMERAS (Horizontal) */}
+                    <div style={{
                         display: "flex",
-                        flexDirection: "column",
-                    }}
-                    onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
-                >
-                    {(!role && status === "idle") ? (
-                        <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
-                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Get free help</div>
-                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I'm a student looking for a mentor</div>
+                        gap: 8, // Reduced gap
+                        height: isMobileLayout ? 100 : 140, 
+                        width: "100%",
+                        justifyContent: "center",
+                        flexShrink: 0
+                    }}>
+                        {/* CAMERA 1: Left (Student Position) */}
+                        <div style={{ 
+                            height: "100%", 
+                            aspectRatio: "4/3", 
+                            borderRadius: 16, 
+                            overflow: "hidden", 
+                            background: "#2E2E2E",
+                            position: "relative",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                        }}>
+                            <VideoPlayer 
+                                // If I am Student -> Local. If Mentor -> Remote.
+                                stream={role === "student" ? localStream : remoteStream} 
+                                isMirrored={role === "student"} 
+                                muted={role === "student"} // Mute my own camera
+                            />
                         </div>
-                    ) : (
-                        role === "student" ? (
-                            <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
-                        ) : (
-                            status === "connected" ? (
-                                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for student...</div>
-                            )
-                        )
-                    )}
-                </div>
 
-                {/* ITEM 2: Mentor Card OR Right Video */}
+                        {/* CAMERA 2: Right (Mentor Position) */}
+                        <div style={{ 
+                            height: "100%", 
+                            aspectRatio: "4/3", 
+                            borderRadius: 16, 
+                            overflow: "hidden", 
+                            background: "#2E2E2E",
+                            position: "relative",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                        }}>
+                             <VideoPlayer 
+                                // If I am Student -> Remote. If Mentor -> Local.
+                                stream={role === "mentor" ? localStream : remoteStream} 
+                                isMirrored={role === "mentor"} 
+                                muted={role === "mentor"} // Mute my own camera
+                            />
+                        </div>
+                    </div>
+
+                    {/* MAIN AREA: SCREEN SHARE */}
+                    <div style={{
+                        flex: 1, // Take up all remaining space
+                        width: "100%",
+                        overflow: "hidden",
+                        background: "transparent",
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center", // Center video vertically in available space
+                        justifyContent: "center"
+                    }}>
+                        {/* Wrapper to enforce aspect ratio */}
+                        <div style={{
+                            position: "relative",
+                            // Use calculated dimensions if available, otherwise 100%
+                            ...screenShareContainerStyle,
+                            // Ensure it never exceeds the parent flex container
+                            maxWidth: "100%",
+                            maxHeight: "100%",
+                            borderRadius: 14, // Added rounded corners
+                            overflow: "hidden"
+                        }}>
+                            <VideoPlayer 
+                                stream={remoteScreenStream || screenStreamRef.current} 
+                                isMirrored={false} 
+                                muted={!remoteScreenStream} // Unmute only if it's a remote screen share
+                                style={{ 
+                                    width: "100%", 
+                                    height: "100%", 
+                                    objectFit: 'contain' 
+                                }}
+                                onVideoSize={(w, h) => setSharedScreenSize({ width: w, height: h })}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                // --- STANDARD LAYOUT (SPLIT VIEW) ---
                 <div
                     style={{
-                        width: finalWidth,
-                        height: finalHeight,
-                        borderRadius: 32,
-                        background: "#2E2E2E",
-                        overflow: "hidden",
-                        position: "relative",
-                        flexShrink: 0,
-                        cursor: (!role && status === "idle") ? "pointer" : "default",
+                        flex: "1 1 0",
+                        width: "100%",
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: isMobileLayout ? "column" : "row",
+                        gap: 8,
+                        paddingTop: 16,
+                        paddingLeft: 16,
+                        paddingRight: 16,
+                        paddingBottom: 0,
+                        alignItems: (!isMobileLayout) ? "flex-end" : "center", 
+                        justifyContent: "center",
+                        position: "relative",
+                        minHeight: 0,
+                        flexWrap: "nowrap",
+                        overflow: "hidden",
+                        boxSizing: "border-box"
                     }}
-                    onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
                 >
-                    {(!role && status === "idle") ? (
-                        <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
-                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Volunteer</div>
-                            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I want to offer free advice</div>
-                        </div>
-                    ) : (
-                        role === "mentor" ? (
-                            <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+                    {/* ITEM 1: Student Card OR Left Video */}
+                    <div
+                        style={{
+                            width: finalWidth,
+                            height: finalHeight,
+                            borderRadius: 32,
+                            background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
+                            overflow: "hidden",
+                            position: "relative",
+                            flexShrink: 0,
+                            cursor: (!role && status === "idle") ? "pointer" : "default",
+                            display: "flex",
+                            flexDirection: "column",
+                        }}
+                        onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
+                    >
+                        {(!role && status === "idle") ? (
+                            <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
+                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Get free help</div>
+                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I'm a student looking for a mentor</div>
+                            </div>
                         ) : (
-                            status === "connected" ? (
-                                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            role === "student" ? (
+                                // --- LOCAL USER (STUDENT) ---
+                                <VideoPlayer stream={localStream} isMirrored={true} muted={true} />
                             ) : (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for mentor...</div>
+                                // --- REMOTE USER (STUDENT) ---
+                                status === "connected" ? (
+                                    <VideoPlayer stream={remoteStream} isMirrored={false} />
+                                ) : (
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for student...</div>
+                                )
                             )
-                        )
-                    )}
+                        )}
+                    </div>
+
+                    {/* ITEM 2: Mentor Card OR Right Video */}
+                    <div
+                        style={{
+                            width: finalWidth,
+                            height: finalHeight,
+                            borderRadius: 32,
+                            background: "#2E2E2E",
+                            overflow: "hidden",
+                            position: "relative",
+                            flexShrink: 0,
+                            cursor: (!role && status === "idle") ? "pointer" : "default",
+                            display: "flex",
+                            flexDirection: "column",
+                        }}
+                        onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
+                    >
+                        {(!role && status === "idle") ? (
+                            <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
+                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Volunteer</div>
+                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I want to offer free advice</div>
+                            </div>
+                        ) : (
+                            role === "mentor" ? (
+                                // --- LOCAL USER (MENTOR) ---
+                                <VideoPlayer stream={localStream} isMirrored={true} muted={true} />
+                            ) : (
+                                // --- REMOTE USER (MENTOR) ---
+                                status === "connected" ? (
+                                    <VideoPlayer stream={remoteStream} isMirrored={false} />
+                                ) : (
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for mentor...</div>
+                                )
+                            )
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
             <div
@@ -1862,11 +2368,14 @@ export default function OmegleMentorshipUI(props: Props) {
                         onStop={handleStop}
                         onEndCall={cleanup}
                         onFileSelect={handleFileSelect}
+                        onScreenShare={toggleScreenShare}
+                        onReport={handleReport}
                         placeholder="Ask anything"
                         showEndCall={status !== "idle"}
                         attachments={attachments}
                         onRemoveAttachment={handleRemoveAttachment}
                         isLoading={isLoading}
+                        isScreenSharing={isScreenSharing}
                     />
                 </div>
             </div>
@@ -1900,5 +2409,11 @@ addPropertyControls(OmegleMentorshipUI, {
         type: ControlType.Color,
         title: "Accent Color",
         defaultValue: "#0099FF",
+    },
+    debugMode: {
+        type: ControlType.Boolean,
+        title: "Debug Mode",
+        defaultValue: false,
+        description: "Enables an on-screen console overlay for debugging mobile connections.",
     },
 })
