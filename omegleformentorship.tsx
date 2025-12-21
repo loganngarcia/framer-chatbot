@@ -1038,7 +1038,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: "rgba(0, 0, 0, 0.7)",
+                background: "rgba(0, 0, 0, 0.8)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1053,7 +1053,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                     maxWidth: 400,
                     background: "#1E1E1E",
                     borderRadius: 28,
-                    padding: 24,
+                    padding: 16,
                     display: "flex",
                     flexDirection: "column",
                     gap: 16,
@@ -1063,7 +1063,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
             >
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ color: "white", fontSize: 20, fontWeight: "600" }}>Report user</div>
+                    <div style={{ color: "white", fontSize: 18, fontWeight: "600" }}>Report user</div>
                     <button 
                         onClick={onClose}
                         style={{ 
@@ -1072,7 +1072,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                             color: "white", 
                             cursor: "pointer", 
                             padding: 0,
-                            opacity: 0.7,
+                            opacity: 0.8,
                             marginTop: -4
                         }}
                     >
@@ -1095,8 +1095,8 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                             style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 14,
-                                padding: "10px 0",
+                                gap: 8,
+                                padding: "8px 0",
                                 cursor: "pointer",
                             }}
                         >
@@ -1104,12 +1104,11 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                                 width: 16,
                                 height: 16,
                                 borderRadius: "50%",
-                                border: `0.33px solid ${selected === reason ? "white" : "rgba(255,255,255,0.45)"}`,
-                                background: hoveredRow === reason ? "rgba(255, 255, 255, 0.12)" : "transparent",
+                                border: `0.33px solid ${selected === reason ? "white" : "rgba(255,255,255,0.65)"}`,
+                                background: hoveredRow === reason ? "rgba(255, 255, 255, 0.24)" : "transparent",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                transition: "all 0.15s ease-out",
                                 boxSizing: "border-box"
                             }}>
                                 {selected === reason && (
@@ -1123,9 +1122,9 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                             </div>
                             <div style={{ 
                                 color: "white", 
-                                fontSize: 15, 
+                                fontSize: 16, 
                                 fontWeight: "400",
-                                opacity: 0.9 
+                                opacity: 0.95 
                             }}>{reason}</div>
                         </div>
                     ))}
@@ -1137,15 +1136,14 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                         disabled={!selected}
                         onClick={() => selected && onSubmit(selected)}
                         style={{
-                            padding: "10px 24px",
+                            padding: "10px 12px",
                             borderRadius: 28,
-                            background: selected ? "white" : "#3A3A3A",
-                            color: selected ? "black" : "rgba(255,255,255,0.4)",
+                            background: selected ? "white" : "rgba(255, 255, 255, 0.5)",
+                            color: selected ? "black" : "rgba(255,255,255,0.5)",
                             border: "none",
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: "500",
                             cursor: selected ? "pointer" : "default",
-                            transition: "all 0.2s ease",
                             boxSizing: "border-box"
                         }}
                     >
