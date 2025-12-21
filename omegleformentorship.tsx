@@ -683,13 +683,13 @@ function ChatInput({
                                 onFileSelect()
                                 setShowMenu(false)
                             }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
                             <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                <svg width="15" height="20" viewBox="0 0 15 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1.93164 5.93275L2.06777 13.2728C2.19283 20.22 13.1986 20.7001 13.069 13.4695L12.9062 4.36756C12.8215 -0.346883 5.35316 -0.672557 5.4411 4.23404L5.60198 13.205C5.64692 15.686 9.5765 15.8573 9.5309 13.2754L9.37197 5.84873" stroke="white" strokeWidth="1.38172" strokeLinecap="round" strokeLinejoin="round"/>
+                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691" stroke="white" strokeWidth="1.06918" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             </div>
                             <div data-layer="Add files & photos..." className="AddFilesPhotosText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Add files & photos</div>
@@ -705,13 +705,13 @@ function ChatInput({
                                     if (onScreenShare) onScreenShare()
                                     setShowMenu(false)
                                 }}
-                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                                 onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
                                 onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
                             >
-                                <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
-                                    <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M0.703125 11.4881V12.4219C0.703125 13.1678 0.999441 13.8832 1.52689 14.4106C2.05433 14.9381 2.7697 15.2344 3.51562 15.2344H12.8906C13.6365 15.2344 14.3519 14.9381 14.8794 14.4106C15.4068 13.8832 15.7031 13.1678 15.7031 12.4219V11.4844M8.20312 11.0156V0.703125M8.20312 0.703125L11.4844 3.98438M8.20312 0.703125L4.92188 3.98438" stroke="white" strokeWidth="1.40625" strokeLinecap="round" strokeLinejoin="round"/>
+                                <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke="white" strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
                                     </svg>
                                 </div>
                                 <div data-layer="Share screen..." className="ShareScreenText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
@@ -731,13 +731,13 @@ function ChatInput({
                                 if (onReport) onReport()
                                 setShowMenu(false)
                             }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
-                            <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
-                                <svg width="17" height="19" viewBox="0 0 17 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0.703125 17.5785V12.5976M0.703125 12.5976C6.1575 8.33194 10.2488 16.8632 15.7031 12.5976V1.93444C10.2488 6.20007 6.1575 -2.33118 0.703125 1.93444V12.5976Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.40625" strokeLinecap="round" strokeLinejoin="round"/>
+                            <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             </div>
                             <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report</div>
