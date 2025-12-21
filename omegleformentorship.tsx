@@ -684,7 +684,7 @@ function ChatInput({
                                 setShowMenu(false)
                             }}
                             style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
                             <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
@@ -706,7 +706,7 @@ function ChatInput({
                                     setShowMenu(false)
                                 }}
                                 style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                                onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                                onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
                                 onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
                             >
                                 <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
@@ -732,7 +732,7 @@ function ChatInput({
                                 setShowMenu(false)
                             }}
                             style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 12, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.04)"}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.08)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
                             <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
