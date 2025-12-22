@@ -2,6 +2,96 @@ import * as React from "react"
 import { addPropertyControls, ControlType } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 
+// --- SHARED STYLES ---
+
+const colors = {
+    background: "#212121",
+    surface: "#303030",
+    surfaceHighlight: "#3D3D3D",
+    surfaceMenu: "#353535",
+    surfaceModal: "#1E1E1E",
+    card: "#2E2E2E",
+    
+    text: {
+        primary: "rgba(255, 255, 255, 0.95)",
+        secondary: "rgba(255, 255, 255, 0.65)",
+        tertiary: "rgba(255, 255, 255, 0.45)",
+        link: "#4DA6FF"
+    },
+    
+    border: {
+        subtle: "rgba(255, 255, 255, 0.1)",
+    },
+    
+    state: {
+        hover: "rgba(255, 255, 255, 0.12)",
+        destructive: "#EC1313", // Red
+        accent: "#0B87DA", // Blue, default student card color
+        overlay: "rgba(0, 0, 0, 0.8)",
+    },
+    
+    file: {
+        pdf: "#EA4335",
+        excel: "#34A853",
+        ppt: "#FBBC04",
+        default: "#4285F4"
+    }
+}
+
+const styles = {
+    flexCenter: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+    } as React.CSSProperties,
+    flexColumn: {
+        display: "flex",
+        flexDirection: "column",
+    } as React.CSSProperties,
+    fullSize: {
+        width: "100%",
+        height: "100%",
+    } as React.CSSProperties,
+    menuItem: {
+        alignSelf: 'stretch',
+        height: 36,
+        paddingLeft: 12,
+        paddingRight: 12,
+        borderRadius: 28,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        gap: 8,
+        display: 'inline-flex',
+        cursor: "pointer",
+        transition: "background 0.2s"
+    } as React.CSSProperties,
+    videoCardSmall: {
+        height: "100%", 
+        aspectRatio: "4/3", 
+        borderRadius: 16, 
+        overflow: "hidden", 
+        background: colors.card,
+        position: "relative",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+    } as React.CSSProperties,
+    textEllipsis: {
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+    } as React.CSSProperties,
+    removeBtn: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        border: "none",
+        zIndex: 10
+    } as React.CSSProperties
+}
+
 // --- MARKDOWN & PARSING UTILITIES ---
 
 function ensureProtocol(url: string): string {
@@ -529,13 +619,15 @@ function VideoPlayer({
     isMirrored = false, 
     style = {}, 
     muted = false,
-    onVideoSize
+    onVideoSize,
+    placeholder
 }: { 
     stream: MediaStream | null, 
     isMirrored?: boolean, 
     style?: React.CSSProperties, 
     muted?: boolean,
-    onVideoSize?: (width: number, height: number) => void
+    onVideoSize?: (width: number, height: number) => void,
+    placeholder?: string
 }) {
     const videoRef = React.useRef<HTMLVideoElement>(null)
     
@@ -572,20 +664,39 @@ function VideoPlayer({
     }, [stream, onVideoSize])
 
     return (
-        <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted={muted} 
-            style={{ 
-                width: "100%", 
-                height: "100%", 
-                objectFit: "cover", 
-                transform: isMirrored ? "scaleX(-1)" : "none", 
-                backgroundColor: "#000",
-                ...style 
-            }} 
-        />
+        <div style={{ width: "100%", height: "100%", background: "#000", position: "relative", ...style }}>
+            <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted={muted} 
+                style={{ 
+                    width: "100%", 
+                    height: "100%", 
+                    objectFit: "cover", 
+                    transform: isMirrored ? "scaleX(-1)" : "none", 
+                    display: stream ? "block" : "none"
+                }} 
+            />
+            {!stream && placeholder && (
+                <div style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "rgba(255, 255, 255, 0.45)",
+                    fontSize: 14,
+                    padding: 8,
+                    textAlign: "center"
+                }}>
+                    {placeholder}
+                </div>
+            )}
+        </div>
     )
 }
 
@@ -676,18 +787,18 @@ function ChatInput({
                     <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'inline-flex'}}>
                         
                         {/* Add files & photos */}
-                        <div 
-                            data-layer="add files/photos" 
-                            className="AddFilesPhotos" 
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onFileSelect()
-                                setShowMenu(false)
-                            }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                        >
+                            <div 
+                                data-layer="add files/photos" 
+                                className="AddFilesPhotos" 
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onFileSelect()
+                                    setShowMenu(false)
+                                }}
+                                style={styles.menuItem}
+                                onMouseEnter={(e) => e.currentTarget.style.background = colors.state.hover}
+                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                            >
                             <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
                                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691" stroke="white" strokeWidth="1.06918" strokeLinecap="round" strokeLinejoin="round"/>
@@ -706,18 +817,53 @@ function ChatInput({
                                     if (onScreenShare) onScreenShare()
                                     setShowMenu(false)
                                 }}
-                                style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, background: isScreenSharing ? 'rgba(255, 255, 255, 0.2)' : 'transparent', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
-                                onMouseEnter={(e) => !isScreenSharing && (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-                                onMouseLeave={(e) => !isScreenSharing && (e.currentTarget.style.background = "transparent")}
+                                style={{
+                                    ...styles.menuItem,
+                                    // Override specific styles when screen sharing is active
+                                    ...(isScreenSharing ? {
+                                        background: 'transparent',
+                                        height: 36,
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        borderRadius: 28,
+                                        justifyContent: 'flex-start',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        display: 'inline-flex'
+                                    } : {})
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (isScreenSharing) {
+                                        e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"
+                                    } else {
+                                        e.currentTarget.style.background = colors.state.hover
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent"
+                                }}
                             >
-                                <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
-                                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke="white" strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
-                                    </svg>
-                                </div>
-                                <div data-layer="Share screen..." className="ShareScreenText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                                    {isScreenSharing ? "Stop sharing" : "Share screen"}
-                                </div>
+                                {isScreenSharing ? (
+                                    <>
+                                        <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 15w width to make sure text is aligned vertical on all buttons." className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        </div>
+                                        <div data-layer="Share screen. truncate if doesnt fit." className="ShareScreenTruncateIfDoesntFit" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop sharing</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
+                                            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke="white" strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        </div>
+                                        <div data-layer="Share screen..." className="ShareScreenText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                                            Share screen
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -732,7 +878,7 @@ function ChatInput({
                                 if (onReport) onReport()
                                 setShowMenu(false)
                             }}
-                            style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, paddingRight: 12, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', cursor: "pointer", transition: "background 0.2s"}}
+                            style={styles.menuItem}
                             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
@@ -741,7 +887,7 @@ function ChatInput({
                                 <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             </div>
-                            <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report</div>
+                            <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report user</div>
                         </div>
 
                     </div>
@@ -1412,20 +1558,17 @@ export default function OmegleMentorshipUI(props: Props) {
     const cleanup = () => {
         if (localStreamRef.current)
             localStreamRef.current.getTracks().forEach((t) => t.stop())
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach((t) => t.stop())
-            screenStreamRef.current = null
-        }
+        
+        // Stop screen share when call ends
+        stopLocalScreenShare()
+
         if (activeCall.current) activeCall.current.close()
-        if (screenCallRef.current) {
-            screenCallRef.current.close()
-            screenCallRef.current = null
-        }
+        // Note: screenCallRef cleanup is handled in stopLocalScreenShare
+        
         if (peerInstance.current) peerInstance.current.destroy()
         if (mqttClient.current) mqttClient.current.end()
         setStatus("idle")
         setRole(null)
-        setIsScreenSharing(false)
         setLocalStream(null)
         setRemoteStream(null)
         setRemoteScreenStream(null)
@@ -1436,18 +1579,21 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- SCREEN SHARING LOGIC ---
     
+    const stopLocalScreenShare = () => {
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(t => t.stop())
+            screenStreamRef.current = null
+        }
+        if (screenCallRef.current) {
+            screenCallRef.current.close()
+            screenCallRef.current = null
+        }
+        setIsScreenSharing(false)
+    }
+
     const toggleScreenShare = async () => {
         if (isScreenSharing) {
-            // STOP SHARING
-            if (screenStreamRef.current) {
-                screenStreamRef.current.getTracks().forEach(t => t.stop())
-                screenStreamRef.current = null
-            }
-            if (screenCallRef.current) {
-                screenCallRef.current.close()
-                screenCallRef.current = null
-            }
-            setIsScreenSharing(false)
+            stopLocalScreenShare()
         } else {
             // START SHARING
             try {
@@ -1468,12 +1614,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
                 // Handle system stop (e.g. browser "Stop sharing" button)
                 screenTrack.onended = () => {
-                     setIsScreenSharing(false)
-                     screenStreamRef.current = null
-                     if (screenCallRef.current) {
-                        screenCallRef.current.close()
-                        screenCallRef.current = null
-                     }
+                     stopLocalScreenShare()
                 }
 
                 // If connected, start a second call for the screen
@@ -1571,6 +1712,12 @@ export default function OmegleMentorshipUI(props: Props) {
 
             if (isScreenShare) {
                 log(`Incoming SCREEN SHARE detected from ${incomingPeerId} (Metadata: ${JSON.stringify(call.metadata)})`)
+                
+                // If we are sharing, stop our share so the new one takes over
+                if (screenStreamRef.current) {
+                    stopLocalScreenShare()
+                }
+
                 call.answer() // Answer without sending a stream back
                 
                 call.on("stream", (remoteStream: any) => {
@@ -1605,6 +1752,17 @@ export default function OmegleMentorshipUI(props: Props) {
         activeCall.current = call
         setStatus("connected")
         if (mqttClient.current) mqttClient.current.end() // Stop signaling once connected
+
+        // If we are already screen sharing, start a call for that too
+        if (screenStreamRef.current && peerInstance.current) {
+             const peerId = call.peer
+             log(`Connected. Starting existing screen share to ${peerId}...`)
+             const screenCall = peerInstance.current.call(peerId, screenStreamRef.current, {
+                metadata: { type: 'screen' }
+             })
+             screenCall.on('error', (err: any) => log(`Sender Screen Call Error: ${err}`))
+             screenCallRef.current = screenCall
+        }
 
         call.on("stream", (remoteStreamIn: any) => {
             log("Remote stream received. Synchronizing video...")
@@ -2138,12 +2296,35 @@ export default function OmegleMentorshipUI(props: Props) {
                             position: "relative",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
                         }}>
-                            <VideoPlayer 
-                                // If I am Student -> Local. If Mentor -> Remote.
-                                stream={role === "student" ? localStream : remoteStream} 
-                                isMirrored={role === "student"} 
-                                muted={role === "student"} // Mute my own camera
-                            />
+                            {(!role && status === "idle") ? (
+                                <div 
+                                    style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center', 
+                                        height: '100%', 
+                                        background: colors.state.accent, 
+                                        color: 'white', 
+                                        fontSize: 14,
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                        textAlign: "center",
+                                        padding: 8
+                                    }}
+                                    onClick={() => handleRoleSelect("student")}
+                                >
+                                    Get free help
+                                </div>
+                            ) : (
+                                <VideoPlayer 
+                                    // If I am Student -> Local. If Mentor -> Remote.
+                                    stream={role === "student" ? localStream : (role === "mentor" ? remoteStream : null)} 
+                                    isMirrored={role === "student"} 
+                                    muted={role === "student"} // Mute my own camera
+                                    placeholder={role === "mentor" && !remoteStream ? "Waiting for student..." : undefined}
+                                    style={{ background: "transparent" }}
+                                />
+                            )}
                         </div>
 
                         {/* CAMERA 2: Right (Mentor Position) */}
@@ -2156,12 +2337,35 @@ export default function OmegleMentorshipUI(props: Props) {
                             position: "relative",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
                         }}>
-                             <VideoPlayer 
-                                // If I am Student -> Remote. If Mentor -> Local.
-                                stream={role === "mentor" ? localStream : remoteStream} 
-                                isMirrored={role === "mentor"} 
-                                muted={role === "mentor"} // Mute my own camera
-                            />
+                            {(!role && status === "idle") ? (
+                                <div 
+                                    style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center', 
+                                        height: '100%', 
+                                        background: colors.card, 
+                                        color: colors.text.primary, 
+                                        fontSize: 14,
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                        textAlign: "center",
+                                        padding: 8
+                                    }}
+                                    onClick={() => handleRoleSelect("mentor")}
+                                >
+                                    Volunteer
+                                </div>
+                            ) : (
+                                <VideoPlayer 
+                                    // If I am Student -> Remote. If Mentor -> Local.
+                                    stream={role === "mentor" ? localStream : (role === "student" ? remoteStream : null)} 
+                                    isMirrored={role === "mentor"} 
+                                    muted={role === "mentor"} // Mute my own camera
+                                    placeholder={role === "student" && !remoteStream ? "Waiting for mentor..." : undefined}
+                                    style={{ background: "transparent" }}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -2305,13 +2509,11 @@ export default function OmegleMentorshipUI(props: Props) {
                     width: "100%",
                     maxWidth: 728,
                     margin: "0 auto",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    ...styles.flexCenter,
                     cursor: "ns-resize",
                     flexShrink: 0,
                     touchAction: "none",
-                    zIndex: 25,
+                    zIndex: 20, // Lowered from 25 to be below menu (100)
                 }}
             >
                 <div
