@@ -1553,6 +1553,49 @@ function sanitizeMessage(text: string): string {
     return sanitized
 }
 
+// --- HELPER: LIVE CURSOR ---
+const RAINBOW_COLORS = [
+    "#FF3B30", // Red
+    "#FF9500", // Orange
+    "#FFCC00", // Yellow
+    "#34C759", // Green
+    "#32ADE6", // Cyan
+    "#007AFF", // Blue
+    "#AF52DE", // Purple
+    "#FF2D55", // Pink
+]
+
+function getRandomRainbowColor() {
+    return RAINBOW_COLORS[Math.floor(Math.random() * RAINBOW_COLORS.length)]
+}
+
+function LiveCursor({ x, y, color }: { x: number, y: number, color: string }) {
+    return (
+        <div
+            style={{
+                position: "absolute",
+                left: `${x * 100}%`,
+                top: `${y * 100}%`,
+                pointerEvents: "none",
+                zIndex: 9999,
+            }}
+        >
+            <svg 
+                width="32" 
+                height="32" 
+                viewBox="0 0 28 28" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                    transform: "rotate(-16deg)", // Slight left tilt
+                }}
+            >
+                <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z" fill={color} stroke="white" strokeWidth="1.5"/>
+            </svg>
+        </div>
+    )
+}
+
 /**
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
@@ -1567,6 +1610,10 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] = React.useState(false)
+    const [remoteCursor, setRemoteCursor] = React.useState<{ x: number, y: number, color: string } | null>(null)
+    const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)
+    const myCursorColor = React.useRef(getRandomRainbowColor())
+    const lastCursorUpdate = React.useRef(0)
     const [editor, setEditor] = React.useState<any>(null)
     const editorRef = React.useRef<any>(null)
     React.useEffect(() => { editorRef.current = editor }, [editor])
@@ -1580,6 +1627,35 @@ export default function OmegleMentorshipUI(props: Props) {
     const pendingSnapshotRef = React.useRef<any>(null)
     const isScreenSharingRef = React.useRef(false)
     React.useEffect(() => { isScreenSharingRef.current = isScreenSharing }, [isScreenSharing])
+
+    // --- VIEWPORT & SCROLL HANDLING ---
+    // Fix for iOS Safari keyboard shifting the viewport
+    React.useEffect(() => {
+        if (typeof window === "undefined" || !window.visualViewport) return
+
+        const handleResize = () => {
+            if (containerRef.current && window.visualViewport) {
+                // Adjust container height to match visual viewport
+                // This prevents the keyboard from pushing content off-screen on iOS Safari
+                // We set the height explicitly because 100vh includes the area under the keyboard
+                containerRef.current.style.height = `${window.visualViewport.height}px`
+                
+                // Force scroll to top to counteract any browser auto-scroll behavior
+                // when the keyboard opens, keeping the UI anchored correctly
+                window.scrollTo(0, 0)
+            }
+        }
+
+        window.visualViewport.addEventListener("resize", handleResize)
+        window.visualViewport.addEventListener("scroll", handleResize)
+        
+        return () => {
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener("resize", handleResize)
+                window.visualViewport.removeEventListener("scroll", handleResize)
+            }
+        }
+    }, [])
 
     // Tldraw sync
     React.useEffect(() => {
@@ -2002,6 +2078,28 @@ export default function OmegleMentorshipUI(props: Props) {
                 }
             } else {
                 log("Warning: No data connection available to start whiteboard sync")
+            }
+        }
+    }
+
+    const handleWhiteboardPointerMove = (e: React.PointerEvent) => {
+        if (!isWhiteboardOpen || !dataConnectionRef.current || !dataConnectionRef.current.open) return
+        
+        const now = Date.now()
+        if (now - lastCursorUpdate.current < 50) return // Limit to 20fps
+        lastCursorUpdate.current = now
+
+        if (whiteboardContainerRef.current) {
+            const rect = whiteboardContainerRef.current.getBoundingClientRect()
+            const x = (e.clientX - rect.left) / rect.width
+            const y = (e.clientY - rect.top) / rect.height
+            
+            // Only send if within bounds
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                dataConnectionRef.current.send({
+                    type: 'cursor-update',
+                    payload: { x, y, color: myCursorColor.current }
+                })
             }
         }
     }
@@ -2442,6 +2540,8 @@ export default function OmegleMentorshipUI(props: Props) {
                     log("Editor not ready to load snapshot. Buffering...")
                     pendingSnapshotRef.current = data.payload
                 }
+            } else if (data.type === 'cursor-update') {
+                setRemoteCursor({ x: data.payload.x, y: data.payload.y, color: data.payload.color })
             } else if (data.type === 'tldraw-update') {
                 if (editorRef.current) {
                     try {
@@ -2921,13 +3021,24 @@ export default function OmegleMentorshipUI(props: Props) {
             style={{
                 width: "100%",
                 height: "100%",
+                // Dynamic height via visualViewport listener: this ensures the UI resizes 
+                // when the mobile keyboard opens, rather than being pushed up/off-screen.
                 background: "#212121",
                 color: "white",
                 fontFamily: "Inter, sans-serif",
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
-                position: "relative"
+                // Fixed positioning ensures the app layer stays anchored to the viewport
+                // preventing body scroll or shifting when keyboard interacts
+                position: "fixed", 
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                // touch-action: none prevents the browser from handling touch gestures like 
+                // panning or zooming, stopping the "rubber band" scroll effect on iOS
+                touchAction: "none", 
             }}
         >
             {/* Hidden file input */}
@@ -3077,11 +3188,23 @@ export default function OmegleMentorshipUI(props: Props) {
                             overflow: "hidden"
                         }}>
                             {isWhiteboardOpen ? (
-                                <div style={{ width: '100%', height: '100%', background: '#FFF', position: 'relative', zIndex: 0 }} onPointerDown={(e) => e.stopPropagation()}>
+                                <div 
+                                    ref={whiteboardContainerRef}
+                                    onPointerMove={handleWhiteboardPointerMove}
+                                    style={{ width: '100%', height: '100%', background: '#FFF', position: 'relative', zIndex: 0 }} 
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
                                     <Tldraw onMount={(e) => {
                                         log("Tldraw editor mounted")
                                         setEditor(e)
                                     }} />
+                                    {remoteCursor && (
+                                        <LiveCursor 
+                                            x={remoteCursor.x} 
+                                            y={remoteCursor.y} 
+                                            color={remoteCursor.color} 
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <>
@@ -3252,6 +3375,8 @@ export default function OmegleMentorshipUI(props: Props) {
                         display: "flex",
                         flexDirection: "column",
                         gap: 16,
+                        overscrollBehavior: "contain",
+                        WebkitOverflowScrolling: "touch",
                     }}
                 >
                     {messages.map((msg, idx) => (
@@ -3428,6 +3553,8 @@ export default function OmegleMentorshipUI(props: Props) {
                         justifyContent: "center",
                         zIndex: 1000, // Elevated to ensure menus appear above everything
                         pointerEvents: "none", // Let clicks pass through outside the input
+                        paddingBottom: "env(safe-area-inset-bottom)",
+                        touchAction: "none",
                     }}
                 >
                     <ChatInput 

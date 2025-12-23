@@ -2957,6 +2957,8 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         bottom: "0",
         left: "0",
         borderRadius: `${universalBorderRadius}px ${universalBorderRadius}px 0px 0px`,
+        paddingBottom: "env(safe-area-inset-bottom)",
+        boxSizing: "border-box",
     }
 
     const finalPosStylesToApply = isMobileView
