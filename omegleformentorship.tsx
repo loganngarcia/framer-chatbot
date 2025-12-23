@@ -734,6 +734,7 @@ interface ChatInputProps {
     isScreenSharing?: boolean
     isWhiteboardOpen?: boolean
     toggleWhiteboard?: () => void
+    isConnected?: boolean
 }
 
 function ChatInput({ 
@@ -752,7 +753,8 @@ function ChatInput({
     isLoading = false,
     isScreenSharing = false,
     isWhiteboardOpen = false,
-    toggleWhiteboard
+    toggleWhiteboard,
+    isConnected = false
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
@@ -929,28 +931,32 @@ function ChatInput({
                             )}
                         </div>
 
-                        <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
+                        {isConnected && (
+                            <>
+                                <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
 
-                        {/* Report */}
-                        <div 
-                            data-layer="report." 
-                            className="Report" 
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (onReport) onReport()
-                                setShowMenu(false)
-                            }}
-                            style={styles.menuItem}
-                            onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)}
-                            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                        >
-                            <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
-                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                            <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report user</div>
-                        </div>
+                                {/* Report */}
+                                <div 
+                                    data-layer="report." 
+                                    className="Report" 
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (onReport) onReport()
+                                        setShowMenu(false)
+                                    }}
+                                    style={styles.menuItem}
+                                    onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                                >
+                                    <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
+                                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report user</div>
+                                </div>
+                            </>
+                        )}
 
                     </div>
                 </div>
@@ -3441,6 +3447,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         isScreenSharing={isScreenSharing}
                         isWhiteboardOpen={isWhiteboardOpen}
                         toggleWhiteboard={toggleWhiteboard}
+                        isConnected={status === "connected"}
                     />
                 </div>
             </div>
