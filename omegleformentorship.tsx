@@ -1,7 +1,8 @@
 import * as React from "react"
 import { addPropertyControls, ControlType } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
-
+// @ts-ignore
+import { Tldraw } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
 // --- SHARED STYLES ---
 
 const colors = {
@@ -61,9 +62,16 @@ const styles = {
         justifyContent: 'flex-start',
         alignItems: 'center',
         gap: 8,
-        display: 'inline-flex',
+        display: 'flex',
         cursor: "pointer",
-        transition: "background 0.2s"
+        transition: "background 0.2s",
+        background: "transparent"
+    } as React.CSSProperties,
+    menuItemHover: {
+        background: "rgba(255, 255, 255, 0.12)"
+    } as React.CSSProperties,
+    menuItemDestructiveHover: {
+        background: "rgba(251, 106, 106, 0.12)"
     } as React.CSSProperties,
     videoCardSmall: {
         height: "100%", 
@@ -724,6 +732,8 @@ interface ChatInputProps {
     onRemoveAttachment: (id: string) => void
     isLoading?: boolean
     isScreenSharing?: boolean
+    isWhiteboardOpen?: boolean
+    toggleWhiteboard?: () => void
 }
 
 function ChatInput({ 
@@ -740,7 +750,9 @@ function ChatInput({
     attachments = [],
     onRemoveAttachment,
     isLoading = false,
-    isScreenSharing = false
+    isScreenSharing = false,
+    isWhiteboardOpen = false,
+    toggleWhiteboard
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
@@ -805,8 +817,8 @@ function ChatInput({
                 }
             `}</style>
             {showMenu && (
-                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 28, marginBottom: -28, zIndex: 100 }}>
-                    <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'inline-flex'}}>
+                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 28, marginBottom: -28, zIndex: 100, pointerEvents: "auto" }}>
+                    <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'flex'}}>
                         
                         {/* Add files & photos */}
                             <div 
@@ -818,7 +830,7 @@ function ChatInput({
                                     setShowMenu(false)
                                 }}
                                 style={styles.menuItem}
-                                onMouseEnter={(e) => e.currentTarget.style.background = colors.state.hover}
+                                onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemHover)}
                                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                             >
                             <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
@@ -839,26 +851,12 @@ function ChatInput({
                                     if (onScreenShare) onScreenShare()
                                     setShowMenu(false)
                                 }}
-                                style={{
-                                    ...styles.menuItem,
-                                    // Override specific styles when screen sharing is active
-                                    ...(isScreenSharing ? {
-                                        background: 'transparent',
-                                        height: 36,
-                                        paddingLeft: 12,
-                                        paddingRight: 12,
-                                        borderRadius: 28,
-                                        justifyContent: 'flex-start',
-                                        alignItems: 'center',
-                                        gap: 8,
-                                        display: 'inline-flex'
-                                    } : {})
-                                }}
+                                style={styles.menuItem}
                                 onMouseEnter={(e) => {
                                     if (isScreenSharing) {
-                                        e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"
+                                        Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
                                     } else {
-                                        e.currentTarget.style.background = colors.state.hover
+                                        Object.assign(e.currentTarget.style, styles.menuItemHover)
                                     }
                                 }}
                                 onMouseLeave={(e) => {
@@ -889,6 +887,48 @@ function ChatInput({
                             </div>
                         )}
 
+                        {/* Whiteboard */}
+                        <div 
+                            data-layer="whiteboard" 
+                            className="Whiteboard" 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (toggleWhiteboard) toggleWhiteboard()
+                                setShowMenu(false)
+                            }}
+                            style={styles.menuItem}
+                            onMouseEnter={(e) => {
+                                if (isWhiteboardOpen) {
+                                    Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
+                                } else {
+                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent"
+                            }}
+                        >
+                            {isWhiteboardOpen ? (
+                                <>
+                                    <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 15w width to make sure text is aligned vertical on all buttons." className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <div className="StopWhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop whiteboard</div>
+                                </>
+                            ) : (
+                                <>
+                                    <div data-svg-wrapper data-layer="center icon flexbox" className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                        <svg width="15" height="14" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M13.7793 0.74707C14.0565 0.531511 14.4509 0.555486 14.6992 0.803711L17.083 3.18848C17.3314 3.43676 17.3562 3.83121 17.1406 4.1084L14.082 8.04004L14.0527 8.07812L14.0645 8.125C14.2939 9.05509 14.2987 10.0549 14.0332 11.0459C13.3301 13.6699 10.9559 15.4003 8.3623 15.4004C5.65298 15.4004 2.17915 14.2581 0.178711 13.0967C1.68588 11.9358 2.2851 10.9916 2.54199 10.1602C2.67313 9.7357 2.71442 9.34525 2.74512 8.98242C2.77602 8.61708 2.79656 8.28554 2.88379 7.95996C3.71294 4.86552 6.67306 3.06254 9.76074 3.82422L9.80859 3.83496L9.84668 3.80566L13.7793 0.74707ZM9.52051 5.19922C7.15092 4.56429 4.87423 5.91049 4.22852 8.32031C4.19176 8.45756 4.17312 8.60946 4.14355 8.96777C4.02192 10.4419 3.6765 11.5305 2.7334 12.6367L2.64258 12.7432L2.77344 12.7949C4.58026 13.5053 6.72492 14.0078 8.3623 14.0078C10.3729 14.0077 12.1596 12.6558 12.6875 10.6855C13.1093 9.11092 12.6373 7.50766 11.583 6.41406L11.4688 6.2998L11.4678 6.29785L11.2637 6.11328C10.773 5.69543 10.1841 5.37707 9.52051 5.19922ZM14.0791 2.27734L11.5459 4.24805L11.4561 4.31738L13.5693 6.43066L13.6396 6.3418L15.6104 3.80762L15.6641 3.73828L14.1494 2.22363L14.0791 2.27734Z" fill="white" fill-opacity="0.95" stroke="#353535" stroke-width="0.2"/>
+                                        </svg>
+                                    </div>
+                                    <div className="WhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Whiteboard</div>
+                                </>
+                            )}
+                        </div>
+
                         <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
 
                         {/* Report */}
@@ -901,7 +941,7 @@ function ChatInput({
                                 setShowMenu(false)
                             }}
                             style={styles.menuItem}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(251, 106, 106, 0.12)"}
+                            onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)}
                             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                         >
                             <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
@@ -1519,8 +1559,128 @@ export default function OmegleMentorshipUI(props: Props) {
     const [status, setStatus] = React.useState("idle")
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
+    const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
+    const [hasWhiteboardStarted, setHasWhiteboardStarted] = React.useState(false)
+    const [editor, setEditor] = React.useState<any>(null)
+    const editorRef = React.useRef<any>(null)
+    React.useEffect(() => { editorRef.current = editor }, [editor])
+
+    const isWhiteboardOpenRef = React.useRef(false)
+    React.useEffect(() => { isWhiteboardOpenRef.current = isWhiteboardOpen }, [isWhiteboardOpen])
+
+    const hasWhiteboardStartedRef = React.useRef(false)
+    React.useEffect(() => { hasWhiteboardStartedRef.current = hasWhiteboardStarted }, [hasWhiteboardStarted])
+
+    const pendingSnapshotRef = React.useRef<any>(null)
     const isScreenSharingRef = React.useRef(false)
     React.useEffect(() => { isScreenSharingRef.current = isScreenSharing }, [isScreenSharing])
+
+    // Tldraw sync
+    React.useEffect(() => {
+        // Inject Tldraw CSS
+        const link = document.createElement('link')
+        link.href = "https://esm.sh/tldraw@2.1.0/tldraw.css"
+        link.rel = "stylesheet"
+        document.head.appendChild(link)
+
+        if (!editor) {
+             return () => {
+                if (document.head.contains(link)) {
+                    document.head.removeChild(link)
+                }
+            }
+        }
+        
+        // Load pending snapshot if exists
+        if (pendingSnapshotRef.current) {
+            log("Applying pending Tldraw snapshot...")
+            try {
+                // Same filtering logic as above for pending snapshot
+                const snapshot = pendingSnapshotRef.current
+                editor.store.mergeRemoteChanges(() => {
+                     const records = Object.values(snapshot)
+                     const contentRecords = records.filter((r: any) => 
+                         r.typeName === 'shape' || 
+                         r.typeName === 'asset' || 
+                         r.typeName === 'page' ||
+                         r.typeName === 'document'
+                     )
+                     if (contentRecords.length > 0) {
+                         editor.store.put(contentRecords)
+                     }
+                })
+                log("Merged pending tldraw snapshot content successfully")
+            } catch (e) {
+                log(`Error merging pending tldraw snapshot: ${e}`)
+            }
+            pendingSnapshotRef.current = null
+        }
+        
+        const cleanup = editor.store.listen((update: any) => {
+            // Only broadcast local changes (source='user')
+            if (update.source === 'user') {
+                // Filter changes to exclude presence/camera updates which shouldn't be synced
+                // Tldraw v2 uses types like 'instance', 'camera', 'pointer', etc.
+                
+                const filteredChanges: any = { added: {}, updated: {}, removed: {} }
+                let hasChanges = false
+
+                const isSyncable = (typeName: string) => {
+                    // Sync content, allow most types but exclude local user state
+                    const localTypes = new Set([
+                        'instance',
+                        'instance_page_state',
+                        'user',
+                        'user_document',
+                        'user_presence',
+                        'camera',
+                        'pointer'
+                    ])
+                    return !localTypes.has(typeName)
+                }
+
+                // Filter Added
+                Object.values(update.changes.added).forEach((record: any) => {
+                    if (isSyncable(record.typeName)) {
+                        filteredChanges.added[record.id] = record
+                        hasChanges = true
+                    }
+                })
+
+                // Filter Updated
+                Object.entries(update.changes.updated).forEach(([id, diff]: [string, any]) => {
+                    // diff is [from, to]
+                    if (isSyncable(diff[1].typeName)) {
+                        filteredChanges.updated[id] = diff
+                        hasChanges = true
+                    }
+                })
+
+                // Filter Removed
+                Object.values(update.changes.removed).forEach((record: any) => {
+                    if (isSyncable(record.typeName)) {
+                        filteredChanges.removed[record.id] = record
+                        hasChanges = true
+                    }
+                })
+
+                if (hasChanges && dataConnectionRef.current && dataConnectionRef.current.open) {
+                    // log(`Sending update: ${Object.keys(filteredChanges.added).length} added, ${Object.keys(filteredChanges.updated).length} updated`)
+                    dataConnectionRef.current.send({
+                        type: 'tldraw-update',
+                        payload: filteredChanges
+                    })
+                }
+            }
+        })
+        
+        return () => {
+            cleanup()
+            if (document.head.contains(link)) {
+                document.head.removeChild(link)
+            }
+        }
+    }, [editor])
 
     // --- STATE: DEBUGGING ---
     // Toggle this via the 'Debug Mode' property in Framer to see on-screen logs.
@@ -1776,11 +1936,20 @@ export default function OmegleMentorshipUI(props: Props) {
         
         if (peerInstance.current) peerInstance.current.destroy()
         if (mqttClient.current) mqttClient.current.end()
+        
+        // Clear whiteboard state
+        setIsWhiteboardOpen(false)
+        setHasWhiteboardStarted(false)
+        setEditor(null) 
+
         setStatus("idle")
         setRole(null)
         setLocalStream(null)
         setRemoteStream(null)
         setRemoteScreenStream(null)
+        setMessages([])
+        setAttachments([])
+        setLogs([])
         if (typeof window !== "undefined") {
             window.location.hash = ""
         }
@@ -1800,10 +1969,48 @@ export default function OmegleMentorshipUI(props: Props) {
         setIsScreenSharing(false)
     }
 
+    const toggleWhiteboard = () => {
+        if (isWhiteboardOpen) {
+            log("Stopping whiteboard...")
+            setIsWhiteboardOpen(false)
+            if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                dataConnectionRef.current.send({ type: 'tldraw-stop' })
+            }
+        } else {
+            log("Starting whiteboard...")
+            if (isScreenSharing) stopLocalScreenShare()
+            setIsWhiteboardOpen(true)
+            setHasWhiteboardStarted(true)
+            if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                log("Sending tldraw-start command...")
+                dataConnectionRef.current.send({ type: 'tldraw-start' })
+                
+                // If we already have content (from persistence), send a snapshot
+                if (editorRef.current) {
+                    const snapshot = editorRef.current.store.getSnapshot()
+                    log(`Sending existing whiteboard snapshot (${JSON.stringify(snapshot).length} bytes)`)
+                    dataConnectionRef.current.send({
+                        type: 'tldraw-snapshot',
+                        payload: snapshot
+                    })
+                }
+            } else {
+                log("Warning: No data connection available to start whiteboard sync")
+            }
+        }
+    }
+
     const toggleScreenShare = async () => {
         if (isScreenSharing) {
             stopLocalScreenShare()
         } else {
+            if (isWhiteboardOpen) {
+                setIsWhiteboardOpen(false)
+                // Notify peer to close whiteboard
+                if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                    dataConnectionRef.current.send({ type: 'tldraw-stop' })
+                }
+            }
             // START SHARING
             try {
                 // Check if screen sharing is supported
@@ -1930,6 +2137,11 @@ export default function OmegleMentorshipUI(props: Props) {
                 // If we are sharing, stop our share so the new one takes over
                 if (screenStreamRef.current) {
                     stopLocalScreenShare()
+                }
+
+                // Close whiteboard if open (Screen share overrides whiteboard)
+                if (isWhiteboardOpen) {
+                    setIsWhiteboardOpen(false)
                 }
 
                 call.answer() // Answer without sending a stream back
@@ -2142,16 +2354,129 @@ export default function OmegleMentorshipUI(props: Props) {
         handleDataConnection(conn)
     }
 
-    const handleDataConnection = (conn: any) => {
+        const handleDataConnection = (conn: any) => {
         dataConnectionRef.current = conn
         
-        conn.on('open', () => {
+        const onOpen = () => {
             log("Data connection established")
-        })
+            
+            // Check if whiteboard is already open and sync state with new peer
+            if (isWhiteboardOpenRef.current || hasWhiteboardStartedRef.current) {
+                log("Syncing existing whiteboard state with new peer...")
+                // Small delay to ensure connection is stable
+                setTimeout(() => {
+                    if (dataConnectionRef.current?.open) {
+                        dataConnectionRef.current.send({ type: 'tldraw-start' })
+                        if (editorRef.current) {
+                            try {
+                                const snapshot = editorRef.current.store.getSnapshot()
+                                log(`Sending snapshot (${JSON.stringify(snapshot).length} bytes)`)
+                                dataConnectionRef.current.send({ type: 'tldraw-snapshot', payload: snapshot })
+                            } catch (e) {
+                                log(`Error sending snapshot: ${e}`)
+                            }
+                        }
+                    }
+                }, 500)
+            }
+        }
+
+        if (conn.open) {
+            onOpen()
+        } else {
+            conn.on('open', onOpen)
+        }
         
         conn.on('data', (data: any) => {
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
+            } else if (data.type === 'tldraw-start') {
+                log("Received tldraw-start command")
+                if (isScreenSharingRef.current) stopLocalScreenShare()
+                setIsWhiteboardOpen(true)
+                setHasWhiteboardStarted(true)
+            } else if (data.type === 'tldraw-stop') {
+                log("Received tldraw-stop command")
+                setIsWhiteboardOpen(false)
+            } else if (data.type === 'tldraw-snapshot') {
+                log(`Received tldraw snapshot (${JSON.stringify(data.payload).length} bytes)`)
+                // Filter the snapshot to exclude local state (camera, presence, etc.)
+                const filteredSnapshot = data.payload
+                // We should technically filter this before sending, but filtering on receive is also safe
+                // to prevent overwriting local view state.
+                
+                if (editorRef.current) {
+                    try {
+                        // Use mergeRemoteChanges instead of loadSnapshot to preserve local state
+                        // loadSnapshot wipes the store. We want to merge content.
+                        
+                        // Actually, loadSnapshot is fine if we filter the payload to NOT include 'instance', 'camera', etc.
+                        // But Tldraw's loadSnapshot might expect a full document structure.
+                        
+                        // Let's try manually putting the records instead of loadSnapshot if the editor is already running,
+                        // to avoid resetting the user's viewport.
+                        
+                        editorRef.current.store.mergeRemoteChanges(() => {
+                             const records = Object.values(filteredSnapshot)
+                             const contentRecords = records.filter((r: any) => 
+                                 r.typeName === 'shape' || 
+                                 r.typeName === 'asset' || 
+                                 r.typeName === 'page' ||
+                                 r.typeName === 'document'
+                             )
+                             if (contentRecords.length > 0) {
+                                 editorRef.current.store.put(contentRecords)
+                             }
+                        })
+                        log("Merged tldraw snapshot content successfully")
+                    } catch (e) {
+                        log(`Error merging tldraw snapshot: ${e}`)
+                    }
+                } else {
+                    log("Editor not ready to load snapshot. Buffering...")
+                    pendingSnapshotRef.current = data.payload
+                }
+            } else if (data.type === 'tldraw-update') {
+                if (editorRef.current) {
+                    try {
+                        const { added, updated, removed } = data.payload
+                        
+                        editorRef.current.store.mergeRemoteChanges(() => {
+                            // Handle Added
+                            const addedRecords = Object.values(added)
+                            if (addedRecords.length > 0) {
+                                try {
+                                    editorRef.current.store.put(addedRecords)
+                                } catch (e) {
+                                    log(`Error processing added records: ${e}`)
+                                }
+                            }
+
+                            // Handle Updated
+                            // Updated comes as { id: [from, to] }
+                            const updatedRecords = Object.values(updated).map((u: any) => u[1])
+                            if (updatedRecords.length > 0) {
+                                try {
+                                    editorRef.current.store.put(updatedRecords)
+                                } catch (e) {
+                                    log(`Error processing updated records: ${e}`)
+                                }
+                            }
+
+                            // Handle Removed
+                            const removedIds = Object.keys(removed)
+                            if (removedIds.length > 0) {
+                                try {
+                                    editorRef.current.store.remove(removedIds)
+                                } catch (e) {
+                                    log(`Error processing removed records: ${e}`)
+                                }
+                            }
+                        })
+                    } catch (e) {
+                        log(`Error applying tldraw update: ${e}`)
+                    }
+                }
             }
         })
 
@@ -2432,7 +2757,27 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // Calculate dynamic size for screen share container to match aspect ratio
     const screenShareContainerStyle = React.useMemo(() => {
-        if (!sharedScreenSize || containerSize.width === 0 || containerSize.height === 0) {
+        // If whiteboard is active, use aspect ratio based on layout:
+        // Mobile: 4:5 (1080x1350), Desktop: 16:9 (1920x1080)
+        let activeWidth: number
+        let activeHeight: number
+        
+        if (isWhiteboardOpen) {
+            if (isMobileLayout) {
+                // 4:5 aspect ratio for mobile
+                activeWidth = 1080
+                activeHeight = 1350
+            } else {
+                // 16:9 aspect ratio for desktop
+                activeWidth = 1920
+                activeHeight = 1080
+            }
+        } else {
+            activeWidth = sharedScreenSize?.width
+            activeHeight = sharedScreenSize?.height
+        }
+
+        if ((!activeWidth || !activeHeight) || containerSize.width === 0 || containerSize.height === 0) {
             return { flex: 1, width: "100%" }
         }
 
@@ -2443,7 +2788,7 @@ export default function OmegleMentorshipUI(props: Props) {
         const availableHeight = Math.max(100, containerSize.height - chromeHeight)
         const availableWidth = Math.max(100, containerSize.width - 32) // 16px padding on each side
 
-        const videoRatio = sharedScreenSize.width / sharedScreenSize.height
+        const videoRatio = activeWidth / activeHeight
         const containerRatio = availableWidth / availableHeight
 
         let finalW, finalH
@@ -2463,7 +2808,7 @@ export default function OmegleMentorshipUI(props: Props) {
             height: finalH,
             flex: "none" // Disable flex growing to enforce size
         }
-    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize])
+    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize, isWhiteboardOpen])
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
     const videoSectionHeight = containerSize.height - chatHeight - 40
@@ -2594,7 +2939,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {(isScreenSharing || !!remoteScreenStream) ? (
+            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen) ? (
                 // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
                 <div style={{
                     flex: "1 1 0",
@@ -2725,17 +3070,36 @@ export default function OmegleMentorshipUI(props: Props) {
                             borderRadius: 14, // Added rounded corners
                             overflow: "hidden"
                         }}>
-                            <VideoPlayer 
-                                stream={remoteScreenStream || screenStreamRef.current} 
-                                isMirrored={false} 
-                                muted={!remoteScreenStream} // Unmute only if it's a remote screen share
-                                style={{ 
-                                    width: "100%", 
-                                    height: "100%", 
-                                    objectFit: 'contain' 
-                                }}
-                                onVideoSize={(w, h) => setSharedScreenSize({ width: w, height: h })}
-                            />
+                            {isWhiteboardOpen ? (
+                                <div style={{ width: '100%', height: '100%', background: '#FFF', position: 'relative', zIndex: 0 }} onPointerDown={(e) => e.stopPropagation()}>
+                                    <Tldraw onMount={(e) => {
+                                        log("Tldraw editor mounted")
+                                        setEditor(e)
+                                    }} />
+                                </div>
+                            ) : (
+                                <>
+                                    {hasWhiteboardStarted && (
+                                         <div style={{ width: '100%', height: '100%', background: '#FFF', position: 'absolute', top: 0, left: 0, zIndex: -1, visibility: 'hidden', pointerEvents: 'none' }} onPointerDown={(e) => e.stopPropagation()}>
+                                            <Tldraw onMount={(e) => {
+                                                log("Hidden Tldraw editor mounted")
+                                                setEditor(e)
+                                            }} />
+                                         </div>
+                                    )}
+                                    <VideoPlayer 
+                                        stream={remoteScreenStream || screenStreamRef.current} 
+                                        isMirrored={false} 
+                                        muted={!remoteScreenStream} // Unmute only if it's a remote screen share
+                                        style={{ 
+                                            width: "100%", 
+                                            height: "100%", 
+                                            objectFit: 'contain' 
+                                        }}
+                                        onVideoSize={(w, h) => setSharedScreenSize({ width: w, height: h })}
+                                    />
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -3056,7 +3420,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         width: "100%",
                         display: "flex",
                         justifyContent: "center",
-                        zIndex: 20,
+                        zIndex: 1000, // Elevated to ensure menus appear above everything
                         pointerEvents: "none", // Let clicks pass through outside the input
                     }}
                 >
@@ -3075,6 +3439,8 @@ export default function OmegleMentorshipUI(props: Props) {
                         onRemoveAttachment={handleRemoveAttachment}
                         isLoading={isLoading}
                         isScreenSharing={isScreenSharing}
+                        isWhiteboardOpen={isWhiteboardOpen}
+                        toggleWhiteboard={toggleWhiteboard}
                     />
                 </div>
             </div>
