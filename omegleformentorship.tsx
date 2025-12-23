@@ -474,6 +474,14 @@ const TOPIC_LOBBY = "framer-hybrid-lobby-v1"
 const MAX_UPLOAD_SIZE_MB = 10
 const INLINE_MAX_BYTES = 2 * 1024 * 1024 // 2MB inline limit
 
+// User abuse guardrails
+// These are designed to prevent abuse and ensure the API is used responsibly
+const MAX_INPUT_LENGTH = 1000 // Limit input characters
+const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
+const API_TIMEOUT_MS = 30000 // 30 seconds timeout
+const MAX_HISTORY_MESSAGES = 20 // Limit history context
+const DAILY_MESSAGE_LIMIT = 100 // Limit messages per day
+
 // --- INTERFACES ---
 interface Props {
     geminiApiKey: string
@@ -781,7 +789,21 @@ function ChatInput({
 
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box", pointerEvents: "auto"}}>
-            {/* CONVERSATION ACTIONS MENU */}
+                {/* CONVERSATION ACTIONS MENU */}
+            <style>{`
+                .ChatTextInput::placeholder {
+                    color: ${colors.text.secondary};
+                }
+                .ChatTextInput::-webkit-input-placeholder {
+                    color: ${colors.text.secondary};
+                }
+                .ChatTextInput::-moz-placeholder {
+                    color: ${colors.text.secondary};
+                }
+                .ChatTextInput:-ms-input-placeholder {
+                    color: ${colors.text.secondary};
+                }
+            `}</style>
             {showMenu && (
                 <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 28, marginBottom: -28, zIndex: 100 }}>
                     <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'inline-flex'}}>
@@ -993,7 +1015,7 @@ function ChatInput({
               <div style={{
                   display: 'flex',
                   alignItems: 'flex-end',
-                  gap: 12,
+                  gap: 8,
                   width: '100%'
               }}>
                   {/* UPLOAD ICON (Now toggles Menu) */}
@@ -1010,7 +1032,7 @@ function ChatInput({
                     }}
                     style={{
                       cursor: (attachments.length >= 10) ? "not-allowed" : "pointer", 
-                      opacity: (attachments.length >= 10) ? 0.3 : 0.65,
+                      opacity: (attachments.length >= 10) ? 0.3 : 0.95,
                       pointerEvents: (attachments.length >= 10) ? "none" : "auto",
                       width: 36,
                       height: 36,
@@ -1301,6 +1323,190 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
     )
 }
 
+// --- HELPER: PII & SAFETY FILTER ---
+function sanitizeMessage(text: string): string {
+    let sanitized = text
+    
+    // Helper to replace match with exact length of asterisks
+    const replaceWithStars = (match: string) => "*".repeat(match.length)
+
+    // 1. Social Security Numbers (XXX-XX-XXXX)
+    sanitized = sanitized.replace(/\b\d{3}-\d{2}-\d{4}\b/g, replaceWithStars)
+
+    // 2. Phone Numbers (US formats)
+    sanitized = sanitized.replace(/\b(\+?\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, replaceWithStars)
+
+    // 3. Emails
+    sanitized = sanitized.replace(/\b[\w\.-]+@[\w\.-]+\.\w{2,}\b/gi, replaceWithStars)
+
+    // 4. Addresses & Zip Codes
+    // Addresses
+    sanitized = sanitized.replace(/\b\d+\s+[A-Za-z0-9\s]+\s+(Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Court|Ct\.?|Way|Place|Pl\.?|Square|Sq\.?)\b/gi, replaceWithStars)
+    // Zip codes
+    sanitized = sanitized.replace(/\b\d{5}(?:-\d{4})?\b/g, replaceWithStars)
+
+    // 5. Credit/Debit Cards (13-19 digits, possibly with spaces or dashes)
+    sanitized = sanitized.replace(/\b(?:\d[ -]*?){13,16}\b/g, replaceWithStars)
+
+    // 6. Gift Card & Financial Scams
+    sanitized = sanitized.replace(/\b(gift\s?card|steam\s?card|google\s?play\s?card|amazon\s?card|itunes\s?card|vanilla\s?visa|apple\s?card|xbox\s?card|playstation\s?card|target\s?card|walmart\s?card|sephora\s?card|ebay\s?card)\b/gi, replaceWithStars)
+    sanitized = sanitized.replace(/\b(western\s?union|moneygram|wire\s?transfer|bitcoin\s?atm|crypto\s?wallet|cash\s?app|venmo|zelle|paypal)\b/gi, replaceWithStars)
+    sanitized = sanitized.replace(/(send\s?money|verify\s?your\s?account|account\s?suspended|claim\s?your\s?prize|you(?:'ve| have)\s?won)/gi, replaceWithStars)
+
+    // 7. Links (Standard URLs & Evasions)
+    // Allow .gov and .edu URLs by temporarily masking them
+    const whitelistRegex = /\b([a-zA-Z0-9.-]+\.(?:gov|edu)(?:\/[^\s]*)?)\b/gi
+    const whitelistedUrls: string[] = []
+    sanitized = sanitized.replace(whitelistRegex, (match) => {
+        whitelistedUrls.push(match)
+        return `__WHITELIST_URL_${whitelistedUrls.length - 1}__`
+    })
+
+    sanitized = sanitized.replace(/(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi, replaceWithStars)
+    sanitized = sanitized.replace(/\b\w+\s*([(\[{]\s*)?(\.|dot|\(\))\s*([)\]}]\s*)?(com|net|org|io|co|me|xyz|biz|info|ai|gg|tv|app|dev|ly|link|top|club|online|site|store|ru|su|cn|tk|ml|cf|ga|finance|trade|exchange|wallet|token|support|help|verify|secure|live|stream|click|buzz|gd)\b/gi, replaceWithStars)
+    sanitized = sanitized.replace(/\b\w+dot(com|net|org|io|co|me|xyz|biz|info|ai|gg|tv|app|dev|ly|link|top|club|online|site|store|ru|su|cn|tk|ml|cf|ga|finance|trade|exchange|wallet|token|support|help|verify|secure|live|stream|click|buzz|gd)\b/gi, replaceWithStars)
+
+    // Restore whitelisted URLs
+    sanitized = sanitized.replace(/__WHITELIST_URL_(\d+)__/g, (_, index) => whitelistedUrls[parseInt(index)])
+
+
+    // 8. Safety & Profanity Filter
+    const badWords = [
+        "amateur", "anal", "anus", "ass", "balls", "barely legal", "bj", "blowjob", "boobs", "bondage",
+        "boner", "breasts", "bukkake", "bush", "busty", "cam girl", "catfish", "climax", "clit", "clitoris",
+        "cock", "cocksucker", "cp", "creampie", "cum", "cumshot", "curvy", "deepthroat", "dick", "dickhead",
+        "dickwad", "dickweed", "dildo", "dilf", "dom", "dp", "dripping", "ejaculate", "ejaculation",
+        "erection", "erotic", "escort", "exhibitionist", "explicit", "facial", "fetish",
+        "fingering", "foreplay", "gangbang", "groomer", "grooming", "handjob", "hard on", "hardcore",
+        "hentai", "hj", "hooker", "horny", "incest", "jacking", "jerking", "jizz", "kink", "labia",
+        "lolita", "masturbate", "masturbation", "masturbating", "masochist", "milf", "molest", "molested",
+        "molester", "molesting", "moan", "necrophilia", "nude", "nudes", "nudity", "nsfw", "OF", "onlyfans",
+        "oral", "orgasm", "pedo", "pedophile", "penetrate", "penetration", "penis", "precum", "prostitute",
+        "pubes", "pubic", "pounding", "pussy", "rape", "raped", "rapist", "raping", "rectum", "revenge porn",
+        "rimjob", "rimming", "sack", "sadist", "scat", "scrotum", "semen", "sex", "sext", "sexting",
+        "sexy", "softcore", "sperm", "squirt", "stalker", "stalking", "stripper", "sub", "teen", "testicles",
+        "thicc", "thot", "threesome", "thrust", "tits", "twerk", "underage", "vagina", "vibrator", "voyeur",
+        "wanking", "watersports", "xxx", "zoophilia",
+        
+        // Profanity / Vulgar Language
+        "fuck", "fucking", "fucked", "fucker", "motherfucker", "motherfucking",
+        "shit", "shitting", "shitted", "shithead", "shitty", "bullshit",
+        "bitch", "bitching", "bitched", "bitchy",
+        "asshole", "cunt", "whore", "slut", "hoe", 
+        
+        // Self-Harm / Violence
+        "suicide", "kill yourself", "die", "kys",
+        
+        // Grooming / Predator Keywords
+        "asl", "meetup", "open bob", "send pic", "take it off",
+        
+        // Security / Phishing Prevention
+        "account number", "amino", "apple", "badoo", "bumble", "cash app", "chatroulette", "discord", "facebook", "fb", "gmail", "google", "microsoft",
+        "fortnite", "grindr", "hinge", "hoop", "instagram", "kik", "line", "liveme", "meetme", "messenger",
+        "minecraft", "monkey", "password", "passwords", "paypal", "pin", "reddit", "roblox", "signal",
+        "skype", "snap", "snapchat", "ssn", "telegram", "tiktok", "tinder", "twitch", "twitter", "wechat",
+        "user name", "username", "venmo", "viber", "wechat", "whisper", "wink", "x app", "youtube", "yubo", "zelle", "bank", "bank account",
+        // General Insults / Name Calling
+        "dumb", "stupid", "idiot", "loser", "ugly", "fat", "fatty", "gross", "creep", "weirdo", 
+        "annoying", "pathetic", "worthless", "trash", "garbage", "scum", "filth",
+        "moron", "imbecile", "dunce", "fool", "clown", "joke",
+        
+        // Racial/Ethnic Slurs
+        "beaner", "border hopper", "bumpkin", "camel jockey", "chink", "cholo", "coon", "cracker", "dune coon",
+        "ghetto", "gook", "greaser", "gypsy", "gyp", "hayseed", "heeb", "hick", "hillbilly", "honky", "injun", "jap",
+        "jungle bunny", "kike", "nigga", "nigger", "nip", "paki", "peckerwood", "pikey",
+        "porch monkey", "raghead", "redneck", "redskin", "sand nigger", "slant", "slope",
+        "spic", "squaw", "tar baby", "towelhead", "trailer trash", "wetback", "white trash", "yid", "yokel", "zipperhead",
+        
+        // Homophobic/Transphobic Slurs
+        "dyke", "fag", "faggot", "fgt", "fruitcake", "gaylord", "homo",
+        "ladyboy", "lezzie", "lesbo", "shemale", "tranny",
+        
+        // Ableist Slurs
+        "cripple", "downie", "downs", "dwarf", "gimp", "imbecile", "lame",
+        "midget", "mongoloid", "retard", "spaz", "spastic",
+        
+        // Slur Euphemisms / Indirect References
+        "f word", "f-word", "hard r", "hard r word", "n word", "n-word",
+        "r-word", "soft r", "soft r word", "r word",
+        
+        // Gen Z Derogatory Terms
+        "boomer", "karen", "simp", "incel", "cuck", "soyboy",
+        
+        // Controversial / Political Topics
+        "israel", "palestine", "gaza", "hamas", "idf", "zionist", "genocide"
+    ]
+
+    const charMap: Record<string, string> = {
+        'a': '[a@4*^àáâãäå]',
+        'b': '[b8]',
+        'c': '[c(k]',
+        'e': '[e3*€èéêë]',
+        'g': '[g69]',
+        'i': '[i1!|*lìíîï]',
+        'l': '[l1|]',
+        'o': '[o0*òóôõö]',
+        's': '[s$5z]',
+        't': '[t7+]',
+        'u': '[u*vüùúû]',
+        'k': '[k]',
+    }
+
+    const createSmartPattern = (word: string) => {
+        const hasSpace = word.includes(' ')
+        if (hasSpace) {
+            return word.split('').map((char, index) => {
+                if (char === ' ') return '[\\s\\W_]+'
+                const lower = char.toLowerCase()
+                const chars = charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+                return index === word.length - 1 ? chars : `${chars}[\\W_]{0,20}`
+            }).join('')
+        }
+        // Single words: create patterns for normal, spaced-out, dotted, and concatenated
+        const normalPattern = word.split('').map((char) => {
+            const lower = char.toLowerCase()
+            return charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+        }).join('')
+        
+        const spacedPattern = word.split('').map((char, index) => {
+            const lower = char.toLowerCase()
+            const chars = charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+            return index === word.length - 1 ? chars : `${chars}[\\s\\W_]{1,5}`
+        }).join('')
+        
+        // Dotted pattern: catches evasions like "f.aggot" or "f.ucking" with dots/punctuation
+        const dottedPattern = word.split('').map((char, index) => {
+            const lower = char.toLowerCase()
+            const chars = charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+            return index === word.length - 1 ? chars : `${chars}[\\W_]{1,3}`
+        }).join('')
+        
+        // Concatenated pattern: matches word when followed by another word char (like "bitch" in "bitchwhore")
+        const concatenatedPattern = word.split('').map((char) => {
+            const lower = char.toLowerCase()
+            return charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+        }).join('')
+        
+        // Dotted concatenated: catches "f.ucking" in "f.uckingb.itchc.unt"
+        const dottedConcatenatedPattern = word.split('').map((char, index) => {
+            const lower = char.toLowerCase()
+            const chars = charMap[lower] || (lower.match(/[a-z0-9]/i) ? lower : `\\${lower}`)
+            return index === word.length - 1 ? chars : `${chars}[\\W_]{1,3}`
+        }).join('')
+        
+        return `\\b(?:${normalPattern}\\b|${spacedPattern}\\b|${dottedPattern}\\b|${concatenatedPattern}(?=\\w)|${dottedConcatenatedPattern}(?=\\w))`
+    }
+
+    const badPatterns = badWords.map(createSmartPattern)
+    const combinedRegex = new RegExp(`(${badPatterns.join('|')})`, 'gi')
+    
+    sanitized = sanitized.replace(combinedRegex, (match) => {
+        return "*".repeat(match.length)
+    })
+
+    return sanitized
+}
+
 /**
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
@@ -1351,6 +1557,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const mqttClient = React.useRef<any>(null)
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null)
+    const dataConnectionRef = React.useRef<any>(null)
     const statusRef = React.useRef(status)
     React.useEffect(() => { statusRef.current = status }, [status])
     
@@ -1362,6 +1569,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const [inputText, setInputText] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
     const abortControllerRef = React.useRef<AbortController | null>(null)
+    const lastMessageTimeRef = React.useRef<number>(0)
 
     // --- STATE: FILE UPLOADS ---
     const [attachments, setAttachments] = React.useState<Attachment[]>([])
@@ -1563,6 +1771,7 @@ export default function OmegleMentorshipUI(props: Props) {
         stopLocalScreenShare()
 
         if (activeCall.current) activeCall.current.close()
+        if (dataConnectionRef.current) dataConnectionRef.current.close()
         // Note: screenCallRef cleanup is handled in stopLocalScreenShare
         
         if (peerInstance.current) peerInstance.current.destroy()
@@ -1700,6 +1909,11 @@ export default function OmegleMentorshipUI(props: Props) {
             initMQTT() // Start looking for partners after P2P is ready
         })
 
+        peer.on("connection", (conn: any) => {
+            log(`Data connection received from ${conn.peer}`)
+            handleDataConnection(conn)
+        })
+
         peer.on("call", (call: any) => {
             const incomingPeerId = call.peer
             const activePeerId = activeCall.current?.peer
@@ -1833,6 +2047,7 @@ export default function OmegleMentorshipUI(props: Props) {
                     localStreamRef.current
                 )
                 handleCall(call)
+                connectToDataPeer(data.id)
             } else {
                 log(`Waiting for handshake from ${data.role || "peer"}: ${data.id}`)
             }
@@ -1918,75 +2133,99 @@ export default function OmegleMentorshipUI(props: Props) {
         setIsLoading(false)
     }
 
-    /**
-     * Handles message delivery to the Google Gemini API.
-     */
-    const handleSendMessage = async () => {
-        if (!inputText.trim() && attachments.length === 0) return
+    // --- DATA CHANNEL & AI HELPERS ---
+
+    const connectToDataPeer = (peerId: string) => {
+        if (!peerInstance.current) return
+        log(`Connecting to data channel of ${peerId}...`)
+        const conn = peerInstance.current.connect(peerId)
+        handleDataConnection(conn)
+    }
+
+    const handleDataConnection = (conn: any) => {
+        dataConnectionRef.current = conn
+        
+        conn.on('open', () => {
+            log("Data connection established")
+        })
+        
+        conn.on('data', (data: any) => {
+            if (data.type === 'chat') {
+                handleIncomingPeerMessage(data.payload)
+            }
+        })
+
+        conn.on('error', (err: any) => log(`Data Conn Error: ${err}`))
+        
+        conn.on('close', () => {
+            log("Data connection closed")
+            dataConnectionRef.current = null
+        })
+    }
+
+    const handleIncomingPeerMessage = (payload: any) => {
+        const peerMsg: Message = {
+            role: "peer",
+            text: payload.text,
+            attachments: payload.attachments || []
+        }
+        
+        setMessages(prev => [...prev, peerMsg])
+        
+        // Trigger AI response for the peer's message (as user context)
+        generateAIResponse(peerMsg.text, [], "peer")
+    }
+
+    const generateAIResponse = async (text: string, currentAttachments: any[], originRole: "user" | "peer") => {
         if (!geminiApiKey) {
-            setMessages(prev => [...prev, { role: "model", text: "Please provide a Gemini API Key in the properties panel." }])
-            return
+             if (originRole === "user") {
+                 setMessages(prev => [...prev, { role: "model", text: "Please provide a Gemini API Key in the properties panel." }])
+             }
+             return
         }
 
-        const textToSend = inputText
-        const attachmentsToSend = [...attachments]
-
-        // Build user message for display
-        const userMsg: Message = { 
-            role: "user", 
-            text: textToSend,
-            attachments: attachmentsToSend.map(a => ({
-                type: a.type,
-                url: a.previewUrl, // For images/videos
-                name: a.name,
-                mimeType: a.mimeType
-            }))
-        }
-        setMessages(prev => [...prev, userMsg])
-        setInputText("")
-        setAttachments([])
-        if (fileInputRef.current) fileInputRef.current.value = ""
-        setIsLoading(true)
-
-        // Abort previous if any
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
         }
         const controller = new AbortController()
         abortControllerRef.current = controller
+        
+        setIsLoading(true)
 
         try {
-            // Build API payload
             let userContent: any = []
-
-            if (textToSend.trim()) {
-                userContent.push({ text: textToSend })
+            if (text.trim()) {
+                userContent.push({ text: text })
             }
 
-            for (const att of attachmentsToSend) {
-                const base64 = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                        const result = reader.result as string
-                        resolve(result.substring(result.indexOf(",") + 1))
-                    }
-                    reader.onerror = reject
-                    reader.readAsDataURL(att.file)
-                })
-
-                userContent.push({
-                    inlineData: {
-                        mimeType: att.file.type || "application/octet-stream",
-                        data: base64
-                    }
-                })
+            for (const att of currentAttachments) {
+                if (att.file) {
+                    const base64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                            const result = reader.result as string
+                            resolve(result.substring(result.indexOf(",") + 1))
+                        }
+                        reader.onerror = reject
+                        reader.readAsDataURL(att.file)
+                    })
+                    userContent.push({
+                        inlineData: {
+                            mimeType: att.file.type || "application/octet-stream",
+                            data: base64
+                        }
+                    })
+                }
             }
 
-            // Construct conversation history
-            const history = messages.map(m => ({
-                role: m.role === "user" ? "user" : "model",
-                parts: [{ text: m.text }]
-            }))
+            // Map peer messages to 'user' for Gemini context
+            // Limit history to prevent excessive context
+            const history = messages
+                .slice(-MAX_HISTORY_MESSAGES)
+                .map(m => ({
+                    role: m.role === "model" ? "model" : "user",
+                    parts: [{ text: m.text }]
+                }))
 
             const payload: any = {
                 contents: [
@@ -1995,14 +2234,13 @@ export default function OmegleMentorshipUI(props: Props) {
                 ]
             }
 
-            // Add system instruction if present
             if (systemPrompt.trim()) {
                 payload.systemInstruction = {
                     parts: [{ text: systemPrompt }]
                 }
             }
 
-            const response = await fetch(
+            const fetchPromise = fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
                 {
                     method: "POST",
@@ -2011,6 +2249,16 @@ export default function OmegleMentorshipUI(props: Props) {
                     signal: controller.signal
                 }
             )
+
+            let timeoutId: any
+            const timeoutPromise = new Promise<Response>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new Error("Request timed out"))
+                }, API_TIMEOUT_MS)
+            })
+
+            const response = await Promise.race([fetchPromise, timeoutPromise])
+            clearTimeout(timeoutId)
 
             const data = await response.json()
             
@@ -2028,15 +2276,101 @@ export default function OmegleMentorshipUI(props: Props) {
                 setMessages(prev => [...prev, { role: "model", text: "Error: No response from Gemini." }])
             }
         } catch (error: any) {
-            if (error.name === 'AbortError') {
-                return // Request cancelled
-            }
+            if (error.name === 'AbortError') return
             console.error("Network Error:", error)
             setMessages(prev => [...prev, { role: "model", text: `Error connecting to Gemini: ${error.message}` }])
         } finally {
             setIsLoading(false)
             abortControllerRef.current = null
         }
+    }
+
+    /**
+     * Handles message delivery to the Google Gemini API.
+     */
+    const handleSendMessage = async () => {
+        if (!inputText.trim() && attachments.length === 0) return
+
+        const textToSend = sanitizeMessage(inputText)
+        
+        // Input length check
+        if (textToSend.length > MAX_INPUT_LENGTH) {
+            setMessages(prev => [...prev, { 
+                role: "model", 
+                text: `Message too long (max ${MAX_INPUT_LENGTH} characters).` 
+            }])
+            return
+        }
+
+        // Daily Limit Check
+        if (typeof window !== "undefined" && window.localStorage) {
+            try {
+                const today = new Date().toISOString().split("T")[0]
+                const stored = localStorage.getItem("gemini-daily-usage")
+                let usage = { date: today, count: 0 }
+                
+                if (stored) {
+                    const parsed = JSON.parse(stored)
+                    if (parsed.date === today) {
+                        usage = parsed
+                    }
+                }
+
+                if (usage.count >= DAILY_MESSAGE_LIMIT) {
+                    setMessages(prev => [...prev, { 
+                        role: "model", 
+                        text: "Daily message limit reached. Please try again at 12AM." 
+                    }])
+                    return
+                }
+
+                // Increment and save (optimistically)
+                usage.count++
+                localStorage.setItem("gemini-daily-usage", JSON.stringify(usage))
+            } catch (e) {
+                // Ignore localStorage errors
+            }
+        }
+
+        // Rate limiting check
+        const now = Date.now()
+        if (now - lastMessageTimeRef.current < MESSAGE_RATE_LIMIT_MS) {
+            return
+        }
+        lastMessageTimeRef.current = now
+
+        const attachmentsToSend = [...attachments]
+
+        // Build user message for display
+        const userMsg: Message = { 
+            role: "user", 
+            text: textToSend,
+            attachments: attachmentsToSend.map(a => ({
+                type: a.type,
+                url: a.previewUrl, // For images/videos
+                name: a.name,
+                mimeType: a.mimeType,
+                file: a.file // Keep file ref for local processing
+            }))
+        }
+        setMessages(prev => [...prev, userMsg])
+        setInputText("")
+        setAttachments([])
+        if (fileInputRef.current) fileInputRef.current.value = ""
+        
+        // Send to Peer
+        if (dataConnectionRef.current && dataConnectionRef.current.open) {
+             dataConnectionRef.current.send({
+                 type: 'chat',
+                 payload: {
+                     text: textToSend,
+                     // Attachments are not currently supported over P2P data channel to avoid bandwidth/blob issues
+                     attachments: [] 
+                 }
+             })
+        }
+
+        await generateAIResponse(textToSend, attachmentsToSend, "user")
     }
 
     // --- DRAG-TO-RESIZE LOGIC ---
@@ -2557,15 +2891,15 @@ export default function OmegleMentorshipUI(props: Props) {
                              width: "100%"
                          }}>
                              <div style={{ 
-                                 maxWidth: msg.role === "user" ? "80%" : "100%", 
-                                 width: msg.role === "user" ? "auto" : "100%",
+                                 maxWidth: (msg.role === "user" || msg.role === "peer") ? "80%" : "100%", 
+                                 width: (msg.role === "user" || msg.role === "peer") ? "auto" : "100%",
                                  display: "flex",
                                  flexDirection: "column",
                                  gap: 8,
                                  alignItems: msg.role === "user" ? "flex-end" : "flex-start"
                              }}>
                                 {/* Attachments rendering */}
-                                {msg.role === "user" && msg.attachments && msg.attachments.length > 0 && (() => {
+                                {(msg.role === "user" || msg.role === "peer") && msg.attachments && msg.attachments.length > 0 && (() => {
                                     const mediaAttachments = msg.attachments.filter(a => a.type === 'image' || a.type === 'video')
                                     const fileAttachments = msg.attachments.filter(a => a.type !== 'image' && a.type !== 'video')
 
@@ -2577,7 +2911,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                                     marginBottom: 4,
                                                     width: "100%",
                                                     display: mediaAttachments.length === 1 ? "flex" : "grid",
-                                                    justifyContent: "flex-end",
+                                                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
                                                     gridTemplateColumns: mediaAttachments.length === 1 
                                                         ? "none"
                                                         : (mediaAttachments.length === 2 || mediaAttachments.length === 4) 
@@ -2638,7 +2972,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                                     width: "100%",
                                                     display: "flex",
                                                     flexDirection: "column",
-                                                    alignItems: "flex-end",
+                                                    alignItems: msg.role === "user" ? "flex-end" : "flex-start",
                                                     gap: 8,
                                                     marginBottom: 4
                                                 }}>
@@ -2658,15 +2992,17 @@ export default function OmegleMentorshipUI(props: Props) {
                                 {/* Text content */}
                                 {msg.text && (
                                     <div style={{ 
-                                        padding: msg.role === "user" ? "10px 16px" : "0", 
-                                        borderRadius: msg.role === "user" ? 20 : 0,
-                                        background: msg.role === "user" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                                        padding: msg.role === "user" || msg.role === "peer" ? "6px 16px" : "0", 
+                                        borderRadius: msg.role === "user" || msg.role === "peer" ? 20 : 0,
+                                        background: (msg.role === "user" || msg.role === "peer")
+                                            ? "rgba(255, 255, 255, 0.08)" 
+                                            : "transparent",
                                         color: "rgba(255,255,255,0.95)",
                                         lineHeight: 1.6,
                                         fontSize: 16,
                                         alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
                                     }}>
-                                        {msg.role === "user" 
+                                        {msg.role === "user" || msg.role === "peer"
                                             ? msg.text 
                                             : renderSimpleMarkdown(
                                                 msg.text, 
