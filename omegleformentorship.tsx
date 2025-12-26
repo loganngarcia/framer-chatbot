@@ -3,7 +3,7 @@ import { addPropertyControls, ControlType } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
 import { Tldraw } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
-// --- SHARED STYLES ---
+// --- SHARED STYLES / STYLE GUIDE ---
 
 const colors = {
     background: "#212121",
@@ -735,6 +735,7 @@ interface ChatInputProps {
     isWhiteboardOpen?: boolean
     toggleWhiteboard?: () => void
     isConnected?: boolean
+    isMobileLayout?: boolean
 }
 
 function ChatInput({ 
@@ -754,7 +755,8 @@ function ChatInput({
     isScreenSharing = false,
     isWhiteboardOpen = false,
     toggleWhiteboard,
-    isConnected = false
+    isConnected = false,
+    isMobileLayout = false
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
@@ -803,7 +805,7 @@ function ChatInput({
 
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box", pointerEvents: "auto"}}>
-                {/* CONVERSATION ACTIONS MENU */}
+                {/* CONVERSATION QUICK ACTIONS MENU */}
             <style>{`
                 .ChatTextInput::placeholder {
                     color: ${colors.text.secondary};
@@ -819,8 +821,45 @@ function ChatInput({
                 }
             `}</style>
             {showMenu && (
-                <div ref={menuRef} style={{ position: "absolute", bottom: "100%", left: 28, marginBottom: -28, zIndex: 100, pointerEvents: "auto" }}>
-                    <div data-layer="conversation actions" className="ConversationActions" style={{width: 196, padding: 10, background: '#353535', boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', borderRadius: 28, outline: '0.33px rgba(255, 255, 255, 0.10) solid', outlineOffset: '-0.33px', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'flex'}}>
+                <>
+                {isMobileLayout && (
+                    <div 
+                        style={{
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: "rgba(0, 0, 0, 0.7)",
+                            zIndex: 1004,
+                            pointerEvents: "auto"
+                        }}
+                        onClick={() => setShowMenu(false)}
+                    />
+                )}
+                <div ref={menuRef} style={{ 
+                    position: isMobileLayout ? "fixed" : "absolute", 
+                    bottom: isMobileLayout ? 0 : "100%", 
+                    left: isMobileLayout ? 0 : 28, 
+                    right: isMobileLayout ? 0 : "auto", 
+                    marginBottom: isMobileLayout ? 0 : -28, 
+                    zIndex: isMobileLayout ? 1005 : 100, 
+                    pointerEvents: "auto" 
+                }}>
+                    <div data-layer="conversation actions" className="ConversationActions" style={{
+                        width: isMobileLayout ? "auto" : 196, 
+                        padding: 10, 
+                        background: '#353535', 
+                        boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', 
+                        borderRadius: isMobileLayout ? "36px 36px 0px 0px" : 28, 
+                        outline: '0.33px rgba(255, 255, 255, 0.10) solid', 
+                        outlineOffset: '-0.33px', 
+                        flexDirection: 'column', 
+                        justifyContent: 'flex-start', 
+                        alignItems: 'flex-start', 
+                        gap: 4, 
+                        display: 'flex',
+                    }}>
                         
                         {/* Add files & photos */}
                             <div 
@@ -831,8 +870,14 @@ function ChatInput({
                                     onFileSelect()
                                     setShowMenu(false)
                                 }}
-                                style={styles.menuItem}
-                                onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemHover)}
+                                style={{
+                                    ...styles.menuItem,
+                                    height: isMobileLayout ? 44 : 36
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (isMobileLayout) return
+                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
+                                }}
                                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                             >
                             <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
@@ -853,8 +898,12 @@ function ChatInput({
                                     if (onScreenShare) onScreenShare()
                                     setShowMenu(false)
                                 }}
-                                style={styles.menuItem}
+                                style={{
+                                    ...styles.menuItem,
+                                    height: isMobileLayout ? 44 : 36
+                                }}
                                 onMouseEnter={(e) => {
+                                    if (isMobileLayout) return
                                     if (isScreenSharing) {
                                         Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
                                     } else {
@@ -898,8 +947,12 @@ function ChatInput({
                                 if (toggleWhiteboard) toggleWhiteboard()
                                 setShowMenu(false)
                             }}
-                            style={styles.menuItem}
+                            style={{
+                                ...styles.menuItem,
+                                height: isMobileLayout ? 44 : 36
+                            }}
                             onMouseEnter={(e) => {
+                                if (isMobileLayout) return
                                 if (isWhiteboardOpen) {
                                     Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
                                 } else {
@@ -922,8 +975,8 @@ function ChatInput({
                             ) : (
                                 <>
                                     <div data-svg-wrapper data-layer="center icon flexbox" className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="15" height="14" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M13.7793 0.74707C14.0565 0.531511 14.4509 0.555486 14.6992 0.803711L17.083 3.18848C17.3314 3.43676 17.3562 3.83121 17.1406 4.1084L14.082 8.04004L14.0527 8.07812L14.0645 8.125C14.2939 9.05509 14.2987 10.0549 14.0332 11.0459C13.3301 13.6699 10.9559 15.4003 8.3623 15.4004C5.65298 15.4004 2.17915 14.2581 0.178711 13.0967C1.68588 11.9358 2.2851 10.9916 2.54199 10.1602C2.67313 9.7357 2.71442 9.34525 2.74512 8.98242C2.77602 8.61708 2.79656 8.28554 2.88379 7.95996C3.71294 4.86552 6.67306 3.06254 9.76074 3.82422L9.80859 3.83496L9.84668 3.80566L13.7793 0.74707ZM9.52051 5.19922C7.15092 4.56429 4.87423 5.91049 4.22852 8.32031C4.19176 8.45756 4.17312 8.60946 4.14355 8.96777C4.02192 10.4419 3.6765 11.5305 2.7334 12.6367L2.64258 12.7432L2.77344 12.7949C4.58026 13.5053 6.72492 14.0078 8.3623 14.0078C10.3729 14.0077 12.1596 12.6558 12.6875 10.6855C13.1093 9.11092 12.6373 7.50766 11.583 6.41406L11.4688 6.2998L11.4678 6.29785L11.2637 6.11328C10.773 5.69543 10.1841 5.37707 9.52051 5.19922ZM14.0791 2.27734L11.5459 4.24805L11.4561 4.31738L13.5693 6.43066L13.6396 6.3418L15.6104 3.80762L15.6641 3.73828L14.1494 2.22363L14.0791 2.27734Z" fill="white" fill-opacity="0.95" stroke="#353535" stroke-width="0.2"/>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M7.7678 12.938C7.38383 13.3223 5.11119 15.1876 4.47671 15.0968L1.08753 14.6089L0.602849 11.2417C0.511562 10.6074 2.37678 8.33438 2.76073 7.95043M7.7678 12.938L14.6179 6.08488C15.0023 5.70053 15.1668 5.12791 15.0754 4.49297C14.9841 3.85804 14.6442 3.2128 14.1306 2.69921L13.0021 1.57C12.7477 1.31548 12.4582 1.10098 12.1503 0.93875C11.8423 0.776525 11.5218 0.669761 11.2073 0.62456C10.8927 0.579359 10.5901 0.596608 10.3169 0.675321C10.0436 0.754034 9.80508 0.892667 9.61484 1.0833L2.76073 7.95043M7.7678 12.938L2.76073 7.95043" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </svg>
                                     </div>
                                     <div className="WhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Whiteboard</div>
@@ -944,8 +997,14 @@ function ChatInput({
                                         if (onReport) onReport()
                                         setShowMenu(false)
                                     }}
-                                    style={styles.menuItem}
-                                    onMouseEnter={(e) => Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)}
+                                    style={{
+                                        ...styles.menuItem,
+                                        height: isMobileLayout ? 44 : 36
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (isMobileLayout) return
+                                        Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
+                                    }}
                                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                 >
                                     <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
@@ -960,6 +1019,7 @@ function ChatInput({
 
                     </div>
                 </div>
+                </>
             )}
 
           <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: 'linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, #212121 35%)', justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
@@ -1835,6 +1895,7 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [chatHeight])
 
     const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 })
+    const isMobileLayout = containerSize.width < 768
     const [sharedScreenSize, setSharedScreenSize] = React.useState<{ width: number, height: number } | null>(null)
     const isDragging = React.useRef(false)
     const dragStartY = React.useRef(0)
@@ -1911,17 +1972,15 @@ export default function OmegleMentorshipUI(props: Props) {
         
         if (hasSavedPreference || hasInitialResized.current) return
 
-        const isMobile = containerSize.width < 768
-        
         // Calculate item dimensions based on available width
-        const availableWidth = isMobile 
+        const availableWidth = isMobileLayout 
             ? (containerSize.width - 32) 
             : (containerSize.width - 32 - 8) / 2
         const targetRatio = 1.55
         const itemHeight = availableWidth / targetRatio
         
         // Calculate total item area height
-        const totalItemHeight = isMobile 
+        const totalItemHeight = isMobileLayout 
             ? (itemHeight * 2) + 8  // 2 items stacked with 8px gap
             : itemHeight              // items side by side
         
@@ -2858,9 +2917,6 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- UI DIMENSION CALCULATIONS ---
     
-    // Detect mobile vs desktop based on container width
-    const isMobileLayout = containerSize.width < 768
-
     // Calculate dynamic size for screen share container to match aspect ratio
     const screenShareContainerStyle = React.useMemo(() => {
         // If whiteboard is active, use aspect ratio based on layout:
@@ -3575,6 +3631,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         isWhiteboardOpen={isWhiteboardOpen}
                         toggleWhiteboard={toggleWhiteboard}
                         isConnected={status === "connected"}
+                        isMobileLayout={isMobileLayout}
                     />
                 </div>
             </div>
