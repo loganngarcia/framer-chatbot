@@ -525,7 +525,7 @@ interface FileAttachmentProps {
     onRemove?: () => void
 }
 
-function FileAttachment({ name, type, onRemove }: FileAttachmentProps) {
+const FileAttachment = React.memo(function FileAttachment({ name, type, onRemove }: FileAttachmentProps) {
     const getIconColor = (fileName: string, fileType: string) => {
         const n = (fileName || "").toLowerCase()
         const t = (fileType || "").toLowerCase()
@@ -627,10 +627,10 @@ function FileAttachment({ name, type, onRemove }: FileAttachmentProps) {
             </div>
         </div>
     )
-}
+})
 
 // --- HELPER COMPONENT: VIDEO PLAYER ---
-function VideoPlayer({ 
+const VideoPlayer = React.memo(function VideoPlayer({ 
     stream, 
     isMirrored = false, 
     style = {}, 
@@ -714,7 +714,7 @@ function VideoPlayer({
             )}
         </div>
     )
-}
+})
 
 // --- HELPER COMPONENT: CHAT INPUT BAR ---
 interface ChatInputProps {
@@ -738,7 +738,7 @@ interface ChatInputProps {
     isMobileLayout?: boolean
 }
 
-function ChatInput({ 
+const ChatInput = React.memo(function ChatInput({ 
     value, 
     onChange, 
     onSend, 
@@ -1238,7 +1238,7 @@ function ChatInput({
           </div>
         </div>
     )
-}
+})
 
 // --- HELPER COMPONENT: DEBUG CONSOLE ---
 function DebugConsole({ logs }: { logs: string[] }) {
@@ -1656,6 +1656,203 @@ function LiveCursor({ x, y, color }: { x: number, y: number, color: string }) {
     )
 }
 
+
+// --- HELPER COMPONENT: MESSAGE BUBBLE (MEMOIZED) ---
+const MessageBubble = React.memo(({ 
+    msg, 
+    isMobileLayout 
+}: { 
+    msg: Message, 
+    isMobileLayout: boolean 
+}) => {
+    // Memoize base styles to avoid recreation
+    const baseTextStyle = React.useMemo(() => ({ 
+        fontSize: 16, 
+        color: "rgba(255,255,255,0.95)", 
+        lineHeight: 1.6 
+    }), [])
+
+    const linkStyle = React.useMemo(() => ({ 
+        color: "#4DA6FF", 
+        textDecoration: "underline" 
+    }), [])
+
+    return (
+        <div style={{ 
+            display: "flex", 
+            justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+            width: "100%"
+        }}>
+            <div style={{ 
+                maxWidth: (msg.role === "user" || msg.role === "peer") ? "80%" : "100%", 
+                width: (msg.role === "user" || msg.role === "peer") ? "auto" : "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                alignItems: msg.role === "user" ? "flex-end" : "flex-start"
+            }}>
+                {/* Attachments rendering */}
+                {(msg.role === "user" || msg.role === "peer") && msg.attachments && msg.attachments.length > 0 && (() => {
+                    const mediaAttachments = msg.attachments.filter(a => a.type === 'image' || a.type === 'video')
+                    const fileAttachments = msg.attachments.filter(a => a.type !== 'image' && a.type !== 'video')
+
+                    return (
+                        <>
+                            {/* 1. Media Grid (Images/Videos) */}
+                            {mediaAttachments.length > 0 && (
+                                <div style={{ 
+                                    display: "grid", 
+                                    gridTemplateColumns: mediaAttachments.length === 1 ? "1fr" : "repeat(auto-fit, minmax(96px, 1fr))", 
+                                    gap: 4, 
+                                    width: "100%",
+                                    marginBottom: 4
+                                }}>
+                                    {mediaAttachments.map((att, i) => (
+                                        <React.Fragment key={i}>
+                                            {att.type === 'video' ? (
+                                                <div style={styles.videoCardSmall}>
+                                                    <video 
+                                                        src={att.url} 
+                                                        controls 
+                                                        style={styles.fullSize}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                mediaAttachments.length === 1 ? (
+                                                    // Single Item: specialized display
+                                                    att.url ? (
+                                                        <img 
+                                                            src={att.url} 
+                                                            alt="Uploaded" 
+                                                            style={{
+                                                                maxHeight: 128,
+                                                                width: "auto",
+                                                                maxWidth: "100%",
+                                                                borderRadius: 16, 
+                                                                display: 'block',
+                                                                objectFit: "contain"
+                                                            }}
+                                                        />
+                                                    ) : null
+                                                ) : (
+                                                    // Grid Item: 96x96 square
+                                                    <div style={{
+                                                        width: 96,
+                                                        height: 96,
+                                                        borderRadius: 12,
+                                                        overflow: "hidden",
+                                                        position: "relative",
+                                                        background: "rgba(255,255,255,0.05)"
+                                                    }}>
+                                                        {att.url && (
+                                                            <img 
+                                                                src={att.url} 
+                                                                alt="Uploaded" 
+                                                                style={{
+                                                                    width: "100%",
+                                                                    height: "100%",
+                                                                    objectFit: "cover",
+                                                                    display: "block"
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                )
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* 2. File Stack (Always Vertical) */}
+                            {fileAttachments.length > 0 && (
+                                <div style={{ 
+                                    width: "100%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: msg.role === "user" ? "flex-end" : "flex-start",
+                                    gap: 8,
+                                    marginBottom: 4
+                                }}>
+                                    {fileAttachments.map((att, i) => (
+                                        <FileAttachment 
+                                            key={i}
+                                            name={att.name || "File"} 
+                                            type={att.mimeType || ""} 
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )
+                })()}
+                
+                {/* Text content */}
+                {msg.text && (
+                    <div style={{ 
+                        padding: msg.role === "user" || msg.role === "peer" ? "6px 16px" : "0", 
+                        borderRadius: msg.role === "user" || msg.role === "peer" ? 20 : 0,
+                        background: (msg.role === "user" || msg.role === "peer")
+                            ? "rgba(255, 255, 255, 0.08)" 
+                            : "transparent",
+                        color: "rgba(255,255,255,0.95)",
+                        lineHeight: 1.6,
+                        fontSize: 16,
+                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
+                    }}>
+                        {msg.role === "user" || msg.role === "peer"
+                            ? msg.text 
+                            : renderSimpleMarkdown(
+                                msg.text, 
+                                baseTextStyle,
+                                linkStyle
+                              )
+                        }
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+})
+
+// --- HELPER COMPONENTS ---
+
+const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { type: 'student' | 'mentor', isCompact: boolean, isMobileLayout: boolean }) => {
+    const isStudent = type === 'student'
+    const label = isStudent ? "Get free help" : "Volunteer"
+    const desc = isStudent ? "I'm a student looking for a mentor" : "I want to offer free advice"
+    const textColor = isStudent ? 'white' : colors.text.primary
+
+    if (isCompact) {
+        return (
+            <div 
+                style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    height: '100%', 
+                    width: '100%',
+                    background: isStudent ? colors.state.accent : undefined, // Keep student accent
+                    color: textColor, 
+                    fontSize: 14,
+                    fontWeight: 600,
+                    textAlign: "center",
+                    padding: 8
+                }}
+            >
+                {label}
+            </div>
+        )
+    }
+
+    return (
+            <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
+            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>{label}</div>
+            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>{desc}</div>
+        </div>
+    )
+})
+
 /**
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
@@ -1994,13 +2191,13 @@ export default function OmegleMentorshipUI(props: Props) {
         
     }, [containerSize])
 
-    const handleRoleSelect = (selectedRole: "student" | "mentor") => {
+    const handleRoleSelect = React.useCallback((selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
             window.location.hash = `#${selectedRole}`
         }
         setRole(selectedRole)
         // Removed setChatHeight(300) to persist user preference
-    }
+    }, [])
 
     // --- EFFECT: DETECT URL HASH AND SET ROLE ---
     /**
@@ -2098,9 +2295,9 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- SCREEN SHARING LOGIC ---
     
-    const stopLocalScreenShare = () => {
+    const stopLocalScreenShare = React.useCallback(() => {
         if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(t => t.stop())
+            screenStreamRef.current.getTracks().forEach((track) => track.stop())
             screenStreamRef.current = null
         }
         if (screenCallRef.current) {
@@ -2108,9 +2305,9 @@ export default function OmegleMentorshipUI(props: Props) {
             screenCallRef.current = null
         }
         setIsScreenSharing(false)
-    }
+    }, [])
 
-    const toggleWhiteboard = () => {
+    const toggleWhiteboard = React.useCallback(() => {
         if (isWhiteboardOpen) {
             log("Stopping whiteboard...")
             setIsWhiteboardOpen(false)
@@ -2139,9 +2336,9 @@ export default function OmegleMentorshipUI(props: Props) {
                 log("Warning: No data connection available to start whiteboard sync")
             }
         }
-    }
+    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare])
 
-    const handleWhiteboardPointerMove = (e: React.PointerEvent) => {
+    const handleWhiteboardPointerMove = React.useCallback((e: React.PointerEvent) => {
         if (!isWhiteboardOpen || !dataConnectionRef.current || !dataConnectionRef.current.open) return
         
         const now = Date.now()
@@ -2161,9 +2358,9 @@ export default function OmegleMentorshipUI(props: Props) {
                 })
             }
         }
-    }
+    }, [isWhiteboardOpen])
 
-    const toggleScreenShare = async () => {
+    const toggleScreenShare = React.useCallback(async () => {
         if (isScreenSharing) {
             stopLocalScreenShare()
         } else {
@@ -2218,17 +2415,17 @@ export default function OmegleMentorshipUI(props: Props) {
                 }
             }
         }
-    }
+    }, [isScreenSharing, isWhiteboardOpen, stopLocalScreenShare])
 
-    const handleReport = () => {
+    const handleReport = React.useCallback(() => {
         setShowReportModal(true)
-    }
+    }, [])
 
-    const onSubmitReport = (reason: string) => {
+    const onSubmitReport = React.useCallback((reason: string) => {
         log(`Report submitted: ${reason}`)
         setShowReportModal(false)
         // You could add logic here to send the report to a backend or AI
-    }
+    }, [])
 
     const getCurrentStream = () => {
         // Deprecated helper in favor of dual-call strategy
@@ -2431,11 +2628,11 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- FILE UPLOAD HANDLERS ---
 
-    const handleFileSelect = () => {
+    const handleFileSelect = React.useCallback(() => {
         if (fileInputRef.current) {
             fileInputRef.current.click()
         }
-    }
+    }, [])
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files: File[] = Array.from(e.target.files || [])
@@ -2487,7 +2684,7 @@ export default function OmegleMentorshipUI(props: Props) {
         })
     }
 
-    const handleRemoveAttachment = (id: string) => {
+    const handleRemoveAttachment = React.useCallback((id: string) => {
         setAttachments(prev => {
             const att = prev.find(a => a.id === id)
             if (att && att.previewUrl && att.type === 'image') {
@@ -2496,17 +2693,17 @@ export default function OmegleMentorshipUI(props: Props) {
             return prev.filter(a => a.id !== id)
         })
         if (fileInputRef.current) fileInputRef.current.value = ""
-    }
+    }, [])
 
     // --- AI CHAT (GEMINI) LOGIC ---
     
-    const handleStop = () => {
+    const handleStop = React.useCallback(() => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
             abortControllerRef.current = null
         }
         setIsLoading(false)
-    }
+    }, [])
 
     // --- DATA CHANNEL & AI HELPERS ---
 
@@ -2653,20 +2850,7 @@ export default function OmegleMentorshipUI(props: Props) {
         })
     }
 
-    const handleIncomingPeerMessage = (payload: any) => {
-        const peerMsg: Message = {
-            role: "peer",
-            text: payload.text,
-            attachments: payload.attachments || []
-        }
-        
-        setMessages(prev => [...prev, peerMsg])
-        
-        // Trigger AI response for the peer's message (as user context)
-        generateAIResponse(peerMsg.text, [], "peer")
-    }
-
-    const generateAIResponse = async (text: string, currentAttachments: any[], originRole: "user" | "peer") => {
+    const generateAIResponse = React.useCallback(async (text: string, currentAttachments: any[], originRole: "user" | "peer") => {
         if (!geminiApiKey) {
              if (originRole === "user") {
                  setMessages(prev => [...prev, { role: "model", text: "Please provide a Gemini API Key in the properties panel." }])
@@ -2773,12 +2957,25 @@ export default function OmegleMentorshipUI(props: Props) {
             setIsLoading(false)
             abortControllerRef.current = null
         }
-    }
+    }, [geminiApiKey, messages, model, systemPrompt])
+
+    const handleIncomingPeerMessage = React.useCallback((payload: any) => {
+        const peerMsg: Message = {
+            role: "peer",
+            text: payload.text,
+            attachments: payload.attachments || []
+        }
+        
+        setMessages(prev => [...prev, peerMsg])
+        
+        // Trigger AI response for the peer's message (as user context)
+        generateAIResponse(peerMsg.text, [], "peer")
+    }, [generateAIResponse])
 
     /**
      * Handles message delivery to the Google Gemini API.
      */
-    const handleSendMessage = async () => {
+    const handleSendMessage = React.useCallback(async () => {
         if (!inputText.trim() && attachments.length === 0) return
 
         const textToSend = sanitizeMessage(inputText)
@@ -2861,11 +3058,11 @@ export default function OmegleMentorshipUI(props: Props) {
         }
 
         await generateAIResponse(textToSend, attachmentsToSend, "user")
-    }
+    }, [inputText, attachments, generateAIResponse])
 
     // --- DRAG-TO-RESIZE LOGIC ---
 
-    const handlePointerDown = (e: React.PointerEvent) => {
+    const handlePointerDown = React.useCallback((e: React.PointerEvent) => {
         e.preventDefault()
         isDragging.current = true
         dragStartY.current = e.clientY
@@ -2873,9 +3070,9 @@ export default function OmegleMentorshipUI(props: Props) {
         
         window.addEventListener("pointermove", handlePointerMove)
         window.addEventListener("pointerup", handlePointerUp)
-    }
+    }, [chatHeight])
 
-    const handlePointerMove = (e: PointerEvent) => {
+    const handlePointerMove = React.useCallback((e: PointerEvent) => {
         if (!isDragging.current) return
         e.preventDefault()
 
@@ -2887,10 +3084,27 @@ export default function OmegleMentorshipUI(props: Props) {
             const newHeight = dragStartHeight.current + deltaY
             
             const containerHeight = containerRef.current?.clientHeight || window.innerHeight
+            const containerWidth = containerRef.current?.clientWidth || window.innerWidth
             const minHeight = 100 
             
             // Calculate dynamic max height based on content
             let maxHeight = containerHeight - 100 // Default: leave 100px for video
+
+            if (isMobileLayout && !isScreenSharing && !remoteScreenStream) {
+                 // Ensure video area is at least large enough to show both tiles side-by-side
+                 const availableWidth = containerWidth - 32 // 16px padding on each side
+                 const availableWidthPerVideo = (availableWidth - 8) / 2 // 8px gap
+                 const targetRatio = 1.55
+                 
+                 // Height needed for videos side-by-side
+                 const horizontalVideoHeight = availableWidthPerVideo / targetRatio
+                 
+                 // The video section must be at least this tall + some buffer (40px chrome)
+                 const minVideoSectionHeight = horizontalVideoHeight
+                 
+                 // Thus, max chat height is constrained
+                 maxHeight = Math.max(100, containerHeight - 40 - minVideoSectionHeight)
+            }
 
             // If screen sharing is active, constrain chat height more aggressively
             // to ensure video remains visible and usable
@@ -2903,9 +3117,9 @@ export default function OmegleMentorshipUI(props: Props) {
 
             setChatHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
         })
-    }
+    }, [isMobileLayout, isScreenSharing, remoteScreenStream])
 
-    const handlePointerUp = () => {
+    const handlePointerUp = React.useCallback(() => {
         isDragging.current = false
         if (rafRef.current) {
             cancelAnimationFrame(rafRef.current)
@@ -2913,7 +3127,7 @@ export default function OmegleMentorshipUI(props: Props) {
         }
         window.removeEventListener("pointermove", handlePointerMove)
         window.removeEventListener("pointerup", handlePointerUp)
-    }
+    }, [handlePointerMove])
 
     // --- UI DIMENSION CALCULATIONS ---
     
@@ -2978,22 +3192,51 @@ export default function OmegleMentorshipUI(props: Props) {
     
     let finalWidth = 0
     let finalHeight = 0
-    
+    let shouldUseHorizontalLayout = !isMobileLayout
+
     if (isMobileLayout) {
-        // MOBILE: Vertical layout - videos stacked, each takes full width
+        // MOBILE: Default to Vertical layout, but switch to Horizontal if videos get too small vertically
         const availableWidth = containerSize.width - 32 // 16px padding on each side
-        const videoHeight = availableWidth / targetRatio
-        const totalVideoHeight = (videoHeight * 2) + 8 // 2 videos + 8px gap
         
-        if (totalVideoHeight <= videoSectionHeight) {
-            // Videos fit at full width
-            finalWidth = availableWidth
-            finalHeight = videoHeight
+        // 1. Calculate Vertical Dimensions
+        const v_videoHeight = availableWidth / targetRatio
+        const v_totalVideoHeight = (v_videoHeight * 2) + 8 
+        
+        let v_finalWidth, v_finalHeight
+        
+        if (v_totalVideoHeight <= videoSectionHeight) {
+            // Videos fit at full width vertically
+            v_finalWidth = availableWidth
+            v_finalHeight = v_videoHeight
         } else {
-            // Scale down to fit height
-            const scaledHeight = (videoSectionHeight - 8) / 2 // subtract gap, divide by 2 videos
-            finalHeight = scaledHeight
-            finalWidth = scaledHeight * targetRatio
+            // Scale down to fit height vertically
+            const scaledHeight = (videoSectionHeight - 8) / 2 
+            v_finalHeight = scaledHeight
+            v_finalWidth = scaledHeight * targetRatio
+        }
+
+        // 2. Calculate Horizontal Dimensions
+        const h_availableWidthPerVideo = (availableWidth - 8) / 2
+        const h_widthByHeight = videoSectionHeight * targetRatio
+        
+        let h_finalWidth, h_finalHeight
+        
+        if (h_widthByHeight <= h_availableWidthPerVideo) {
+             h_finalHeight = videoSectionHeight
+             h_finalWidth = h_widthByHeight
+        } else {
+             h_finalWidth = h_availableWidthPerVideo
+             h_finalHeight = h_finalWidth / targetRatio
+        }
+
+        // 3. Compare: If Horizontal offers larger videos (better fit), use it
+        if (v_finalWidth < h_finalWidth) {
+            shouldUseHorizontalLayout = true
+            finalWidth = h_finalWidth
+            finalHeight = h_finalHeight
+        } else {
+            finalWidth = v_finalWidth
+            finalHeight = v_finalHeight
         }
     } else {
         // DESKTOP: Horizontal layout - videos side by side
@@ -3014,7 +3257,7 @@ export default function OmegleMentorshipUI(props: Props) {
     }
 
     // --- MARKDOWN STYLES ---
-    const markdownStyles = `
+    const markdownStyles = React.useMemo(() => `
         .chat-markdown-table {
             width: 100%;
             border-collapse: collapse;
@@ -3069,7 +3312,8 @@ export default function OmegleMentorshipUI(props: Props) {
             50% { opacity: 1; transform: scale(1.0); }
             100% { opacity: 0.5; transform: scale(0.85); }
         }
-    `
+    `, [accentColor])
+
 
     return (
         <div
@@ -3150,22 +3394,10 @@ export default function OmegleMentorshipUI(props: Props) {
                         }}>
                             {(!role && status === "idle") ? (
                                 <div 
-                                    style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center', 
-                                        height: '100%', 
-                                        background: colors.state.accent, 
-                                        color: 'white', 
-                                        fontSize: 14,
-                                        cursor: "pointer",
-                                        fontWeight: 600,
-                                        textAlign: "center",
-                                        padding: 8
-                                    }}
+                                    style={{ width: '100%', height: '100%' }}
                                     onClick={() => handleRoleSelect("student")}
                                 >
-                                    Get free help
+                                    <RoleSelectionButton type="student" isCompact={true} isMobileLayout={isMobileLayout} />
                                 </div>
                             ) : (
                                 <VideoPlayer 
@@ -3191,22 +3423,10 @@ export default function OmegleMentorshipUI(props: Props) {
                         }}>
                             {(!role && status === "idle") ? (
                                 <div 
-                                    style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center', 
-                                        height: '100%', 
-                                        background: colors.card, 
-                                        color: colors.text.primary, 
-                                        fontSize: 14,
-                                        cursor: "pointer",
-                                        fontWeight: 600,
-                                        textAlign: "center",
-                                        padding: 8
-                                    }}
+                                    style={{ width: '100%', height: '100%' }}
                                     onClick={() => handleRoleSelect("mentor")}
                                 >
-                                    Volunteer
+                                    <RoleSelectionButton type="mentor" isCompact={true} isMobileLayout={isMobileLayout} />
                                 </div>
                             ) : (
                                 <VideoPlayer 
@@ -3295,7 +3515,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         flex: "1 1 0",
                         width: "100%",
                         display: "flex",
-                        flexDirection: isMobileLayout ? "column" : "row",
+                        flexDirection: shouldUseHorizontalLayout ? "row" : "column",
                         gap: 8,
                         paddingTop: 16,
                         paddingLeft: 16,
@@ -3315,7 +3535,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         style={{
                             width: finalWidth,
                             height: finalHeight,
-                            borderRadius: 32,
+                            borderRadius: finalHeight < 164 ? 16 : 32, // Smaller radius when compact
                             background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
                             overflow: "hidden",
                             position: "relative",
@@ -3327,10 +3547,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
                     >
                         {(!role && status === "idle") ? (
-                            <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
-                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Get free help</div>
-                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I'm a student looking for a mentor</div>
-                            </div>
+                            <RoleSelectionButton type="student" isCompact={finalHeight < 164} isMobileLayout={isMobileLayout} />
                         ) : (
                             role === "student" ? (
                                 // --- LOCAL USER (STUDENT) ---
@@ -3351,7 +3568,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         style={{
                             width: finalWidth,
                             height: finalHeight,
-                            borderRadius: 32,
+                            borderRadius: finalHeight < 164 ? 16 : 32, // Smaller radius when compact
                             background: "#2E2E2E",
                             overflow: "hidden",
                             position: "relative",
@@ -3363,10 +3580,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
                     >
                         {(!role && status === "idle") ? (
-                            <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
-                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>Volunteer</div>
-                                <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>I want to offer free advice</div>
-                            </div>
+                            <RoleSelectionButton type="mentor" isCompact={finalHeight < 164} isMobileLayout={isMobileLayout} />
                         ) : (
                             role === "mentor" ? (
                                 // --- LOCAL USER (MENTOR) ---
@@ -3436,135 +3650,7 @@ export default function OmegleMentorshipUI(props: Props) {
                     }}
                 >
                     {messages.map((msg, idx) => (
-                         <div key={idx} style={{ 
-                             display: "flex", 
-                             justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                             width: "100%"
-                         }}>
-                             <div style={{ 
-                                 maxWidth: (msg.role === "user" || msg.role === "peer") ? "80%" : "100%", 
-                                 width: (msg.role === "user" || msg.role === "peer") ? "auto" : "100%",
-                                 display: "flex",
-                                 flexDirection: "column",
-                                 gap: 8,
-                                 alignItems: msg.role === "user" ? "flex-end" : "flex-start"
-                             }}>
-                                {/* Attachments rendering */}
-                                {(msg.role === "user" || msg.role === "peer") && msg.attachments && msg.attachments.length > 0 && (() => {
-                                    const mediaAttachments = msg.attachments.filter(a => a.type === 'image' || a.type === 'video')
-                                    const fileAttachments = msg.attachments.filter(a => a.type !== 'image' && a.type !== 'video')
-
-                                    return (
-                                        <>
-                                            {/* 1. Media Grid (Images/Videos) */}
-                                            {mediaAttachments.length > 0 && (
-                                                <div style={{ 
-                                                    marginBottom: 4,
-                                                    width: "100%",
-                                                    display: mediaAttachments.length === 1 ? "flex" : "grid",
-                                                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                                                    gridTemplateColumns: mediaAttachments.length === 1 
-                                                        ? "none"
-                                                        : (mediaAttachments.length === 2 || mediaAttachments.length === 4) 
-                                                            ? "repeat(2, 96px)" 
-                                                            : "repeat(3, 96px)",
-                                                    gap: 8,
-                                                }}>
-                                                    {mediaAttachments.map((att, i) => (
-                                                        <React.Fragment key={i}>
-                                                            {mediaAttachments.length === 1 ? (
-                                                                // Single Item: specialized display
-                                                                att.url ? (
-                                                                    <img 
-                                                                        src={att.url} 
-                                                                        alt="Uploaded" 
-                                                                        style={{
-                                                                            maxHeight: 128,
-                                                                            width: "auto",
-                                                                            maxWidth: "100%",
-                                                                            borderRadius: 16, 
-                                                                            display: 'block',
-                                                                            objectFit: "contain"
-                                                                        }}
-                                                                    />
-                                                                ) : null
-                                                            ) : (
-                                                                // Grid Item: 96x96 square
-                                                                <div style={{
-                                                                    width: 96,
-                                                                    height: 96,
-                                                                    borderRadius: 12,
-                                                                    overflow: "hidden",
-                                                                    position: "relative",
-                                                                    background: "rgba(255,255,255,0.05)"
-                                                                }}>
-                                                                    {att.url && (
-                                                                        <img 
-                                                                            src={att.url} 
-                                                                            alt="Uploaded" 
-                                                                            style={{
-                                                                                width: "100%",
-                                                                                height: "100%",
-                                                                                objectFit: "cover",
-                                                                                display: "block"
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* 2. File Stack (Always Vertical) */}
-                                            {fileAttachments.length > 0 && (
-                                                <div style={{ 
-                                                    width: "100%",
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: msg.role === "user" ? "flex-end" : "flex-start",
-                                                    gap: 8,
-                                                    marginBottom: 4
-                                                }}>
-                                                    {fileAttachments.map((att, i) => (
-                                                        <FileAttachment 
-                                                            key={i}
-                                                            name={att.name || "File"} 
-                                                            type={att.mimeType || ""} 
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </>
-                                    )
-                                })()}
-                                
-                                {/* Text content */}
-                                {msg.text && (
-                                    <div style={{ 
-                                        padding: msg.role === "user" || msg.role === "peer" ? "6px 16px" : "0", 
-                                        borderRadius: msg.role === "user" || msg.role === "peer" ? 20 : 0,
-                                        background: (msg.role === "user" || msg.role === "peer")
-                                            ? "rgba(255, 255, 255, 0.08)" 
-                                            : "transparent",
-                                        color: "rgba(255,255,255,0.95)",
-                                        lineHeight: 1.6,
-                                        fontSize: 16,
-                                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
-                                    }}>
-                                        {msg.role === "user" || msg.role === "peer"
-                                            ? msg.text 
-                                            : renderSimpleMarkdown(
-                                                msg.text, 
-                                                { fontSize: 16, color: "rgba(255,255,255,0.95)", lineHeight: 1.6 },
-                                                { color: "#4DA6FF", textDecoration: "underline" }
-                                              )
-                                        }
-                                    </div>
-                                )}
-                             </div>
-                         </div>
+                        <MessageBubble key={idx} msg={msg} isMobileLayout={isMobileLayout} />
                     ))}
                     {isLoading && (
                         <div style={{ paddingLeft: 8, paddingBottom: 8 }}>
@@ -3676,6 +3762,6 @@ addPropertyControls(OmegleMentorshipUI, {
         type: ControlType.Boolean,
         title: "Debug Mode",
         defaultValue: false,
-        description: "Enables an on-screen console overlay for debugging mobile connections.",
+        description: "Enables an on-screen console overlay for bugs and issues.",
     },
 })
