@@ -1834,7 +1834,7 @@ const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { t
                     width: '100%',
                     background: isStudent ? colors.state.accent : undefined, // Keep student accent
                     color: textColor, 
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: 600,
                     textAlign: "center",
                     padding: 8
@@ -3535,7 +3535,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         style={{
                             width: finalWidth,
                             height: finalHeight,
-                            borderRadius: finalHeight < 164 ? 16 : 32, // Smaller radius when compact
+                            borderRadius: finalHeight < (isMobileLayout ? 164 : 224) ? 16 : 32, // Smaller radius when compact
                             background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
                             overflow: "hidden",
                             position: "relative",
@@ -3547,7 +3547,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
                     >
                         {(!role && status === "idle") ? (
-                            <RoleSelectionButton type="student" isCompact={finalHeight < 164} isMobileLayout={isMobileLayout} />
+                            <RoleSelectionButton type="student" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
                         ) : (
                             role === "student" ? (
                                 // --- LOCAL USER (STUDENT) ---
@@ -3568,7 +3568,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         style={{
                             width: finalWidth,
                             height: finalHeight,
-                            borderRadius: finalHeight < 164 ? 16 : 32, // Smaller radius when compact
+                            borderRadius: finalHeight < (isMobileLayout ? 164 : 224) ? 16 : 32, // Smaller radius when compact
                             background: "#2E2E2E",
                             overflow: "hidden",
                             position: "relative",
@@ -3580,7 +3580,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
                     >
                         {(!role && status === "idle") ? (
-                            <RoleSelectionButton type="mentor" isCompact={finalHeight < 164} isMobileLayout={isMobileLayout} />
+                            <RoleSelectionButton type="mentor" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
                         ) : (
                             role === "mentor" ? (
                                 // --- LOCAL USER (MENTOR) ---
