@@ -939,7 +939,7 @@ const ChatInput = React.memo(function ChatInput({
     const hasContent = value.trim() || attachments.length > 0
 
     return (
-        <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: 24, paddingRight: 24, boxSizing: "border-box", pointerEvents: "auto"}}>
+        <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: isMobileLayout ? 16 : 24, paddingRight: isMobileLayout ? 16 : 24, boxSizing: "border-box", pointerEvents: "auto"}}>
                 {/* CONVERSATION QUICK ACTIONS MENU */}
             <style>{`
                 .ChatTextInput::placeholder {
@@ -3784,10 +3784,16 @@ export default function OmegleMentorshipUI(props: Props) {
                  maxHeight = Math.max(100, containerHeight - 40 - minVideoSectionHeight)
             }
 
-            // If screen sharing is active, constrain chat height more aggressively
+            // If screen sharing or whiteboard is active, constrain chat height more aggressively
             // to ensure video remains visible and usable
-            if (isScreenSharing || !!remoteScreenStream) {
-                const topRowHeight = isMobileLayout ? 100 : 140
+            if (isScreenSharing || !!remoteScreenStream || isWhiteboardOpen) {
+                let topRowHeight = 140
+                if (isMobileLayout) {
+                     const availableW = Math.max(0, containerWidth - 32)
+                     const tileW = (availableW - 8) / 2
+                     topRowHeight = tileW / (4/3)
+                }
+
                 const chromeHeight = 24 + 16 + topRowHeight + 8 // Handle, Pads, TopRow, Gap
                 const minVideoHeight = 200 // Ensure at least 200px vertical space for screen share
                 maxHeight = containerHeight - chromeHeight - minVideoHeight
@@ -3795,7 +3801,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             setChatHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
         })
-    }, [isMobileLayout, isScreenSharing, remoteScreenStream])
+    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen])
 
     const handlePointerUp = React.useCallback(() => {
         isDragging.current = false
@@ -3837,7 +3843,13 @@ export default function OmegleMentorshipUI(props: Props) {
 
         // Available space calculation
         // Total Height - Chat - DragHandle(24) - Pads(Top 16 + Bottom 0) - TopRow(100/140) - Gap(8)
-        const topRowHeight = isMobileLayout ? 100 : 140
+        let topRowHeight = 140
+        if (isMobileLayout) {
+             const availW = Math.max(100, containerSize.width - 32)
+             const tileW = (availW - 8) / 2
+             topRowHeight = tileW / (4/3)
+        }
+
         const chromeHeight = chatHeight + 24 + 16 + topRowHeight + 8
         const availableHeight = Math.max(100, containerSize.height - chromeHeight)
         const availableWidth = Math.max(100, containerSize.width - 32) // 16px padding on each side
@@ -4055,14 +4067,15 @@ export default function OmegleMentorshipUI(props: Props) {
                     <div style={{
                         display: "flex",
                         gap: 8, // Reduced gap
-                        height: isMobileLayout ? 100 : 140, 
+                        height: isMobileLayout ? "auto" : 140, 
                         width: "100%",
                         justifyContent: "center",
                         flexShrink: 0
                     }}>
                         {/* CAMERA 1: Left (Student Position) */}
                         <div style={{ 
-                            height: "100%", 
+                            height: isMobileLayout ? "auto" : "100%", 
+                            width: isMobileLayout ? "50%" : "auto",
                             aspectRatio: "4/3", 
                             borderRadius: 16, 
                             overflow: "hidden", 
@@ -4091,7 +4104,8 @@ export default function OmegleMentorshipUI(props: Props) {
 
                         {/* CAMERA 2: Right (Mentor Position) */}
                         <div style={{ 
-                            height: "100%", 
+                            height: isMobileLayout ? "auto" : "100%", 
+                            width: isMobileLayout ? "50%" : "auto",
                             aspectRatio: "4/3", 
                             borderRadius: 16, 
                             overflow: "hidden", 
