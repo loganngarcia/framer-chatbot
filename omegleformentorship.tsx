@@ -2,8 +2,141 @@ import * as React from "react"
 import { addPropertyControls, ControlType } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
-import { Tldraw } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
+import { Tldraw, exportToBlob } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
+
+// -----------------------------------------------------------------------------
+// Constants for Gemini Live
+// -----------------------------------------------------------------------------
+const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
+const MODEL_OUTPUT_SAMPLE_RATE = 24000
+const INPUT_TARGET_SAMPLE_RATE = 16000
+
+// -----------------------------------------------------------------------------
+// Audio Processing Helpers for Live API
+// -----------------------------------------------------------------------------
+
+function highPassFilter(audioData: Float32Array, sampleRate: number, cutoffFreq: number = 80): Float32Array {
+    const RC = 1.0 / (cutoffFreq * 2 * Math.PI)
+    const dt = 1.0 / sampleRate
+    const alpha = RC / (RC + dt)
+    
+    const filtered = new Float32Array(audioData.length)
+    filtered[0] = audioData[0]
+    
+    for (let i = 1; i < audioData.length; i++) {
+        filtered[i] = alpha * (filtered[i - 1] + audioData[i] - audioData[i - 1])
+    }
+    
+    return filtered
+}
+
+function normalizeAudio(audioData: Float32Array): Float32Array {
+    let maxAmp = 0
+    for (let i = 0; i < audioData.length; i++) {
+        const amp = Math.abs(audioData[i])
+        if (amp > maxAmp) maxAmp = amp
+    }
+    
+    if (maxAmp === 0) return audioData
+    
+    // Normalize to 0.7 to leave headroom and avoid clipping
+    const normalized = new Float32Array(audioData.length)
+    const targetLevel = 0.7
+    const gain = targetLevel / maxAmp
+    
+    for (let i = 0; i < audioData.length; i++) {
+        normalized[i] = audioData[i] * gain
+    }
+    
+    return normalized
+}
+
+function detectVoiceActivity(audioData: Float32Array, threshold: number): boolean {
+    let sumSquares = 0
+    let zeroCrossings = 0
+    
+    for (let i = 0; i < audioData.length; i++) {
+        sumSquares += audioData[i] * audioData[i]
+        
+        if (i > 0 && audioData[i] * audioData[i - 1] < 0) {
+            zeroCrossings++
+        }
+    }
+    
+    const rms = Math.sqrt(sumSquares / audioData.length)
+    const zcr = zeroCrossings / audioData.length
+    
+    return rms > threshold && zcr > 0.01 && zcr < 0.5
+}
+
+function base64ToFloat32Array(base64: string): Float32Array {
+    const binaryString = atob(base64)
+    const len = binaryString.length
+    const bytes = new Uint8Array(len)
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+    }
+    const int16 = new Int16Array(bytes.buffer)
+    const float32 = new Float32Array(int16.length)
+    for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768
+    }
+    return float32
+}
+
+function float32ToBase64(float32: Float32Array): string {
+    const int16 = new Int16Array(float32.length)
+    for (let i = 0; i < float32.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32[i]))
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
+    }
+    const bytes = new Uint8Array(int16.buffer)
+    let binary = ""
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+}
+
+function downsampleBuffer(
+    buffer: Float32Array,
+    inputRate: number,
+    outputRate: number
+): Float32Array {
+    if (outputRate === inputRate) return buffer
+    
+    const sampleRateRatio = inputRate / outputRate
+    const newLength = Math.round(buffer.length / sampleRateRatio)
+    const result = new Float32Array(newLength)
+    
+    for (let i = 0; i < newLength; i++) {
+        const srcIndex = i * sampleRateRatio
+        const srcIndexInt = Math.floor(srcIndex)
+        const fraction = srcIndex - srcIndexInt
+        
+        let sum = 0
+        let count = 0
+        const windowSize = Math.ceil(sampleRateRatio)
+        
+        for (let j = 0; j < windowSize && srcIndexInt + j < buffer.length; j++) {
+            sum += buffer[srcIndexInt + j]
+            count++
+        }
+        
+        const averaged = count > 0 ? sum / count : 0
+        
+        if (srcIndexInt + 1 < buffer.length && fraction > 0) {
+            result[i] = averaged * (1 - fraction * 0.5) + buffer[srcIndexInt + 1] * (fraction * 0.5)
+        } else {
+            result[i] = averaged
+        }
+    }
+    
+    return result
+}
+
 // --- SHARED STYLES / STYLE GUIDE ---
+// Use for all colors and styles
 
 const colors = {
     background: "#212121",
@@ -736,6 +869,7 @@ interface ChatInputProps {
     toggleWhiteboard?: () => void
     isConnected?: boolean
     isMobileLayout?: boolean
+    isLiveMode?: boolean
 }
 
 const ChatInput = React.memo(function ChatInput({ 
@@ -756,7 +890,8 @@ const ChatInput = React.memo(function ChatInput({
     isWhiteboardOpen = false,
     toggleWhiteboard,
     isConnected = false,
-    isMobileLayout = false
+    isMobileLayout = false,
+    isLiveMode = false
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
@@ -984,7 +1119,7 @@ const ChatInput = React.memo(function ChatInput({
                             )}
                         </div>
 
-                        {isConnected && (
+                        {isConnected && !isLiveMode && (
                             <>
                                 <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
 
@@ -2021,6 +2156,507 @@ export default function OmegleMentorshipUI(props: Props) {
         }
     }, [editor])
 
+    // --- STATE: GEMINI LIVE ---
+    const [isLiveMode, setIsLiveMode] = React.useState(false)
+    const [userIsSpeaking, setUserIsSpeaking] = React.useState(false)
+    const [isLiveGenerating, setIsLiveGenerating] = React.useState(false)
+    
+    const liveClientRef = React.useRef<WebSocket | null>(null)
+    const liveAudioContextRef = React.useRef<AudioContext | null>(null)
+    const liveSourceRef = React.useRef<MediaStreamAudioSourceNode | null>(null)
+    const liveProcessorRef = React.useRef<ScriptProcessorNode | null>(null)
+    const liveInputStreamRef = React.useRef<MediaStream | null>(null)
+    const activeAudioSourcesRef = React.useRef<AudioBufferSourceNode[]>([])
+    const liveNextPlayTimeRef = React.useRef<number>(0)
+    const transcriptionTimeoutRef = React.useRef<any>(null)
+    const isUserMessageInProgressRef = React.useRef(false)
+    const suggestionsGeneratedForTurnRef = React.useRef(false)
+    const lastUserSpeechTimeRef = React.useRef(0)
+    const userIsSpeakingRef = React.useRef(false)
+    const isLiveGeneratingRef = React.useRef(false)
+
+
+
+    const stopAllAudio = React.useCallback(() => {
+        if (typeof window !== "undefined" && window.speechSynthesis) {
+            window.speechSynthesis.cancel()
+        }
+        activeAudioSourcesRef.current.forEach((source) => {
+            try {
+                source.stop()
+            } catch (e) {
+                // Ignore
+            }
+        })
+        activeAudioSourcesRef.current = []
+    }, [])
+
+    const captureCurrentContext = React.useCallback(async () => {
+        try {
+            // Priority 1: Screen Share
+            if (isScreenSharingRef.current && screenStreamRef.current) {
+                const track = screenStreamRef.current.getVideoTracks()[0]
+                if (track && track.readyState === "live") {
+                    return new Promise<string | null>((resolve) => {
+                        const vid = document.createElement('video')
+                        vid.muted = true
+                        vid.playsInline = true
+                        vid.srcObject = screenStreamRef.current
+                        vid.onloadedmetadata = () => {
+                             vid.play().then(() => {
+                                const cvs = document.createElement('canvas')
+                                cvs.width = vid.videoWidth
+                                cvs.height = vid.videoHeight
+                                const ctx = cvs.getContext('2d')
+                                ctx?.drawImage(vid, 0, 0)
+                                resolve(cvs.toDataURL('image/jpeg', 0.6).split(',')[1])
+                                // Cleanup
+                                vid.pause()
+                                vid.srcObject = null
+                                vid.remove()
+                            }).catch((e) => {
+                                console.warn("Video play failed", e)
+                                resolve(null)
+                            })
+                        }
+                        vid.onerror = () => resolve(null)
+                    })
+                }
+            }
+
+            // Priority 2: Whiteboard
+            if (isWhiteboardOpenRef.current && whiteboardContainerRef.current) {
+                 // Try to find canvas (Tldraw usually renders a canvas)
+                 const canvas = whiteboardContainerRef.current.querySelector('canvas')
+                 if (canvas) {
+                     return canvas.toDataURL('image/jpeg', 0.6).split(',')[1]
+                 }
+                 // If no canvas (e.g. SVG mode), try exportToBlob if available
+                 if (editorRef.current && exportToBlob) {
+                     try {
+                        // @ts-ignore
+                        const shapes = Array.from(editorRef.current.getCurrentPageShapes())
+                        if (shapes.length > 0) {
+                            const ids = shapes.map((s: any) => s.id)
+                            const blob = await exportToBlob({ 
+                                editor: editorRef.current, 
+                                ids, 
+                                format: 'jpeg', 
+                                opts: { background: true } 
+                            })
+                            return new Promise((resolve) => {
+                                const reader = new FileReader()
+                                reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+                                reader.readAsDataURL(blob)
+                            })
+                        }
+                     } catch(e) {}
+                 }
+            }
+        } catch (e) {
+            console.error("Capture context error", e)
+        }
+        return null
+    }, [])
+
+    const fetchAiSuggestions = React.useCallback(
+        async (lastAiMessageContent: string) => {
+            if (!geminiApiKey || !lastAiMessageContent.trim()) {
+                return
+            }
+
+            const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiMessageContent}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
+
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${SUGGESTION_MODEL_ID}:generateContent?key=${geminiApiKey}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: suggestionPrompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 100,
+                                stopSequences: ["\n\n"],
+                            },
+                        }),
+                    }
+                )
+
+                if (!response.ok) return
+
+                const data = await response.json()
+                const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+
+                if (responseText) {
+                    try {
+                        const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
+                        if (jsonMatch && jsonMatch[0]) {
+                            const suggestionsArray = JSON.parse(jsonMatch[0])
+                            // Note: suggestions not yet used in UI
+                        }
+                    } catch (e) { }
+                }
+            } catch (e) { }
+        },
+        [geminiApiKey]
+    )
+
+    const stopLiveSession = React.useCallback(() => {
+        stopAllAudio()
+        if (liveClientRef.current) {
+            liveClientRef.current.close()
+            liveClientRef.current = null
+        }
+        if (liveProcessorRef.current) {
+            liveProcessorRef.current.disconnect()
+            liveProcessorRef.current = null
+        }
+        if (liveSourceRef.current) {
+            liveSourceRef.current.disconnect()
+            liveSourceRef.current = null
+        }
+        if (liveInputStreamRef.current) {
+            liveInputStreamRef.current.getTracks().forEach((track) => track.stop())
+            liveInputStreamRef.current = null
+        }
+        if (liveAudioContextRef.current) {
+            liveAudioContextRef.current.close()
+            liveAudioContextRef.current = null
+        }
+        if (transcriptionTimeoutRef.current) {
+            clearTimeout(transcriptionTimeoutRef.current)
+            transcriptionTimeoutRef.current = null
+        }
+        setIsLiveMode(false)
+        isLiveGeneratingRef.current = false
+        setIsLiveGenerating(false)
+        userIsSpeakingRef.current = false
+        setUserIsSpeaking(false)
+        suggestionsGeneratedForTurnRef.current = false
+        isUserMessageInProgressRef.current = false
+    }, [stopAllAudio])
+
+    const startLiveSession = React.useCallback(async () => {
+        if (!geminiApiKey) return
+
+        const liveModel = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+
+        try {
+            const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiApiKey}`
+            const ws = new WebSocket(url)
+            liveClientRef.current = ws
+
+            ws.onopen = async () => {
+                ws.send(
+                    JSON.stringify({
+                        setup: {
+                            model: liveModel,
+                            generationConfig: {
+                                responseModalities: ["AUDIO"],
+                                speechConfig: {
+                                    voiceConfig: {
+                                        prebuiltVoiceConfig: {
+                                            voiceName: "Puck"
+                                        }
+                                    }
+                                }
+                            },
+                            systemInstruction: {
+                                parts: [{ text: systemPrompt }],
+                            },
+                            inputAudioTranscription: {},
+                            outputAudioTranscription: {},
+                        },
+                    })
+                )
+
+                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+                const audioCtx = new AudioContextClass()
+
+                if (audioCtx.state === "suspended") {
+                    await audioCtx.resume()
+                }
+
+                liveAudioContextRef.current = audioCtx
+                liveNextPlayTimeRef.current = audioCtx.currentTime + 0.1
+
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: 16000,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true, 
+                            autoGainControl: true,
+                            latency: 0.01,
+                        } as any,
+                    })
+                    liveInputStreamRef.current = stream
+                    const source = audioCtx.createMediaStreamSource(stream)
+                    liveSourceRef.current = source
+
+                    const processor = audioCtx.createScriptProcessor(8192, 1, 1)
+                    liveProcessorRef.current = processor
+
+                    let consecutiveSpeechFrames = 0
+                    const SPEECH_FRAMES_THRESHOLD = 2
+
+                    processor.onaudioprocess = (e) => {
+                        if (!liveClientRef.current) return
+                        let inputData = e.inputBuffer.getChannelData(0)
+
+                        const isSpeaking = detectVoiceActivity(inputData, 0.01) // threshold default
+                        
+                        if (isSpeaking) {
+                            consecutiveSpeechFrames++
+                            lastUserSpeechTimeRef.current = Date.now()
+                            
+                            if (consecutiveSpeechFrames >= SPEECH_FRAMES_THRESHOLD && !userIsSpeakingRef.current) {
+                                userIsSpeakingRef.current = true
+                                setUserIsSpeaking(true)
+                                captureCurrentContext().then(b64 => { if (b64 && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ mimeType: "image/jpeg", data: b64 }] } })) } })
+
+                                // CAPTURE CONTEXT IMAGE
+                                captureCurrentContext().then(b64 => {
+                                    if (b64 && liveClientRef.current && liveClientRef.current.readyState === WebSocket.OPEN) {
+                                        liveClientRef.current.send(JSON.stringify({
+                                            realtimeInput: {
+                                                mediaChunks: [{
+                                                    mimeType: "image/jpeg",
+                                                    data: b64
+                                                }]
+                                            }
+                                        }))
+                                    }
+                                })
+                            }
+                        } else {
+                            consecutiveSpeechFrames = 0
+                            if (userIsSpeakingRef.current && Date.now() - lastUserSpeechTimeRef.current > 500) {
+                                userIsSpeakingRef.current = false
+                                setUserIsSpeaking(false)
+                            }
+                        }
+
+                        const downsampledData = downsampleBuffer(
+                            inputData,
+                            audioCtx.sampleRate,
+                            INPUT_TARGET_SAMPLE_RATE
+                        )
+
+                        const b64 = float32ToBase64(downsampledData)
+
+                        if (ws.readyState === WebSocket.OPEN && b64.length > 0) {
+                            ws.send(
+                                JSON.stringify({
+                                    realtimeInput: {
+                                        mediaChunks: [
+                                            {
+                                                mimeType: `audio/pcm;rate=${INPUT_TARGET_SAMPLE_RATE}`,
+                                                data: b64,
+                                            },
+                                        ],
+                                    },
+                                })
+                            )
+                        }
+                    }
+
+                    source.connect(processor)
+                    processor.connect(audioCtx.destination)
+                } catch (err) {
+                    console.error("Audio capture failed", err)
+                    stopLiveSession()
+                }
+            }
+
+            ws.onmessage = async (event) => {
+                try {
+                    let data
+                    if (event.data instanceof Blob) {
+                        data = JSON.parse(await event.data.text())
+                    } else {
+                        data = JSON.parse(event.data)
+                    }
+
+                    if (data.serverContent?.interrupted) {
+                        stopAllAudio()
+                        setIsLiveGenerating(false)
+                        return
+                    }
+
+                    if (data.serverContent?.modelTurn?.parts) {
+                        isLiveGeneratingRef.current = true
+                        setIsLiveGenerating(true)
+                        
+                        suggestionsGeneratedForTurnRef.current = false
+                        isUserMessageInProgressRef.current = false
+                        
+                        const parts = data.serverContent.modelTurn.parts
+                        for (const part of parts) {
+                            if (part.inlineData) {
+                                if (
+                                    liveAudioContextRef.current &&
+                                    part.inlineData.data &&
+                                    !data.serverContent?.turnComplete
+                                ) {
+                                    const audioCtx = liveAudioContextRef.current
+                                    const float32 = base64ToFloat32Array(
+                                        part.inlineData.data
+                                    )
+                                    const buffer = audioCtx.createBuffer(
+                                        1,
+                                        float32.length,
+                                        MODEL_OUTPUT_SAMPLE_RATE
+                                    )
+                                    buffer.copyToChannel(float32, 0)
+
+                                    const source = audioCtx.createBufferSource()
+                                    source.buffer = buffer
+                                    source.connect(audioCtx.destination)
+
+                                    const now = audioCtx.currentTime
+                                    const playTime = Math.max(
+                                        now,
+                                        liveNextPlayTimeRef.current
+                                    )
+                                    source.start(playTime)
+                                    liveNextPlayTimeRef.current =
+                                        playTime + buffer.duration
+                                    
+                                    activeAudioSourcesRef.current.push(source)
+                                    
+                                    source.onended = () => {
+                                        activeAudioSourcesRef.current = activeAudioSourcesRef.current.filter(s => s !== source)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (data.serverContent?.turnComplete) {
+                        isLiveGeneratingRef.current = false
+                        setIsLiveGenerating(false)
+                        
+                        if (transcriptionTimeoutRef.current) {
+                            clearTimeout(transcriptionTimeoutRef.current)
+                            transcriptionTimeoutRef.current = null
+                        }
+                        
+                        if (!suggestionsGeneratedForTurnRef.current) {
+                            setMessages((prev) => {
+                                const lastAssistantMsg = [...prev]
+                                    .reverse()
+                                    .find((m) => m.role === "assistant")
+                                
+                                if (lastAssistantMsg && lastAssistantMsg.text.trim()) {
+                                    fetchAiSuggestions(lastAssistantMsg.text.trim())
+                                }
+                                return prev
+                            })
+                        }
+                    }
+
+                    if (data.serverContent?.outputTranscription?.text) {
+                        const text = data.serverContent.outputTranscription.text
+                        
+                        if (transcriptionTimeoutRef.current) {
+                            clearTimeout(transcriptionTimeoutRef.current)
+                        }
+                        
+                        transcriptionTimeoutRef.current = setTimeout(() => {
+                            if (!suggestionsGeneratedForTurnRef.current) {
+                                setMessages((prev) => {
+                                    const lastAssistantMsg = [...prev]
+                                        .reverse()
+                                        .find((m) => m.role === "assistant")
+                                    
+                                    if (lastAssistantMsg && lastAssistantMsg.text.trim()) {
+                                        fetchAiSuggestions(lastAssistantMsg.text.trim())
+                                        suggestionsGeneratedForTurnRef.current = true
+                                    }
+                                    return prev
+                                })
+                            }
+                        }, 800)
+                        
+                        React.startTransition(() => {
+                            setMessages((prev) => {
+                                const last = prev[prev.length - 1]
+                                if (last && last.role === "assistant") {
+                                    return [
+                                        ...prev.slice(0, -1),
+                                        {
+                                            ...last,
+                                            text: last.text + text,
+                                        },
+                                    ]
+                                }
+                                return [
+                                    ...prev,
+                                    { role: "assistant", text: text },
+                                ]
+                            })
+                        })
+                    }
+
+                    if (data.serverContent?.inputTranscription?.text) {
+                        const text = data.serverContent.inputTranscription.text
+                        
+                        React.startTransition(() => {
+                            setMessages((prev) => {
+                                const last = prev[prev.length - 1]
+                                const isAppendingToExisting = last && last.role === "user"
+                                
+                                if (!isAppendingToExisting && !isUserMessageInProgressRef.current) {
+                                    isUserMessageInProgressRef.current = true
+                                }
+                                
+                                if (isAppendingToExisting) {
+                                    return [
+                                        ...prev.slice(0, -1),
+                                        { ...last, text: last.text + text },
+                                    ]
+                                }
+                                return [...prev, { role: "user", text: text }]
+                            })
+                        })
+                    }
+                } catch (e) {
+                    console.error("WS Parse Error", e)
+                }
+            }
+
+            ws.onclose = (ev) => {
+                stopLiveSession()
+            }
+
+            ws.onerror = (e) => {
+                stopLiveSession()
+            }
+
+            setIsLiveMode(true)
+            setStatus("connected") // Connected to AI
+        } catch (e) {
+            console.error("Live Init Error", e)
+            stopLiveSession()
+        }
+    }, [geminiApiKey, systemPrompt, stopLiveSession, fetchAiSuggestions, captureCurrentContext])
+
+    const handleConnectWithAI = React.useCallback(() => {
+        // Switch to Live Mode
+        startLiveSession()
+    }, [startLiveSession])
+
+    // Cleanup on unmount
+    React.useEffect(() => {
+        return () => {
+            stopLiveSession()
+        }
+    }, [stopLiveSession])
+
     // --- STATE: DEBUGGING ---
     // Toggle this via the 'Debug Mode' property in Framer to see on-screen logs.
     // Useful for mobile debugging where browser console isn't easily accessible.
@@ -2261,16 +2897,32 @@ export default function OmegleMentorshipUI(props: Props) {
     /**
      * Resets all connections and stops media tracks.
      */
-    const cleanup = () => {
+    const cleanup = React.useCallback(() => {
+        if (isLiveMode) {
+            stopLiveSession()
+        }
+        
         if (localStreamRef.current)
             localStreamRef.current.getTracks().forEach((t) => t.stop())
         
         // Stop screen share when call ends
-        stopLocalScreenShare()
+        // Manually stop screen share logic here instead of calling function that might not be defined
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach((track: any) => track.stop())
+            screenStreamRef.current = null
+        }
+        if (screenCallRef.current) {
+            screenCallRef.current.close()
+            screenCallRef.current = null
+        }
+        setIsScreenSharing(false)
+        if (isWhiteboardOpenRef.current) {
+             // Re-open whiteboard if it was closed due to screen share
+             // But here we are cleaning up everything, so no need.
+        }
 
         if (activeCall.current) activeCall.current.close()
         if (dataConnectionRef.current) dataConnectionRef.current.close()
-        // Note: screenCallRef cleanup is handled in stopLocalScreenShare
         
         if (peerInstance.current) peerInstance.current.destroy()
         if (mqttClient.current) mqttClient.current.end()
@@ -2291,7 +2943,7 @@ export default function OmegleMentorshipUI(props: Props) {
         if (typeof window !== "undefined") {
             window.location.hash = ""
         }
-    }
+    }, [isLiveMode, stopLiveSession])
 
     // --- SCREEN SHARING LOGIC ---
     
@@ -2698,12 +3350,17 @@ export default function OmegleMentorshipUI(props: Props) {
     // --- AI CHAT (GEMINI) LOGIC ---
     
     const handleStop = React.useCallback(() => {
+        // If Gemini Live is active, stop it
+        if (isLiveMode) {
+            stopLiveSession()
+        }
+        
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
             abortControllerRef.current = null
         }
         setIsLoading(false)
-    }, [])
+    }, [isLiveMode, stopLiveSession])
 
     // --- DATA CHANNEL & AI HELPERS ---
 
@@ -3028,13 +3685,34 @@ export default function OmegleMentorshipUI(props: Props) {
 
         const attachmentsToSend = [...attachments]
 
+        // If not in Live Mode, but Screen Sharing or Whiteboarding, capture context and send as image
+        if (!isLiveMode && (isScreenSharingRef.current || isWhiteboardOpenRef.current)) {
+            try {
+                const contextImage = await captureCurrentContext()
+                if (contextImage) {
+                    attachmentsToSend.push({
+                        id: `ctx-${Date.now()}`,
+                        type: 'image',
+                        url: `data:image/jpeg;base64,${contextImage}`, // Display as Data URL
+                        previewUrl: `data:image/jpeg;base64,${contextImage}`,
+                        name: isWhiteboardOpenRef.current ? "Whiteboard Snapshot.jpg" : "Screen Share Snapshot.jpg",
+                        mimeType: "image/jpeg",
+                        // Create a dummy File object if needed by downstream logic, though we handle based on type/url usually
+                        file: new File([Uint8Array.from(atob(contextImage), c => c.charCodeAt(0))], "snapshot.jpg", { type: "image/jpeg" })
+                    })
+                }
+            } catch (e) {
+                console.error("Failed to capture context for message", e)
+            }
+        }
+
         // Build user message for display
         const userMsg: Message = { 
             role: "user", 
             text: textToSend,
             attachments: attachmentsToSend.map(a => ({
                 type: a.type,
-                url: a.previewUrl, // For images/videos
+                url: a.previewUrl || a.url, // For images/videos
                 name: a.name,
                 mimeType: a.mimeType,
                 file: a.file // Keep file ref for local processing
@@ -3421,14 +4099,69 @@ export default function OmegleMentorshipUI(props: Props) {
                             position: "relative",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
                         }}>
-                            {(!role && status === "idle") ? (
-                                <div 
-                                    style={{ width: '100%', height: '100%' }}
-                                    onClick={() => handleRoleSelect("mentor")}
-                                >
-                                    <RoleSelectionButton type="mentor" isCompact={true} isMobileLayout={isMobileLayout} />
+                            {isLiveMode ? (
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
+                                     <svg
+                                        width="48"
+                                        height="48"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        style={{
+                                            animation: userIsSpeaking || isLiveGenerating ? "pulseStar 1.5s infinite ease-in-out" : "none",
+                                            transition: "all 0.3s ease",
+                                            transform: "scale(0.8)"
+                                        }}
+                                    >
+                                        <path
+                                            d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                            fill="#FFFFFF"
+                                        />
+                                    </svg>
+                                    <style>{`
+                                        @keyframes pulseStar {
+                                            0% { transform: scale(0.95); opacity: 0.7; }
+                                            50% { transform: scale(1.1); opacity: 1; }
+                                            100% { transform: scale(0.95); opacity: 0.7; }
+                                        }
+                                    `}</style>
                                 </div>
                             ) : (
+                                (!role && status === "idle") ? (
+                                    <div 
+                                        style={{ width: '100%', height: '100%' }}
+                                        onClick={() => handleRoleSelect("mentor")}
+                                    >
+                                        <RoleSelectionButton type="mentor" isCompact={true} isMobileLayout={isMobileLayout} />
+                                    </div>
+                                ) : (
+                                role === "student" && isLiveMode ? (
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
+                                         <svg
+                                            width="32"
+                                            height="32"
+                                            viewBox="0 0 20 20"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            style={{
+                                                animation: userIsSpeaking || isLiveGenerating ? "pulseStar 1.5s infinite ease-in-out" : "none",
+                                                transition: "all 0.3s ease"
+                                            }}
+                                        >
+                                            <path
+                                                d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                                fill="#FFFFFF"
+                                            />
+                                        </svg>
+                                        <style>{`
+                                            @keyframes pulseStar {
+                                                0% { transform: scale(0.95); opacity: 0.7; }
+                                                50% { transform: scale(1.1); opacity: 1; }
+                                                100% { transform: scale(0.95); opacity: 0.7; }
+                                            }
+                                        `}</style>
+                                    </div>
+                                ) : (
                                 <VideoPlayer 
                                     // If I am Student -> Remote. If Mentor -> Local.
                                     stream={role === "mentor" ? localStream : (role === "student" ? remoteStream : null)} 
@@ -3437,6 +4170,8 @@ export default function OmegleMentorshipUI(props: Props) {
                                     placeholder={role === "student" && !remoteStream ? "Waiting for mentor..." : undefined}
                                     style={{ background: "transparent" }}
                                 />
+                                )
+                                )
                             )}
                         </div>
                     </div>
@@ -3536,7 +4271,7 @@ export default function OmegleMentorshipUI(props: Props) {
                             width: finalWidth,
                             height: finalHeight,
                             borderRadius: finalHeight < (isMobileLayout ? 164 : 224) ? 16 : 32, // Smaller radius when compact
-                            background: (!role && status === "idle") ? "#0B87DA" : "#2E2E2E",
+                            background: (!role && status === "idle") ? colors.state.accent : colors.card,
                             overflow: "hidden",
                             position: "relative",
                             flexShrink: 0,
@@ -3557,7 +4292,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                 status === "connected" ? (
                                     <VideoPlayer stream={remoteStream} isMirrored={false} />
                                 ) : (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for student...</div>
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: colors.text.secondary, fontSize: 15 }}>Searching for student</div>
                                 )
                             )
                         )}
@@ -3569,7 +4304,7 @@ export default function OmegleMentorshipUI(props: Props) {
                             width: finalWidth,
                             height: finalHeight,
                             borderRadius: finalHeight < (isMobileLayout ? 164 : 224) ? 16 : 32, // Smaller radius when compact
-                            background: "#2E2E2E",
+                            background: colors.card,
                             overflow: "hidden",
                             position: "relative",
                             flexShrink: 0,
@@ -3588,9 +4323,60 @@ export default function OmegleMentorshipUI(props: Props) {
                             ) : (
                                 // --- REMOTE USER (MENTOR) ---
                                 status === "connected" ? (
-                                    <VideoPlayer stream={remoteStream} isMirrored={false} />
+                                    isLiveMode ? (
+                                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
+                                             <svg
+                                                width="64"
+                                                height="64"
+                                                viewBox="0 0 20 20"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                style={{
+                                                    animation: userIsSpeaking || isLiveGenerating ? "pulseStar 1.5s infinite ease-in-out" : "none",
+                                                    transition: "all 0.3s ease"
+                                                }}
+                                            >
+                                                <path
+                                                    d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                                    fill="#FFFFFF"
+                                                />
+                                            </svg>
+                                            <style>{`
+                                                @keyframes pulseStar {
+                                                    0% { transform: scale(0.95); opacity: 0.7; }
+                                                    50% { transform: scale(1.1); opacity: 1; }
+                                                    100% { transform: scale(0.95); opacity: 0.7; }
+                                                }
+                                            `}</style>
+                                        </div>
+                                    ) : (
+                                        <VideoPlayer stream={remoteStream} isMirrored={false} />
+                                    )
                                 ) : (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255, 255, 255, 0.45)", fontSize: 15 }}>Searching for mentor...</div>
+                                <div data-layer="tile" className="Tile" style={{alignSelf: 'stretch', height: "100%", padding: 16, background: 'transparent', overflow: 'hidden', borderRadius: 28, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
+                                      <div data-layer="Searching for mentor" className="SearchingForMentor" style={{textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: colors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.4, wordWrap: 'break-word'}}>Searching for mentor</div>
+                                      <div 
+                                        onClick={handleConnectWithAI}
+                                        data-layer="Or connect with AI" 
+                                        className="OrConnectWithAi" 
+                                        style={{
+                                            height: 44, 
+                                            textAlign: 'center', 
+                                            justifyContent: 'center', 
+                                            display: 'flex', 
+                                            flexDirection: 'column', 
+                                            color: colors.text.secondary, 
+                                            fontSize: 15, 
+                                            fontFamily: 'Inter', 
+                                            fontWeight: '400', 
+                                            lineHeight: 1.4, 
+                                            wordWrap: 'break-word',
+                                            cursor: 'pointer',
+                                            width: '100%',
+                                            marginTop: -4 // Negative gap to pull closer as requested
+                                        }}
+                                      >Or connect with AI</div>
+                                    </div>
                                 )
                             )
                         )}
@@ -3716,8 +4502,9 @@ export default function OmegleMentorshipUI(props: Props) {
                         isScreenSharing={isScreenSharing}
                         isWhiteboardOpen={isWhiteboardOpen}
                         toggleWhiteboard={toggleWhiteboard}
-                        isConnected={status === "connected"}
+                        isConnected={status === "connected" && !isLiveMode}
                         isMobileLayout={isMobileLayout}
+                        isLiveMode={isLiveMode}
                     />
                 </div>
             </div>
