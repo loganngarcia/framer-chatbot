@@ -4006,18 +4006,9 @@ export default function OmegleMentorshipUI(props: Props) {
             let maxHeight = containerHeight - 100 // Default: leave 100px for video
 
             if (isMobileLayout && !isScreenSharing && !remoteScreenStream) {
-                 // Ensure video area is at least large enough to show both tiles side-by-side
-                 const availableWidth = containerWidth - 32 // 16px padding on each side
-                 const availableWidthPerVideo = (availableWidth - 8) / 2 // 8px gap
-                 const targetRatio = 1.55
-                 
-                 // Height needed for videos side-by-side
-                 const horizontalVideoHeight = availableWidthPerVideo / targetRatio
-                 
-                 // The video section must be at least this tall + some buffer (40px chrome)
-                 const minVideoSectionHeight = horizontalVideoHeight
-                 
-                 // Thus, max chat height is constrained
+                 // Relaxed constraint: Allow user to shrink video area down to 80px
+                 // This overrides the strict aspect ratio check to give users more control over chat size
+                 const minVideoSectionHeight = 80
                  maxHeight = Math.max(100, containerHeight - 40 - minVideoSectionHeight)
             }
 
