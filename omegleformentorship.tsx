@@ -2971,6 +2971,89 @@ export default function OmegleMentorshipUI(props: Props) {
         })
     }
 
+    // --- UI HELPER: Calculate Chat Height Constraints ---
+    // Returns { minHeight, maxHeight } based on current layout and content
+    // Extracted to ensure consistent logic between resize events and drag interactions.
+    const calculateHeightConstraints = React.useCallback((
+        cWidth: number, 
+        cHeight: number, 
+        _isMobileLayout: boolean, 
+        _isScreenSharing: boolean, 
+        _remoteScreenStream: MediaStream | null, 
+        _isWhiteboardOpen: boolean,
+        _sharedScreenSize: { width: number, height: number } | null
+    ) => {
+        // 1. Calculate Min Height (Max Video Height Constraint)
+        let minHeight = 100
+        
+        if (!_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen) {
+            const targetRatio = 1.55
+            let maxVideoHeightNeeded = 0
+            
+            if (_isMobileLayout) {
+                // Mobile: Vertical stack
+                const availableWidth = Math.max(0, cWidth - 32)
+                const v_videoHeight = availableWidth / targetRatio
+                maxVideoHeightNeeded = (v_videoHeight * 2) + 8
+            } else {
+                // Desktop: Horizontal row
+                const availableWidthPerVideo = (cWidth - 32 - 8) / 2
+                maxVideoHeightNeeded = availableWidthPerVideo / targetRatio
+            }
+            
+            const calculatedMinChatHeight = cHeight - 40 - maxVideoHeightNeeded
+            minHeight = Math.max(100, calculatedMinChatHeight)
+        } else {
+            // Screen Share / Whiteboard Mode
+             let activeWidth = _sharedScreenSize?.width
+             let activeHeight = _sharedScreenSize?.height
+             
+             if (_isWhiteboardOpen) {
+                  if (_isMobileLayout) { activeWidth = 1080; activeHeight = 1350; }
+                  else { activeWidth = 1920; activeHeight = 1080; }
+             }
+
+             if (activeWidth && activeHeight) {
+                  const videoRatio = activeWidth / activeHeight
+                  const availableWidth = Math.max(0, cWidth - 32)
+                  const maxVideoHeightNeeded = availableWidth / videoRatio
+                  
+                  let topRowHeight = 140
+                  if (_isMobileLayout) {
+                       const tileW = Math.max(0, (availableWidth - 8) / 2)
+                       topRowHeight = tileW / (4/3)
+                  }
+                  const chromeHeight = 24 + 16 + topRowHeight + 8 
+                  
+                  const calculatedMinChatHeight = cHeight - chromeHeight - maxVideoHeightNeeded
+                  minHeight = Math.max(100, calculatedMinChatHeight)
+             }
+        }
+
+        // 2. Calculate Max Height (Min Video Height Constraint)
+        let maxHeight = cHeight - 100 // Default
+
+        if (_isMobileLayout && !_isScreenSharing && !_remoteScreenStream) {
+             const minVideoSectionHeight = 80
+             maxHeight = Math.max(100, cHeight - 40 - minVideoSectionHeight)
+        }
+
+        if (_isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen) {
+            let topRowHeight = 140
+            if (_isMobileLayout) {
+                 const availableW = Math.max(0, cWidth - 32)
+                 const tileW = (availableW - 8) / 2
+                 topRowHeight = tileW / (4/3)
+            }
+
+            const chromeHeight = 24 + 16 + topRowHeight + 8
+            const minVideoHeight = 200
+            maxHeight = cHeight - chromeHeight - minVideoHeight
+        }
+        
+        return { minHeight, maxHeight }
+    }, [])
+
     // --- EFFECT: RESPONSIVE LAYOUT ENGINE ---
     // Uses ResizeObserver to track container dimensions for aspect-ratio calculations.
     React.useLayoutEffect(() => {
@@ -3018,6 +3101,26 @@ export default function OmegleMentorshipUI(props: Props) {
         hasInitialResized.current = true
         
     }, [containerSize])
+
+    // --- EFFECT: ENFORCE CHAT HEIGHT CONSTRAINTS ON RESIZE ---
+    // Ensures the chat height adjusts when the viewport/container changes size,
+    // keeping the drag bar in a valid position relative to video constraints.
+    React.useEffect(() => {
+        if (containerSize.width === 0 || containerSize.height === 0) return
+
+        const { minHeight, maxHeight } = calculateHeightConstraints(
+            containerSize.width,
+            containerSize.height,
+            isMobileLayout,
+            isScreenSharing,
+            remoteScreenStream,
+            isWhiteboardOpen,
+            sharedScreenSize
+        )
+
+        setChatHeight(prev => Math.max(minHeight, Math.min(prev, maxHeight)))
+
+    }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, sharedScreenSize, calculateHeightConstraints])
 
     const handleRoleSelect = React.useCallback((selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
@@ -4000,36 +4103,20 @@ export default function OmegleMentorshipUI(props: Props) {
             
             const containerHeight = containerRef.current?.clientHeight || window.innerHeight
             const containerWidth = containerRef.current?.clientWidth || window.innerWidth
-            const minHeight = 100 
-            
-            // Calculate dynamic max height based on content
-            let maxHeight = containerHeight - 100 // Default: leave 100px for video
 
-            if (isMobileLayout && !isScreenSharing && !remoteScreenStream) {
-                 // Relaxed constraint: Allow user to shrink video area down to 80px
-                 // This overrides the strict aspect ratio check to give users more control over chat size
-                 const minVideoSectionHeight = 80
-                 maxHeight = Math.max(100, containerHeight - 40 - minVideoSectionHeight)
-            }
-
-            // If screen sharing or whiteboard is active, constrain chat height more aggressively
-            // to ensure video remains visible and usable
-            if (isScreenSharing || !!remoteScreenStream || isWhiteboardOpen) {
-                let topRowHeight = 140
-                if (isMobileLayout) {
-                     const availableW = Math.max(0, containerWidth - 32)
-                     const tileW = (availableW - 8) / 2
-                     topRowHeight = tileW / (4/3)
-                }
-
-                const chromeHeight = 24 + 16 + topRowHeight + 8 // Handle, Pads, TopRow, Gap
-                const minVideoHeight = 200 // Ensure at least 200px vertical space for screen share
-                maxHeight = containerHeight - chromeHeight - minVideoHeight
-            }
+            const { minHeight, maxHeight } = calculateHeightConstraints(
+                containerWidth,
+                containerHeight,
+                isMobileLayout,
+                isScreenSharing,
+                remoteScreenStream,
+                isWhiteboardOpen,
+                sharedScreenSize
+            )
 
             setChatHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
         })
-    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen])
+    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, sharedScreenSize, calculateHeightConstraints])
 
     const handlePointerUp = React.useCallback(() => {
         isDragging.current = false
@@ -4233,6 +4320,14 @@ export default function OmegleMentorshipUI(props: Props) {
     `, [accentColor])
 
 
+    // --- MEMOIZED HELPERS ---
+    const handleScreenShareVideoSize = React.useCallback((w: number, h: number) => {
+        setSharedScreenSize({ width: w, height: h })
+    }, [])
+
+    const screenShareVideoStyle = React.useMemo(() => ({ width: '100%', height: '100%', objectFit: 'contain' as const, background: '#000' }), [])
+    const transparentStyle = React.useMemo(() => ({ background: "transparent" }), [])
+
     return (
         <div
             ref={containerRef}
@@ -4325,7 +4420,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     isMirrored={role === "student"} 
                                     muted={role === "student"} // Mute my own camera
                                     placeholder={role === "mentor" && !remoteStream ? "Waiting for student..." : undefined}
-                                    style={{ background: "transparent" }}
+                                    style={transparentStyle}
                                 />
                             )}
                         </div>
@@ -4410,7 +4505,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     isMirrored={role === "mentor"} 
                                     muted={role === "mentor"} // Mute my own camera
                                     placeholder={role === "student" && !remoteStream ? "Waiting for mentor..." : undefined}
-                                    style={{ background: "transparent" }}
+                                    style={transparentStyle}
                                 />
                                 )
                                 )
