@@ -621,7 +621,7 @@ const MAX_INPUT_LENGTH = 1000 // Limit input characters
 const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
 const API_TIMEOUT_MS = 30000 // 30 seconds timeout
 const MAX_HISTORY_MESSAGES = 20 // Limit history context
-const DAILY_MESSAGE_LIMIT = 100 // Limit messages per day
+const DAILY_MESSAGE_LIMIT = 250 // Limit messages per day
 
 // --- INTERFACES ---
 interface Props {
@@ -870,6 +870,7 @@ interface ChatInputProps {
     isConnected?: boolean
     isMobileLayout?: boolean
     isLiveMode?: boolean
+    onPasteFile?: (files: File[]) => void
 }
 
 const ChatInput = React.memo(function ChatInput({ 
@@ -891,12 +892,31 @@ const ChatInput = React.memo(function ChatInput({
     toggleWhiteboard,
     isConnected = false,
     isMobileLayout = false,
-    isLiveMode = false
+    isLiveMode = false,
+    onPasteFile
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
     const menuRef = React.useRef<HTMLDivElement>(null)
     const [canShareScreen, setCanShareScreen] = React.useState(false)
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = e.clipboardData?.items
+        if (!items) return
+
+        const files: File[] = []
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === 'file') {
+                const file = items[i].getAsFile()
+                if (file) files.push(file)
+            }
+        }
+
+        if (files.length > 0) {
+            e.preventDefault()
+            onPasteFile?.(files)
+        }
+    }
 
     React.useEffect(() => {
         // Check if screen sharing is supported
@@ -1294,6 +1314,7 @@ const ChatInput = React.memo(function ChatInput({
                         ref={textareaRef}
                         value={value}
                         onChange={onChange}
+                        onPaste={handlePaste}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault()
@@ -1795,10 +1816,14 @@ function LiveCursor({ x, y, color }: { x: number, y: number, color: string }) {
 // --- HELPER COMPONENT: MESSAGE BUBBLE (MEMOIZED) ---
 const MessageBubble = React.memo(({ 
     msg, 
-    isMobileLayout 
+    isMobileLayout,
+    id,
+    isLast
 }: { 
     msg: Message, 
-    isMobileLayout: boolean 
+    isMobileLayout: boolean,
+    id?: string,
+    isLast?: boolean
 }) => {
     // Memoize base styles to avoid recreation
     const baseTextStyle = React.useMemo(() => ({ 
@@ -1813,10 +1838,17 @@ const MessageBubble = React.memo(({
     }), [])
 
     return (
-        <div style={{ 
+        <div id={id} style={{ 
             display: "flex", 
             justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-            width: "100%"
+            width: "100%",
+            scrollMarginTop: 24,
+            // FIX: "Snap to Top" without permanent void.
+            // If this is the LAST message and it is from the AI, we give it a large min-height.
+            // This ensures there is enough space below the PREVIOUS user message to scroll it to the top.
+            // Once a new message arrives, this message is no longer last, so it collapses to normal height.
+            // result: User message snaps to top, AI responds in the large space, then history cleans up.
+            minHeight: (isLast && (msg.role === "model" || msg.role === "assistant")) ? "calc(100vh - 200px)" : "auto"
         }}>
             <div style={{ 
                 maxWidth: (msg.role === "user" || msg.role === "peer") ? "80%" : "100%", 
@@ -1995,6 +2027,15 @@ const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { t
 export default function OmegleMentorshipUI(props: Props) {
     const { geminiApiKey, systemPrompt, accentColor, model = "gemini-2.5-flash-lite", debugMode = false } = props
 
+    /**
+     * User's session role.
+     * student: "Get free help" user seeking guidance.
+     * mentor:  "Volunteer" user providing guidance.
+     */
+    const [role, setRole] = React.useState<"student" | "mentor" | null>(null)
+    const roleRef = React.useRef(role)
+    React.useEffect(() => { roleRef.current = role }, [role])
+
     // --- STATE: WEBRTC & CONNECTIVITY ---
     // status: tracks the lifecycle of the connection (idle -> searching -> connected)
     const [status, setStatus] = React.useState("idle")
@@ -2009,6 +2050,76 @@ export default function OmegleMentorshipUI(props: Props) {
     const [editor, setEditor] = React.useState<any>(null)
     const editorRef = React.useRef<any>(null)
     React.useEffect(() => { editorRef.current = editor }, [editor])
+
+    // --- LOCATION & SYSTEM PROMPT ENHANCEMENT ---
+    interface LocationInfo {
+        city?: string
+        region?: string
+        country?: string
+    }
+
+    const [locationInfo, setLocationInfo] = React.useState<LocationInfo | null>(null)
+
+    const getSystemPromptWithContext = React.useCallback(() => {
+        // Constraint: Only students or unspecified roles get location/time info
+        if (role === "mentor") {
+            return systemPrompt || ""
+        }
+
+        const now = new Date()
+        const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        
+        let prompt = systemPrompt || ""
+        prompt += `\n\n[System Context]\nCurrent Date: ${dateStr}\nCurrent Time: ${timeStr}`
+
+        if (locationInfo) {
+            prompt += `\nLocation: ${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}`
+        }
+
+        return prompt
+    }, [systemPrompt, locationInfo, role])
+
+    React.useEffect(() => {
+        if (typeof window === "undefined") return
+
+        const fetchLocation = async () => {
+             try {
+                 const cached = localStorage.getItem("user_location_info")
+                 if (cached) {
+                     setLocationInfo(JSON.parse(cached))
+                     return
+                 }
+             } catch (e) {}
+
+             try {
+                 // Free IP Geolocation API (ipwho.is) - No key required
+                 // 5s timeout to prevent hanging
+                 const controller = new AbortController()
+                 const id = setTimeout(() => controller.abort(), 5000)
+                 
+                 const res = await fetch("https://ipwho.is/", { signal: controller.signal })
+                 clearTimeout(id)
+
+                 if (res.ok) {
+                     const data = await res.json()
+                     if (data.success !== false) {
+                         const info: LocationInfo = {
+                             city: data.city,
+                             region: data.region,
+                             country: data.country
+                         }
+                         setLocationInfo(info)
+                         localStorage.setItem("user_location_info", JSON.stringify(info))
+                     }
+                 }
+             } catch (e) {
+                 // Silently fail - optional enhancement allows graceful degradation
+             }
+        }
+        
+        fetchLocation()
+    }, [])
 
     const isWhiteboardOpenRef = React.useRef(false)
     React.useEffect(() => { isWhiteboardOpenRef.current = isWhiteboardOpen }, [isWhiteboardOpen])
@@ -2158,6 +2269,41 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- STATE: GEMINI LIVE ---
     const [isLiveMode, setIsLiveMode] = React.useState(false)
+    const lastLiveUpdateRef = React.useRef(Date.now())
+
+    React.useEffect(() => {
+        if (!isLiveMode) return
+
+        const checkTimeUpdate = () => {
+            if (typeof window === "undefined") return
+            
+            const now = Date.now()
+            // Update every 10 minutes (600,000ms) as requested
+            // Note: We check every minute, but only send if 10m elapsed
+            if (now - lastLiveUpdateRef.current > 600000 && liveClientRef.current && liveClientRef.current.readyState === WebSocket.OPEN) {
+                lastLiveUpdateRef.current = now
+                
+                const date = new Date()
+                const timeContext = `[System Update] Current Date: ${date.toLocaleDateString()}, Current Time: ${date.toLocaleTimeString()}`
+                
+                // Send invisible context update to model via clientContent
+                liveClientRef.current.send(JSON.stringify({
+                    clientContent: {
+                        turns: [{
+                            role: "user",
+                            parts: [{ text: timeContext }]
+                        }],
+                        turnComplete: true
+                    }
+                }))
+                if (debugMode) log("Sent time update to Gemini Live session")
+            }
+        }
+
+        const interval = setInterval(checkTimeUpdate, 60000) // Check every minute
+        return () => clearInterval(interval)
+    }, [isLiveMode, debugMode])
+
     const [userIsSpeaking, setUserIsSpeaking] = React.useState(false)
     const [isLiveGenerating, setIsLiveGenerating] = React.useState(false)
     
@@ -2189,6 +2335,10 @@ export default function OmegleMentorshipUI(props: Props) {
             }
         })
         activeAudioSourcesRef.current = []
+        // Reset play time so next audio plays immediately
+        if (liveAudioContextRef.current) {
+            liveNextPlayTimeRef.current = liveAudioContextRef.current.currentTime + 0.1
+        }
     }, [])
 
     const captureCurrentContext = React.useCallback(async () => {
@@ -2349,6 +2499,7 @@ export default function OmegleMentorshipUI(props: Props) {
             liveClientRef.current = ws
 
             ws.onopen = async () => {
+                const currentSystemPrompt = getSystemPromptWithContext()
                 ws.send(
                     JSON.stringify({
                         setup: {
@@ -2364,7 +2515,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                 }
                             },
                             systemInstruction: {
-                                parts: [{ text: systemPrompt }],
+                                parts: [{ text: currentSystemPrompt }],
                             },
                             inputAudioTranscription: {},
                             outputAudioTranscription: {},
@@ -2407,7 +2558,10 @@ export default function OmegleMentorshipUI(props: Props) {
                         if (!liveClientRef.current) return
                         let inputData = e.inputBuffer.getChannelData(0)
 
-                        const isSpeaking = detectVoiceActivity(inputData, 0.01) // threshold default
+                        // Hardcoded threshold for interruption
+                        const interruptionThreshold = 0.01
+
+                        const isSpeaking = detectVoiceActivity(inputData, interruptionThreshold)
                         
                         if (isSpeaking) {
                             consecutiveSpeechFrames++
@@ -2445,6 +2599,12 @@ export default function OmegleMentorshipUI(props: Props) {
                             audioCtx.sampleRate,
                             INPUT_TARGET_SAMPLE_RATE
                         )
+
+                        // HALLUCINATION FIX: Mute audio if no voice detected (Noise Gate)
+                        // This prevents background noise from being transcribed as foreign languages
+                        if (!userIsSpeakingRef.current && !isSpeaking) {
+                            downsampledData.fill(0)
+                        }
 
                         const b64 = float32ToBase64(downsampledData)
 
@@ -2643,7 +2803,7 @@ export default function OmegleMentorshipUI(props: Props) {
             console.error("Live Init Error", e)
             stopLiveSession()
         }
-    }, [geminiApiKey, systemPrompt, stopLiveSession, fetchAiSuggestions, captureCurrentContext])
+    }, [geminiApiKey, getSystemPromptWithContext, stopLiveSession, fetchAiSuggestions, captureCurrentContext])
 
     const handleConnectWithAI = React.useCallback(() => {
         // Switch to Live Mode
@@ -2672,14 +2832,7 @@ export default function OmegleMentorshipUI(props: Props) {
         }
     }
 
-    /**
-     * User's session role.
-     * student: "Get free help" user seeking guidance.
-     * mentor:  "Volunteer" user providing guidance.
-     */
-    const [role, setRole] = React.useState<"student" | "mentor" | null>(null)
-    const roleRef = React.useRef(role)
-    React.useEffect(() => { roleRef.current = role }, [role])
+    // (Role state moved to top of component to fix scoping for system prompt)
 
     // --- REFS: DOM & PERSISTENT OBJECTS ---
     const [localStream, setLocalStream] = React.useState<MediaStream | null>(null)
@@ -2705,6 +2858,45 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isLoading, setIsLoading] = React.useState(false)
     const abortControllerRef = React.useRef<AbortController | null>(null)
     const lastMessageTimeRef = React.useRef<number>(0)
+    const messagesEndRef = React.useRef<HTMLDivElement>(null)
+    const chatHistoryRef = React.useRef<HTMLDivElement>(null)
+
+    const [extraPadding, setExtraPadding] = React.useState(false)
+
+    // --- HOOK: SCROLL MANAGER ---
+    // Mimics "Chat" behavior (WhatsApp/Telegram/Gemini):
+    // 1. When a user sends a message, snap it to the top.
+    // 2. But we must avoid the "void" (scrolling past content).
+    // 3. Solution: We can ONLY snap to the top if there is enough content below it.
+    //    If content is short, we just scroll to the very bottom.
+    //    This creates the "best effort" snap-to-top without breaking the UI.
+    React.useLayoutEffect(() => {
+        const lastIdx = messages.length - 1
+        if (lastIdx < 0) return
+
+        const lastMsg = messages[lastIdx]
+        
+        // Scroll for user messages (including Gemini Live transcripts)
+        if (lastMsg.role === "user" || lastMsg.role === "peer") {
+             requestAnimationFrame(() => {
+                 const element = document.getElementById(`msg-${lastIdx}`)
+                 const container = chatHistoryRef.current
+                 
+                 if (element && container) {
+                     // 1. Where do we WANT to be? (24px from top)
+                     const desiredTop = element.offsetTop - 24
+                     
+                     // 2. Snap to it.
+                     // Because we have large padding (75vh), we can almost ALWAYS snap to desiredTop.
+                     // The padding ensures maxScroll is large enough.
+                     container.scrollTo({
+                         top: desiredTop,
+                         behavior: "smooth"
+                     })
+                 }
+             })
+        }
+    }, [messages.length, messages[messages.length - 1]?.text])
 
     // --- STATE: FILE UPLOADS ---
     const [attachments, setAttachments] = React.useState<Attachment[]>([])
@@ -3280,19 +3472,11 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- FILE UPLOAD HANDLERS ---
 
-    const handleFileSelect = React.useCallback(() => {
-        if (fileInputRef.current) {
-            fileInputRef.current.click()
-        }
-    }, [])
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files: File[] = Array.from(e.target.files || [])
+    const processFiles = React.useCallback(async (files: File[]) => {
         if (files.length === 0) return
 
         if (attachments.length + files.length > 10) {
             alert("Maximum 10 attachments allowed.")
-            if (fileInputRef.current) fileInputRef.current.value = ""
             return
         }
 
@@ -3324,8 +3508,6 @@ export default function OmegleMentorshipUI(props: Props) {
         
         setAttachments(prev => [...prev, ...newAttachments])
         
-        if (fileInputRef.current) fileInputRef.current.value = ""
-        
         // Handle video thumbnails
         newAttachments.forEach(att => {
             if (att.type === 'video') {
@@ -3334,6 +3516,18 @@ export default function OmegleMentorshipUI(props: Props) {
                 })
             }
         })
+    }, [attachments.length])
+
+    const handleFileSelect = React.useCallback(() => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click()
+        }
+    }, [])
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files: File[] = Array.from(e.target.files || [])
+        await processFiles(files)
+        if (fileInputRef.current) fileInputRef.current.value = ""
     }
 
     const handleRemoveAttachment = React.useCallback((id: string) => {
@@ -3565,14 +3759,16 @@ export default function OmegleMentorshipUI(props: Props) {
                 ]
             }
 
-            if (systemPrompt.trim()) {
+            const currentSystemPrompt = getSystemPromptWithContext()
+
+            if (currentSystemPrompt.trim()) {
                 payload.systemInstruction = {
-                    parts: [{ text: systemPrompt }]
+                    parts: [{ text: currentSystemPrompt }]
                 }
             }
 
             const fetchPromise = fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}&alt=sse`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -3591,20 +3787,61 @@ export default function OmegleMentorshipUI(props: Props) {
             const response = await Promise.race([fetchPromise, timeoutPromise])
             clearTimeout(timeoutId)
 
-            const data = await response.json()
-            
             if (!response.ok) {
+                const data = await response.json().catch(() => ({}))
                 const errorMsg = data?.error?.message || response.statusText
                 console.error("Gemini API Error:", data)
                 setMessages(prev => [...prev, { role: "model", text: `Error: ${errorMsg}` }])
                 return
             }
 
-            if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-                const aiText = data.candidates[0].content.parts[0].text
-                setMessages(prev => [...prev, { role: "model", text: aiText }])
-            } else {
+            if (!response.body) {
                 setMessages(prev => [...prev, { role: "model", text: "Error: No response from Gemini." }])
+                return
+            }
+
+            setMessages(prev => [...prev, { role: "model", text: "" }])
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ""
+
+            while (true) {
+                if (controller.signal.aborted) break
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                buffer += chunk
+                const lines = buffer.split("\n")
+                buffer = lines.pop() || ""
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        try {
+                            const jsonStr = line.substring(5).trim()
+                            if (!jsonStr) continue
+                            const json = JSON.parse(jsonStr)
+                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+                            if (text) {
+                                setMessages(prev => {
+                                    const newMessages = [...prev]
+                                    const lastMsg = newMessages[newMessages.length - 1]
+                                    if (lastMsg && lastMsg.role === "model") {
+                                        newMessages[newMessages.length - 1] = {
+                                            ...lastMsg,
+                                            text: lastMsg.text + text
+                                        }
+                                        return newMessages
+                                    }
+                                    return prev
+                                })
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream line", e)
+                        }
+                    }
+                }
             }
         } catch (error: any) {
             if (error.name === 'AbortError') return
@@ -3614,7 +3851,7 @@ export default function OmegleMentorshipUI(props: Props) {
             setIsLoading(false)
             abortControllerRef.current = null
         }
-    }, [geminiApiKey, messages, model, systemPrompt])
+    }, [geminiApiKey, messages, model, getSystemPromptWithContext])
 
     const handleIncomingPeerMessage = React.useCallback((payload: any) => {
         const peerMsg: Message = {
@@ -4436,24 +4673,34 @@ export default function OmegleMentorshipUI(props: Props) {
                 }}
             >
                 <div
+                    ref={chatHistoryRef}
                     style={{
                         flex: 1,
                         width: "100%",
                         padding: "0 24px",
-                        paddingBottom: 90,
+                        // FIX: Standard padding.
+                        // We rely on the "minHeight" logic of the last message/loader to handle the "void" dynamically.
+                        // This removes the permanent giant void at the bottom.
+                        paddingBottom: 90, 
                         overflowY: "auto",
                         display: "flex",
                         flexDirection: "column",
                         gap: 16,
                         overscrollBehavior: "contain",
                         WebkitOverflowScrolling: "touch",
+                        position: "relative" // Ensure offsetTop calculations work correctly
                     }}
                 >
                     {messages.map((msg, idx) => (
-                        <MessageBubble key={idx} msg={msg} isMobileLayout={isMobileLayout} />
+                        <MessageBubble key={idx} id={`msg-${idx}`} msg={msg} isMobileLayout={isMobileLayout} isLast={idx === messages.length - 1} />
                     ))}
-                    {isLoading && (
-                        <div style={{ paddingLeft: 8, paddingBottom: 8 }}>
+                    {isLoading && (!messages.length || messages[messages.length - 1].role !== "model" || messages[messages.length - 1].text.length === 0) && (
+                        <div style={{ 
+                            paddingLeft: 8, 
+                            paddingBottom: 8,
+                            // FIX: Ensure loader takes up space to push user message to top
+                            minHeight: "calc(100vh - 200px)"
+                        }}>
                             <div style={{ animation: "pulseStar 1.5s infinite ease-in-out", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                 <svg
                                     width="20"
@@ -4481,6 +4728,7 @@ export default function OmegleMentorshipUI(props: Props) {
                             </div>
                         </div>
                     )}
+                    <div />
                 </div>
 
                 {/* 4. CHAT INPUT INTERFACE */}
@@ -4519,6 +4767,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         isConnected={status === "connected" && !isLiveMode}
                         isMobileLayout={isMobileLayout}
                         isLiveMode={isLiveMode}
+                        onPasteFile={processFiles}
                     />
                 </div>
             </div>
