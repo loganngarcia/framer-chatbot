@@ -898,6 +898,9 @@ const ChatInput = React.memo(function ChatInput({
     onConnectWithAI
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+    const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
+    const [isAddFilesTooltipHovered, setIsAddFilesTooltipHovered] = React.useState(false)
+    const [isEndCallTooltipHovered, setIsEndCallTooltipHovered] = React.useState(false)
     const [showMenu, setShowMenu] = React.useState(false)
     const menuRef = React.useRef<HTMLDivElement>(null)
     const [canShareScreen, setCanShareScreen] = React.useState(false)
@@ -1293,6 +1296,8 @@ const ChatInput = React.memo(function ChatInput({
                              setShowMenu(prev => !prev)
                         }
                     }}
+                    onMouseEnter={() => setIsAddFilesTooltipHovered(true)}
+                    onMouseLeave={() => setIsAddFilesTooltipHovered(false)}
                     style={{
                       cursor: (attachments.length >= 10) ? "not-allowed" : "pointer", 
                       opacity: (attachments.length >= 10) ? 0.3 : 0.95,
@@ -1302,9 +1307,30 @@ const ChatInput = React.memo(function ChatInput({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginBottom: 0 // Aligned with send button
+                      marginBottom: 0, // Aligned with send button
+                      position: "relative"
                     }}
                   >
+                    {!showMenu && isAddFilesTooltipHovered && (
+                        <div style={{
+                            position: "absolute",
+                            bottom: "100%",
+                            left: "50%",
+                            transform: isMobileLayout ? "translate(-25%, -17px)" : "translate(-50%, -17px)",
+                            background: "#000000",
+                            color: "white",
+                            padding: "4px 12px",
+                            borderRadius: "28px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            pointerEvents: "none",
+                            zIndex: 10,
+                            boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                        }}>
+                            Add files and more
+                        </div>
+                    )}
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -1385,13 +1411,36 @@ const ChatInput = React.memo(function ChatInput({
                         data-layer="start ai live call" 
                         className="StartAiLiveCall"
                         onClick={onConnectWithAI}
+                        onMouseEnter={() => setIsAiTooltipHovered(true)}
+                        onMouseLeave={() => setIsAiTooltipHovered(false)}
                         style={{
                             cursor: "pointer",
                             width: 36,
                             height: 36,
-                            display: "block"
+                            display: "block",
+                            position: "relative"
                         }}
                       >
+                          {isAiTooltipHovered && (
+                              <div style={{
+                                  position: "absolute",
+                                  bottom: "100%",
+                                  left: "50%",
+                                  transform: isMobileLayout ? "translate(-70%, -17px)" : "translate(-50%, -17px)",
+                                  background: "#000000",
+                                  color: "white",
+                                  padding: "4px 12px",
+                                  borderRadius: "28px",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                  pointerEvents: "none",
+                                  zIndex: 10,
+                                  boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                              }}>
+                                  Connect with AI
+                              </div>
+                          )}
                           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z" fill="white" fillOpacity="0.95"/>
                           </svg>
@@ -1403,7 +1452,40 @@ const ChatInput = React.memo(function ChatInput({
 
             {/* END CALL BUTTON */}
             {showEndCall && (
-              <div data-svg-wrapper data-layer="end call button." className="EndCallButton" onClick={onEndCall} style={{cursor: "pointer", flexShrink: 0, pointerEvents: "auto"}}>
+              <div 
+                  data-svg-wrapper 
+                  data-layer="end call button." 
+                  className="EndCallButton" 
+                  onClick={onEndCall} 
+                  onMouseEnter={() => setIsEndCallTooltipHovered(true)}
+                  onMouseLeave={() => setIsEndCallTooltipHovered(false)}
+                  style={{
+                      cursor: "pointer", 
+                      flexShrink: 0, 
+                      pointerEvents: "auto",
+                      position: "relative"
+                  }}
+              >
+                {isEndCallTooltipHovered && (
+                    <div style={{
+                        position: "absolute",
+                        bottom: "100%",
+                        left: "50%",
+                        transform: isMobileLayout ? "translate(-50%, -4px)" : "translate(-50%, -4px)",
+                        background: "#000000",
+                        color: "white",
+                        padding: "4px 12px",
+                        borderRadius: "28px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        pointerEvents: "none",
+                        zIndex: 10,
+                        boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                    }}>
+                        End call
+                    </div>
+                )}
                 <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect width="56" height="56" rx="28" fill="#EC1313"/>
                 <g transform="translate(17.5, 23)">
@@ -2499,6 +2581,9 @@ export default function OmegleMentorshipUI(props: Props) {
                                 temperature: 0.7,
                                 maxOutputTokens: 100,
                                 stopSequences: ["\n\n"],
+                                thinkingConfig: {
+                                    thinkingBudget: 0
+                                }
                             },
                         }),
                     }
@@ -2583,6 +2668,9 @@ export default function OmegleMentorshipUI(props: Props) {
                             model: liveModel,
                             generationConfig: {
                                 responseModalities: ["AUDIO"],
+                                thinkingConfig: {
+                                    thinkingBudget: 0
+                                },
                                 speechConfig: {
                                     voiceConfig: {
                                         prebuiltVoiceConfig: {
@@ -3564,7 +3652,12 @@ export default function OmegleMentorshipUI(props: Props) {
                                   Respond with ONLY "VIOLATION" if found, or "SAFE" if not.` },
                                 ...evidenceParts
                             ]
-                        }]
+                        }],
+                        generationConfig: {
+                            thinkingConfig: {
+                                thinkingBudget: 0
+                            }
+                        }
                     })
                 })
                 
@@ -4103,7 +4196,12 @@ export default function OmegleMentorshipUI(props: Props) {
                 contents: [
                     ...history,
                     { role: "user", parts: userContent }
-                ]
+                ],
+                generationConfig: {
+                    thinkingConfig: {
+                        thinkingBudget: 0
+                    }
+                }
             }
 
             const currentSystemPrompt = getSystemPromptWithContext()
