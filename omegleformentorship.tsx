@@ -1,5 +1,5 @@
 import * as React from "react"
-import { addPropertyControls, ControlType } from "framer"
+import { addPropertyControls, ControlType, RenderTarget } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
 import { Tldraw, exportToBlob } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
@@ -922,6 +922,30 @@ const ChatInput = React.memo(function ChatInput({
             onPasteFile?.(files)
         }
     }
+
+    React.useEffect(() => {
+        // Focus cursor on mount if not in canvas
+        if (RenderTarget.current() !== RenderTarget.canvas) {
+            textareaRef.current?.focus()
+
+            // Global key listener for typing
+            const handleGlobalKeyDown = (e: KeyboardEvent) => {
+                // Ignore if focus is already on an input or textarea
+                const active = document.activeElement
+                const isInputActive =
+                    active?.tagName === "INPUT" ||
+                    active?.tagName === "TEXTAREA" ||
+                    active?.getAttribute("contenteditable") === "true"
+
+                if (!isInputActive && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    textareaRef.current?.focus()
+                }
+            }
+
+            window.addEventListener("keydown", handleGlobalKeyDown)
+            return () => window.removeEventListener("keydown", handleGlobalKeyDown)
+        }
+    }, [])
 
     React.useEffect(() => {
         // Check if screen sharing is supported
