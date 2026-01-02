@@ -871,6 +871,7 @@ interface ChatInputProps {
     isMobileLayout?: boolean
     isLiveMode?: boolean
     onPasteFile?: (files: File[]) => void
+    onConnectWithAI?: () => void
 }
 
 const ChatInput = React.memo(function ChatInput({ 
@@ -893,7 +894,8 @@ const ChatInput = React.memo(function ChatInput({
     isConnected = false,
     isMobileLayout = false,
     isLiveMode = false,
-    onPasteFile
+    onPasteFile,
+    onConnectWithAI
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [showMenu, setShowMenu] = React.useState(false)
@@ -1375,6 +1377,26 @@ const ChatInput = React.memo(function ChatInput({
                         </svg>
                     )}
                   </div>
+
+                  {/* START LIVE AI CALL BUTTON (When idle and no input) */}
+                  {!hasContent && !showEndCall && onConnectWithAI && (
+                      <div 
+                        data-svg-wrapper 
+                        data-layer="start ai live call" 
+                        className="StartAiLiveCall"
+                        onClick={onConnectWithAI}
+                        style={{
+                            cursor: "pointer",
+                            width: 36,
+                            height: 36,
+                            display: "block"
+                        }}
+                      >
+                          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z" fill="white" fillOpacity="0.95"/>
+                          </svg>
+                      </div>
+                  )}
               </div>
 
             </div>
@@ -2024,6 +2046,54 @@ const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { t
  * OmegleMentorshipUI
  * Main component handling video streaming, real-time signaling, and AI-assisted chat.
  */
+
+// --- HELPER: MEDIA CAPTURE ---
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+            const res = reader.result as string
+            resolve(res.substring(res.indexOf(",") + 1))
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+    })
+}
+
+const captureVideoFrame = async (streamOrTrack: MediaStream | MediaStreamTrack | null): Promise<Blob | null> => {
+    if (!streamOrTrack) return null
+    try {
+        const track = 'getVideoTracks' in streamOrTrack ? streamOrTrack.getVideoTracks()[0] : streamOrTrack
+        if (!track || track.kind !== 'video') return null
+        
+        // Use ImageCapture if available
+        if ('ImageCapture' in window) {
+            const imageCapture = new (window as any).ImageCapture(track)
+            const bitmap = await imageCapture.grabFrame()
+            
+            // Resize to max 800px width/height to save bandwidth/processing
+            const canvas = document.createElement('canvas')
+            const scale = Math.min(1, 800 / Math.max(bitmap.width, bitmap.height))
+            canvas.width = bitmap.width * scale
+            canvas.height = bitmap.height * scale
+            
+            const ctx = canvas.getContext('2d')
+            if (!ctx) {
+                bitmap.close()
+                return null
+            }
+            
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+            bitmap.close() // Important: Release memory
+            
+            return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7))
+        }
+        return null
+    } catch (e) { 
+        return null 
+    }
+}
+
 export default function OmegleMentorshipUI(props: Props) {
     const { geminiApiKey, systemPrompt, accentColor, model = "gemini-2.5-flash-lite", debugMode = false } = props
 
@@ -2471,6 +2541,13 @@ export default function OmegleMentorshipUI(props: Props) {
             liveInputStreamRef.current.getTracks().forEach((track) => track.stop())
             liveInputStreamRef.current = null
         }
+        
+        // Clear local stream if it was set by live session
+        if (localStreamRef.current) {
+             setLocalStream(null)
+             localStreamRef.current = null
+        }
+
         if (liveAudioContextRef.current) {
             liveAudioContextRef.current.close()
             liveAudioContextRef.current = null
@@ -2525,7 +2602,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
                 const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
                 const audioCtx = new AudioContextClass()
-
+                
                 if (audioCtx.state === "suspended") {
                     await audioCtx.resume()
                 }
@@ -2535,6 +2612,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
                         audio: {
                             sampleRate: 16000,
                             channelCount: 1,
@@ -2544,6 +2622,11 @@ export default function OmegleMentorshipUI(props: Props) {
                             latency: 0.01,
                         } as any,
                     })
+                    
+                    // Set as local stream for UI
+                    localStreamRef.current = stream
+                    setLocalStream(stream)
+
                     liveInputStreamRef.current = stream
                     const source = audioCtx.createMediaStreamSource(stream)
                     liveSourceRef.current = source
@@ -2822,6 +2905,50 @@ export default function OmegleMentorshipUI(props: Props) {
     // Useful for mobile debugging where browser console isn't easily accessible.
     const [logs, setLogs] = React.useState<string[]>([])
     const [showReportModal, setShowReportModal] = React.useState(false)
+    const [isBanned, setIsBanned] = React.useState(false)
+
+    // --- BAN SYSTEM LOGIC ---
+    const checkBanStatus = React.useCallback(() => {
+        if (typeof window === "undefined") return false
+        
+        const expiry = localStorage.getItem("curastem_ban_expiry")
+        if (expiry) {
+            const remaining = parseInt(expiry) - Date.now()
+            if (remaining > 0) {
+                if (!isBanned) setIsBanned(true)
+                return true
+            } else {
+                localStorage.removeItem("curastem_ban_expiry")
+                if (isBanned) setIsBanned(false)
+            }
+        }
+        return false
+    }, [isBanned])
+
+    React.useEffect(() => {
+        checkBanStatus()
+        const interval = setInterval(checkBanStatus, 1000)
+        return () => clearInterval(interval)
+    }, [checkBanStatus])
+
+    // Effect to enforce ban (disconnect if active)
+    React.useEffect(() => {
+        if (isBanned && status !== "idle") {
+            log("User is banned, disconnecting active session...")
+            // We need to be careful not to create a loop if cleanup changes status
+            // But cleanup() sets status to idle, so this should only run once
+            if (activeCall.current) activeCall.current.close()
+            if (dataConnectionRef.current) dataConnectionRef.current.close()
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(t => t.stop())
+                localStreamRef.current = null
+                setLocalStream(null)
+            }
+            setStatus("idle")
+            setRole(null) // Reset role to force re-entry logic if desired
+        }
+    }, [isBanned, status])
+
     
     // Helper for standardized console logging
     // Use this wrapper instead of console.log to ensure output appears in the UI debug console
@@ -3368,11 +3495,109 @@ export default function OmegleMentorshipUI(props: Props) {
         setShowReportModal(true)
     }, [])
 
-    const onSubmitReport = React.useCallback((reason: string) => {
+    const onSubmitReport = React.useCallback(async (reason: string) => {
         log(`Report submitted: ${reason}`)
         setShowReportModal(false)
-        // You could add logic here to send the report to a backend or AI
-    }, [])
+
+        // Optimized Evidence Gathering
+        const evidenceStart = Date.now()
+
+        // Parallel capture of all evidence sources
+        const capturePromises: Promise<Blob | null>[] = []
+
+        // 1. Whiteboard
+        if (editorRef.current) {
+            capturePromises.push((async () => {
+                try {
+                    // @ts-ignore
+                    const { exportToBlob } = await import("https://esm.sh/tldraw@2.1.0?external=react,react-dom")
+                    const svg = await editorRef.current.getSvg(Array.from(editorRef.current.currentPageShapeIds))
+                    if (svg) {
+                        return await exportToBlob({
+                            editor: editorRef.current,
+                            ids: Array.from(editorRef.current.currentPageShapeIds),
+                            format: 'png',
+                        })
+                    }
+                    return null
+                } catch (e) { return null }
+            })())
+        } else { capturePromises.push(Promise.resolve(null)) }
+
+        // 2. Peer Video (Optimized)
+        capturePromises.push(captureVideoFrame(remoteStreamRef.current))
+
+        // 3. Screen Share (Optimized)
+        capturePromises.push(captureVideoFrame(remoteScreenStream))
+
+        // Wait for all captures (with 2s timeout fallback)
+        const results = await Promise.race([
+            Promise.all(capturePromises),
+            new Promise<any[]>(r => setTimeout(() => r([null, null, null]), 2000))
+        ])
+
+        const [whiteboardBlob, peerVideoBlob, screenShareBlob] = results
+        log(`Evidence captured in ${Date.now() - evidenceStart}ms`)
+
+        // --- GEMINI API REVIEW ---
+        const evidenceParts: any[] = []
+        try {
+            if (whiteboardBlob) evidenceParts.push({ inlineData: { mimeType: "image/png", data: await blobToBase64(whiteboardBlob) } })
+            if (peerVideoBlob) evidenceParts.push({ inlineData: { mimeType: "image/jpeg", data: await blobToBase64(peerVideoBlob) } })
+            if (screenShareBlob) evidenceParts.push({ inlineData: { mimeType: "image/jpeg", data: await blobToBase64(screenShareBlob) } })
+        } catch (e) { log(`Error processing evidence: ${e}`) }
+
+        let confirmedViolation = true
+
+        if (evidenceParts.length > 0 && geminiApiKey) {
+            log("Sending evidence to Gemini...")
+            try {
+                // Non-blocking fetch (fire and forget disconnect logic after response)
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: `Analyze these images for code of conduct violations. 
+                                  Strictly check for: Nudity, sexually explicit content, gore, violence, impersonation, blatant advertising, scam, or illegal activity.
+                                  Respond with ONLY "VIOLATION" if found, or "SAFE" if not.` },
+                                ...evidenceParts
+                            ]
+                        }]
+                    })
+                })
+                
+                const data = await response.json()
+                const verdict = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.toUpperCase()
+                
+                log(`AI Verdict: ${verdict}`)
+                if (verdict === "SAFE") {
+                    confirmedViolation = false
+                    log("AI found no violation. Report logged but no immediate ban enforced.")
+                }
+            } catch (e) {
+                log(`AI Review Failed: ${e}. Defaulting to user report.`)
+            }
+        }
+
+        if (confirmedViolation) {
+            // Notify the peer that they are reported (so they ban themselves)
+            if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                dataConnectionRef.current.send({
+                    type: 'REPORT_VIOLATION',
+                    reason: reason
+                })
+            }
+        }
+        
+        // Disconnect locally and find new
+        cleanup()
+    }, [cleanup, remoteScreenStream, geminiApiKey, model])
+
+
+
+
 
     const getCurrentStream = () => {
         // Deprecated helper in favor of dual-call strategy
@@ -3702,6 +3927,25 @@ export default function OmegleMentorshipUI(props: Props) {
         }
         
         conn.on('data', (data: any) => {
+            if (data.type === 'REPORT_VIOLATION') {
+                log("Received violation report")
+                // Determine ban duration
+                const violationCount = parseInt(localStorage.getItem("curastem_violation_count") || "0")
+                let banDuration = 10 * 60 * 1000 // 10 mins
+                if (violationCount > 0) {
+                    banDuration = 60 * 60 * 1000 // 1 hour
+                }
+                
+                // Set ban state
+                localStorage.setItem("curastem_violation_count", (violationCount + 1).toString())
+                localStorage.setItem("curastem_ban_expiry", (Date.now() + banDuration).toString())
+                
+                // Enforce ban
+                checkBanStatus()
+                cleanup()
+                return
+            }
+
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
             } else if (data.type === 'tldraw-start') {
@@ -4354,6 +4598,32 @@ export default function OmegleMentorshipUI(props: Props) {
                 touchAction: "none", 
             }}
         >
+            {/* BAN BANNER (Top of screen) */}
+            {isBanned && (
+                <div style={{
+                    width: "100%",
+                    background: "transparent", 
+                    color: "rgba(160, 160, 160, 1)", // 65% grey text (approx)
+                    padding: "12px 16px",
+                    textAlign: "center",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    zIndex: 2000,
+                    flexShrink: 0,
+                    borderBottom: "1px solid rgba(255,255,255,0.1)"
+                }}>
+                    You are temporarily banned. Please review the{" "}
+                    <a 
+                        href="https://curastem.org/code-of-conduct" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ color: "rgba(160, 160, 160, 1)", textDecoration: "underline", fontWeight: 700 }}
+                    >
+                        code of conduct
+                    </a>.
+                </div>
+            )}
+
             {/* Hidden file input */}
             <input
                 ref={fileInputRef}
@@ -4406,7 +4676,7 @@ export default function OmegleMentorshipUI(props: Props) {
                             position: "relative",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
                         }}>
-                            {(!role && status === "idle") ? (
+                            {(!role && status === "idle" && !isLiveMode) ? (
                                 <div 
                                     style={{ width: '100%', height: '100%' }}
                                     onClick={() => handleRoleSelect("student")}
@@ -4416,9 +4686,9 @@ export default function OmegleMentorshipUI(props: Props) {
                             ) : (
                                 <VideoPlayer 
                                     // If I am Student -> Local. If Mentor -> Remote.
-                                    stream={role === "student" ? localStream : (role === "mentor" ? remoteStream : null)} 
-                                    isMirrored={role === "student"} 
-                                    muted={role === "student"} // Mute my own camera
+                                    stream={(role === "student" || isLiveMode) ? localStream : (role === "mentor" ? remoteStream : null)} 
+                                    isMirrored={role === "student" || isLiveMode} 
+                                    muted={role === "student" || isLiveMode} // Mute my own camera
                                     placeholder={role === "mentor" && !remoteStream ? "Waiting for student..." : undefined}
                                     style={transparentStyle}
                                 />
@@ -4608,20 +4878,20 @@ export default function OmegleMentorshipUI(props: Props) {
                             width: finalWidth,
                             height: finalHeight,
                             borderRadius: finalHeight < (isMobileLayout ? 164 : 224) ? 16 : 32, // Smaller radius when compact
-                            background: (!role && status === "idle") ? colors.state.accent : colors.card,
+                            background: (!role && status === "idle" && !isLiveMode) ? colors.state.accent : colors.card,
                             overflow: "hidden",
                             position: "relative",
                             flexShrink: 0,
-                            cursor: (!role && status === "idle") ? "pointer" : "default",
+                            cursor: (!role && status === "idle" && !isLiveMode) ? "pointer" : "default",
                             display: "flex",
                             flexDirection: "column",
                         }}
-                        onClick={() => (!role && status === "idle") && handleRoleSelect("student")}
+                        onClick={() => (!role && status === "idle" && !isLiveMode) && handleRoleSelect("student")}
                     >
-                        {(!role && status === "idle") ? (
+                        {(!role && status === "idle" && !isLiveMode) ? (
                             <RoleSelectionButton type="student" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
                         ) : (
-                            role === "student" ? (
+                            (role === "student" || isLiveMode) ? (
                                 // --- LOCAL USER (STUDENT) ---
                                 <VideoPlayer stream={localStream} isMirrored={true} muted={true} />
                             ) : (
@@ -4837,6 +5107,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onSend={handleSendMessage}
+                        onConnectWithAI={handleConnectWithAI}
                         onStop={handleStop}
                         onEndCall={cleanup}
                         onFileSelect={handleFileSelect}
