@@ -849,6 +849,447 @@ const VideoPlayer = React.memo(function VideoPlayer({
     )
 })
 
+// --- HELPER COMPONENT: DOC EDITOR ---
+interface DocEditorProps {
+    content: string
+    onChange: (content: string) => void
+    settings: { fontStyle: 'serif' | 'sans', fontSize: number, h1Size: number, h2Size: number, pSize: number }
+    onSettingsChange: (settings: { fontStyle: 'serif' | 'sans', fontSize: number, h1Size: number, h2Size: number, pSize: number }) => void
+}
+
+const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange }: DocEditorProps) {
+    const editorRef = React.useRef<HTMLDivElement>(null)
+    const [showFontMenu, setShowFontMenu] = React.useState(false)
+
+    // Sync content updates
+    const handleInput = () => {
+        if (editorRef.current) {
+            onChange(editorRef.current.innerHTML)
+        }
+    }
+
+    // Initialize content only once or when radically changed externally (avoid cursor jumps)
+    React.useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== content) {
+            // Only update if significantly different to avoid cursor reset
+             // Simple check: if empty or strict mismatch when not focused
+            if (document.activeElement !== editorRef.current) {
+                editorRef.current.innerHTML = content
+            }
+        }
+    }, [content])
+
+    const handleFormat = (command: string, value?: string) => {
+        document.execCommand(command, false, value)
+        handleInput() // Sync immediately
+    }
+
+    // Logic: If selection exists, it applies to selection. If collapsed (cursor), find the parent block element and apply class/style?
+    // standard execCommand 'bold' works on selection or toggles style for future typing. 
+    // To "bold the whole line" if no selection, we need custom logic.
+    const handleSmartFormat = (command: string) => {
+        const selection = window.getSelection()
+        if (!selection || !editorRef.current) return
+
+        if (selection.isCollapsed) {
+            // No text selected -> Apply to current block/line
+            const range = selection.getRangeAt(0)
+            let node = range.commonAncestorContainer as HTMLElement | null
+            
+            // Traverse up to find the block element (P, LI, H1, H2, DIV) inside the editor
+            while (node && node !== editorRef.current) {
+                const tag = node.nodeName.toUpperCase()
+                if (['P', 'LI', 'H1', 'H2', 'DIV'].includes(tag)) {
+                    break
+                }
+                node = node.parentElement
+            }
+
+            if (node && node !== editorRef.current) {
+                // Select the whole node content
+                const newRange = document.createRange()
+                newRange.selectNodeContents(node)
+                selection.removeAllRanges()
+                selection.addRange(newRange)
+                
+                // Execute command
+                document.execCommand(command, false)
+                
+                // Collapse to end (optional, usually better UX)
+                selection.collapseToEnd()
+                handleInput()
+                return
+            }
+        }
+        
+        // Default behavior (selected text or inline toggle)
+        document.execCommand(command, false)
+        handleInput()
+    }
+
+    const downloadDoc = () => {
+        // Extract Name from H1 if possible
+        let filename = "Document.doc"
+        if (editorRef.current) {
+            const h1 = editorRef.current.querySelector('h1')
+            if (h1 && h1.innerText.trim()) {
+                const name = h1.innerText.trim().replace(/[^a-z0-9]/gi, '_')
+                filename = `${name}.doc`
+            }
+        }
+
+        // Simple HTML-to-Word export
+        const header = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <meta charset='utf-8'>
+                <title>Document</title>
+                <style>
+                    @page {
+                        margin: 0.5in;
+                    }
+                    body { 
+                        font-family: ${settings.fontStyle === 'serif' ? '"Times New Roman", serif' : 'Inter, sans-serif'}; 
+                        font-size: ${settings.pSize}pt; 
+                        margin: 0.5in;
+                    }
+                    h1 { font-size: ${settings.h1Size}pt; }
+                    h2 { font-size: ${settings.h2Size}pt; }
+                    p, li, div { font-size: ${settings.pSize}pt; }
+                </style>
+            </head><body>`
+        const footer = "</body></html>"
+        const sourceHTML = header + content + footer
+        
+        const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML)
+        const fileDownload = document.createElement("a")
+        document.body.appendChild(fileDownload)
+        fileDownload.href = source
+        fileDownload.download = filename
+        fileDownload.click()
+        document.body.removeChild(fileDownload)
+    }
+
+    // Determine current block type and size
+    const getSelectionInfo = () => {
+        const selection = window.getSelection()
+        if (!selection || !selection.rangeCount) return { tag: 'P', size: settings.pSize }
+        
+        let node = selection.anchorNode
+        // Traverse up to find block
+        while (node && node !== editorRef.current) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tag = (node as HTMLElement).tagName
+                if (tag === 'H1') return { tag: 'H1', size: settings.h1Size }
+                if (tag === 'H2') return { tag: 'H2', size: settings.h2Size }
+                if (tag === 'P' || tag === 'LI' || tag === 'DIV') return { tag: 'P', size: settings.pSize }
+            }
+            node = node.parentNode
+        }
+        return { tag: 'P', size: settings.pSize }
+    }
+
+    const [selectedFontSize, setSelectedFontSize] = React.useState(settings.pSize)
+    const [fontSizeInput, setFontSizeInput] = React.useState(settings.pSize.toString())
+    const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
+    const toolbarRef = React.useRef<HTMLDivElement>(null)
+    const [toolbarWidth, setToolbarWidth] = React.useState(0)
+    
+    // Watch for selection changes to update font size display
+    React.useEffect(() => {
+        const handleSelectionChange = () => {
+            const selection = window.getSelection()
+            if (!selection || !selection.rangeCount) return
+            
+            // Try to detect font size of selection (for inline spans)
+            // If no inline span, fall back to Category size
+            const range = selection.getRangeAt(0)
+            const parent = range.commonAncestorContainer.parentElement
+            
+            let size = 0
+            // Check if parent has inline style fontSize (override)
+            if (parent && parent.style.fontSize) {
+                 const parsed = parseFloat(parent.style.fontSize)
+                 if (!isNaN(parsed)) {
+                     size = Math.round(parsed)
+                 }
+            }
+            
+            // Otherwise use category size
+            if (!size) {
+                const info = getSelectionInfo()
+                size = info.size
+            }
+
+            setSelectedFontSize(size)
+            if (!isEditingFontSize) {
+                setFontSizeInput(size.toString())
+            }
+        }
+        
+        document.addEventListener('selectionchange', handleSelectionChange)
+        return () => document.removeEventListener('selectionchange', handleSelectionChange)
+    }, [settings.h1Size, settings.h2Size, settings.pSize, isEditingFontSize])
+
+    // Watch toolbar width for responsive layout
+    React.useEffect(() => {
+        if (!toolbarRef.current) return
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setToolbarWidth(entry.contentRect.width)
+            }
+        })
+        observer.observe(toolbarRef.current)
+        return () => observer.disconnect()
+    }, [])
+
+    const updateFontSize = (newSize: number) => {
+        const size = Math.max(8, Math.min(72, newSize))
+        
+        const selection = window.getSelection()
+        if (selection && !selection.isCollapsed) {
+            // 1. Text Selection -> Apply inline span override
+            const span = document.createElement("span")
+            span.style.fontSize = `${size}px`
+            const range = selection.getRangeAt(0)
+            const content = range.extractContents()
+            span.appendChild(content)
+            range.insertNode(span)
+            handleInput()
+        } else {
+            // 2. Cursor (Collapsed) -> Update Category Setting
+            const info = getSelectionInfo()
+            if (info.tag === 'H1') {
+                onSettingsChange({ ...settings, h1Size: size })
+            } else if (info.tag === 'H2') {
+                onSettingsChange({ ...settings, h2Size: size })
+            } else {
+                onSettingsChange({ ...settings, pSize: size })
+            }
+        }
+        setSelectedFontSize(size)
+        // If not manually editing input, sync the input
+        if (!isEditingFontSize) {
+            setFontSizeInput(size.toString())
+        }
+    }
+
+    const handleFontSizeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value
+        setFontSizeInput(val)
+        
+        if (val === "") return
+
+        const num = parseInt(val)
+        if (!isNaN(num)) {
+            // Update the font size but don't force-sync input (let user type)
+            updateFontSize(num)
+        }
+    }
+
+    const handleBlur = () => {
+        setIsEditingFontSize(false)
+        let num = parseInt(fontSizeInput)
+        if (isNaN(num)) {
+             num = selectedFontSize // Revert to current actual size if invalid
+        }
+        // Apply clamp on blur
+        const clamped = Math.max(8, Math.min(72, num))
+        updateFontSize(clamped)
+        setFontSizeInput(clamped.toString())
+    }
+
+    const isCompact = toolbarWidth < 300 // Hide text if very narrow
+
+    return (
+        <div data-layer="doc editor" className="DocEditor" style={{
+            width: '100%', 
+            height: '100%', 
+            position: 'relative', 
+            background: 'white', 
+            overflow: 'hidden', 
+            // Removed borderRadius, padding, boxShadow to match Whiteboard/ScreenShare
+        }}>
+            <div 
+                ref={toolbarRef}
+                data-layer="Frame 1000007263" 
+                className="Frame1000007263" 
+                style={{
+                    position: 'absolute', 
+                    top: 16,
+                    left: "50%",
+                    transform: "translateX(-50%)", 
+                    width: "auto",
+                    maxWidth: "90%",
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    display: 'flex', 
+                    zIndex: 10,
+                    background: "#F5F5F5",
+                    borderRadius: 28,
+                    padding: 4,
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
+                }}
+            >
+                <div data-layer="Frame 1000007257" className="Frame1000007257" style={{padding: 4, background: 'transparent', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'flex', flexShrink: 0}}>
+                    {/* Font Style Toggle */}
+                    <div 
+                        data-layer="Frame 1000007258" 
+                        className="Frame1000007258" 
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => onSettingsChange({...settings, fontStyle: settings.fontStyle === 'serif' ? 'sans' : 'serif'})}
+                        style={{width: 72, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}
+                    >
+                        <div data-layer="Modern" className="Modern" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                            {settings.fontStyle === 'serif' ? 'Classic' : 'Modern'}
+                        </div>
+                    </div>
+
+                    {/* Font Size Controls */}
+                    <div data-layer="Frame 1000007259" className="Frame1000007259" style={{height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex'}}>
+                        <div onMouseDown={(e) => e.preventDefault()} onClick={() => updateFontSize(selectedFontSize - 1)} style={{cursor: 'pointer', padding: '0 4px'}}>
+                            <div data-svg-wrapper data-layer="Frame 1000007260" className="Frame1000007260">
+                                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M0.599609 14H9.59961" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <input 
+                            value={fontSizeInput} 
+                            onChange={handleFontSizeInput}
+                            onFocus={() => setIsEditingFontSize(true)}
+                            onBlur={handleBlur}
+                            type="number"
+                            style={{
+                                width: 24, 
+                                border: 'none', 
+                                background: 'transparent', 
+                                textAlign: 'center', 
+                                fontSize: 14, 
+                                fontFamily: 'Inter', 
+                                outline: 'none',
+                                padding: 0,
+                                appearance: 'textfield',
+                                WebkitAppearance: 'none',
+                                margin: 0
+                            }}
+                        />
+                        <div onMouseDown={(e) => e.preventDefault()} onClick={() => updateFontSize(selectedFontSize + 1)} style={{cursor: 'pointer', padding: '0 4px'}}>
+                            <div data-svg-wrapper data-layer="Frame 1000007261" className="Frame1000007261">
+                                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9.59961 14H5.09961M5.09961 14H0.599609M5.09961 14V9.5M5.09961 14V18.5" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bold */}
+                    <div 
+                        data-layer="Frame 1000007260" 
+                        className="Frame1000007260" 
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSmartFormat('bold')}
+                        style={{width: 32, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}
+                    >
+                        <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '700', lineHeight: "19.32px", wordWrap: 'break-word'}}>B</div>
+                    </div>
+
+                    {/* Italic */}
+                    <div 
+                        data-svg-wrapper 
+                        data-layer="Frame 1000007261" 
+                        className="Frame1000007261"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSmartFormat('italic')}
+                        style={{width: 32, height: 32, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'white', borderRadius: 28, cursor: 'pointer'}}
+                    >
+                        <span style={{ color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Times New Roman', fontStyle: 'italic', fontWeight: 400 }}>I</span>
+                    </div>
+
+                    {/* List */}
+                    <div 
+                        data-svg-wrapper 
+                        data-layer="Frame 1000007262" 
+                        className="Frame1000007262"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleFormat('insertUnorderedList')}
+                        style={{width: 32, height: 32, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'white', borderRadius: 28, cursor: 'pointer'}}
+                    >
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="32" height="32" rx="16" fill="white"/>
+                            <path d="M9 11.6C9 11.4409 9.06321 11.2883 9.17574 11.1757C9.28826 11.0632 9.44087 11 9.6 11H10.4C10.5591 11 10.7117 11.0632 10.8243 11.1757C10.9368 11.2883 11 11.4409 11 11.6C11 11.7591 10.9368 11.9117 10.8243 12.0243C10.7117 12.1368 10.5591 12.2 10.4 12.2H9.6C9.44087 12.2 9.28826 12.1368 9.17574 12.0243C9.06321 11.9117 9 11.7591 9 11.6ZM12.2 11.6C12.2 11.4409 12.2632 11.2883 12.3757 11.1757C12.4883 11.0632 12.6409 11 12.8 11H22.4C22.5591 11 22.7117 11.0632 22.8243 11.1757C22.9368 11.2883 23 11.4409 23 11.6C23 11.7591 22.9368 11.9117 22.8243 12.0243C22.7117 12.1368 22.5591 12.2 22.4 12.2H12.8C12.6409 12.2 12.4883 12.1368 12.3757 12.0243C12.2632 11.9117 12.2 11.7591 12.2 11.6ZM9 16C9 15.8409 9.06321 15.6883 9.17574 15.5757C9.28826 15.4632 9.44087 15.4 9.6 15.4H10.4C10.5591 15.4 10.7117 15.4632 10.8243 15.5757C10.9368 15.6883 11 15.8409 11 16C11 16.1591 10.9368 16.3117 10.8243 16.4243C10.7117 16.5368 10.5591 16.6 10.4 16.6H9.6C9.44087 16.6 9.28826 16.5368 9.17574 16.4243C9.06321 16.3117 9 16.1591 9 16ZM12.2 16C12.2 15.8409 12.2632 15.6883 12.3757 15.5757C12.4883 15.4632 12.6409 15.4 12.8 15.4H22.4C22.5591 15.4 22.7117 15.4632 22.8243 15.5757C22.9368 15.6883 23 15.8409 23 16C23 16.1591 22.9368 16.3117 22.8243 16.4243C22.7117 16.5368 22.5591 16.6 22.4 16.6H12.8C12.6409 16.6 12.4883 16.5368 12.3757 16.4243C12.2632 16.3117 12.2 16.1591 12.2 16ZM9 20.4C9 20.2409 9.06321 20.0883 9.17574 19.9757C9.28826 19.8632 9.44087 19.8 9.6 19.8H10.4C10.5591 19.8 10.7117 19.8632 10.8243 19.9757C10.9368 20.0883 11 20.2409 11 20.4C11 20.5591 10.9368 20.7117 10.8243 20.8243C10.7117 20.9368 10.5591 21 10.4 21H9.6C9.44087 21 9.28826 20.9368 9.17574 20.8243C9.06321 20.7117 9 20.5591 9 20.4ZM12.2 20.4C12.2 20.2409 12.2632 20.0883 12.3757 19.9757C12.4883 19.8632 12.6409 19.8 12.8 19.8H22.4C22.5591 19.8 22.7117 19.8632 22.8243 19.9757C22.9368 20.0883 23 20.2409 23 20.4C23 20.5591 22.9368 20.7117 22.8243 20.8243C22.7117 20.9368 22.5591 21 22.4 21H12.8C12.6409 21 12.4883 20.9368 12.3757 20.8243C12.2632 20.7117 12.2 20.5591 12.2 20.4Z" fill="black" fillOpacity="0.95"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div data-layer="Frame 1000007258" className="Frame1000007258" style={{height: 40, padding: 4, background: 'transparent', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 10, display: 'flex', flexShrink: 0}}>
+                    <div 
+                        data-layer="Frame 1000007258" 
+                        className="Frame1000007258" 
+                        onClick={downloadDoc}
+                        style={{height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex', cursor: 'pointer', background: 'white'}}
+                    >
+                        {!isCompact && (
+                            <div data-layer="Download" className="Download" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Download</div>
+                        )}
+                        <div data-svg-wrapper data-layer="Frame 1000007260" className="Frame1000007260">
+                            <svg width="13" height="28" viewBox="0 0 13 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M0.601562 16.6641V17.371C0.601562 17.9356 0.825871 18.4771 1.22514 18.8764C1.62441 19.2757 2.16594 19.5 2.73059 19.5H9.82737C10.392 19.5 10.9336 19.2757 11.3328 18.8764C11.7321 18.4771 11.9564 17.9356 11.9564 17.371V16.6613M6.27898 8.5V16.3065M6.27898 16.3065L8.76285 13.8226M6.27898 16.3065L3.79511 13.8226" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* EDITOR AREA */}
+            <div 
+                className="DocContentArea"
+                style={{ 
+                    width: "100%",
+                    height: "100%",
+                    flex: 1, 
+                    marginTop: 0,
+                    paddingTop: 80,
+                    overflowY: 'auto', 
+                    color: 'black',
+                    fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif',
+                    fontSize: `${settings.pSize}px`, // Use Body size as base
+                    lineHeight: 1.5,
+                    outline: 'none',
+                    paddingLeft: 24,
+                    paddingRight: 24,
+                    paddingBottom: 24
+                }}
+            >
+                <div 
+                    ref={editorRef}
+                    contentEditable
+                    onInput={handleInput}
+                    suppressContentEditableWarning={true}
+                    style={{ minHeight: "100%", outline: "none" }}
+                />
+            </div>
+            
+             <style>{`
+                .DocContentArea ul { padding-left: 20px; margin: 8px 0; }
+                .DocContentArea ol { padding-left: 20px; margin: 8px 0; }
+                .DocContentArea h1 { font-size: ${settings.h1Size}px; font-weight: bold; margin: 0.5em 0; border-bottom: 1px solid #ddd; }
+                .DocContentArea h2 { font-size: ${settings.h2Size}px; font-weight: bold; margin: 0.5em 0; }
+                .DocContentArea p { margin: 0.5em 0; }
+                /* Hide number input spinners */
+                input[type=number]::-webkit-inner-spin-button, 
+                input[type=number]::-webkit-outer-spin-button { 
+                    -webkit-appearance: none; 
+                    margin: 0; 
+                }
+                input[type=number] {
+                    -moz-appearance: textfield;
+                }
+            `}</style>
+        </div>
+    )
+})
+
 // --- HELPER COMPONENT: CHAT INPUT BAR ---
 interface ChatInputProps {
     value: string
@@ -867,6 +1308,8 @@ interface ChatInputProps {
     isScreenSharing?: boolean
     isWhiteboardOpen?: boolean
     toggleWhiteboard?: () => void
+    isResumeOpen?: boolean
+    toggleResume?: () => void
     isConnected?: boolean
     isMobileLayout?: boolean
     isLiveMode?: boolean
@@ -891,6 +1334,8 @@ const ChatInput = React.memo(function ChatInput({
     isScreenSharing = false,
     isWhiteboardOpen = false,
     toggleWhiteboard,
+    isResumeOpen = false,
+    toggleResume,
     isConnected = false,
     isMobileLayout = false,
     isLiveMode = false,
@@ -1166,6 +1611,41 @@ const ChatInput = React.memo(function ChatInput({
                                     <div className="WhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Whiteboard</div>
                                 </>
                             )}
+                        </div>
+
+                        {/* Resume */}
+                        <div 
+                            data-layer="resume" 
+                            className="Resume" 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (toggleResume) toggleResume()
+                                setShowMenu(false)
+                            }}
+                            style={{
+                                ...styles.menuItem,
+                                height: isMobileLayout ? 44 : 36
+                            }}
+                            onMouseEnter={(e) => {
+                                if (isMobileLayout) return
+                                if (isResumeOpen) {
+                                    Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
+                                } else {
+                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent"
+                            }}
+                        >
+                            <div data-svg-wrapper className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9.33333 1.33333H2.66667C1.93029 1.33333 1.33333 1.93029 1.33333 2.66667V13.3333C1.33333 14.0697 1.93029 14.6667 2.66667 14.6667H11.3333C12.0697 14.6667 12.6667 14.0697 12.6667 13.3333V4.66667M9.33333 1.33333L12.6667 4.66667M9.33333 1.33333V4.66667H12.6667M10.6667 8.66667H3.33333M10.6667 11.3333H3.33333" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div className="ResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                                {isResumeOpen ? "Close Doc" : "Doc Editor"}
+                            </div>
                         </div>
 
                         {isConnected && !isLiveMode && (
@@ -2219,6 +2699,46 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] = React.useState(false)
+    
+    // --- STATE: RESUME EDITOR ---
+    const [isResumeOpen, setIsResumeOpen] = React.useState(false)
+    const [resumeContent, setResumeContent] = React.useState(`
+<h1 style="text-align: center;">[Your Name]</h1>
+<p style="text-align: center;">[City, State, Zip] | [Phone] | [Email]</p>
+<hr />
+<h2>Professional Experience</h2>
+<p><strong>[Job Title]</strong>, [Company Name] | [Dates]</p>
+<ul>
+<li>[Responsibility or Achievement]</li>
+<li>[Responsibility or Achievement]</li>
+</ul>
+<p><strong>[Job Title]</strong>, [Company Name] | [Dates]</p>
+<ul>
+<li>[Responsibility or Achievement]</li>
+<li>[Responsibility or Achievement]</li>
+</ul>
+<h2>Education</h2>
+<p><strong>[Degree]</strong>, [University Name] | [Graduation Date]</p>
+<h2>Skills</h2>
+<ul>
+<li>[Skill 1], [Skill 2], [Skill 3]</li>
+</ul>
+    `.trim())
+    interface ResumeSettings {
+        fontStyle: 'serif' | 'sans';
+        fontSize: number; // Base font size
+        h1Size: number;
+        h2Size: number;
+        pSize: number;
+    }
+
+    const [resumeSettings, setResumeSettings] = React.useState<ResumeSettings>({ 
+        fontStyle: 'sans', 
+        fontSize: 11,
+        h1Size: 22, // 2em approx
+        h2Size: 16.5, // 1.5em approx
+        pSize: 11 // 1em approx
+    })
     const [remoteCursor, setRemoteCursor] = React.useState<{ x: number, y: number, color: string } | null>(null)
     const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)
     const myCursorColor = React.useRef(getRandomRainbowColor())
@@ -2298,6 +2818,7 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [])
 
     const isWhiteboardOpenRef = React.useRef(false)
+    const docTimeoutRef = React.useRef<any>(null) // Debounce for doc editor
     React.useEffect(() => { isWhiteboardOpenRef.current = isWhiteboardOpen }, [isWhiteboardOpen])
 
     const hasWhiteboardStartedRef = React.useRef(false)
@@ -3493,6 +4014,15 @@ export default function OmegleMentorshipUI(props: Props) {
         setIsScreenSharing(false)
     }, [])
 
+    const toggleResume = React.useCallback(() => {
+        setIsResumeOpen(v => !v)
+        // Ensure only one major overlay is open
+        if (!isResumeOpen) { // Will become true
+            if (isWhiteboardOpen) setIsWhiteboardOpen(false)
+            if (isScreenSharing) stopLocalScreenShare()
+        }
+    }, [isResumeOpen, isWhiteboardOpen, isScreenSharing, stopLocalScreenShare])
+
     const toggleWhiteboard = React.useCallback(() => {
         if (isWhiteboardOpen) {
             log("Stopping whiteboard...")
@@ -3523,6 +4053,16 @@ export default function OmegleMentorshipUI(props: Props) {
             }
         }
     }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare])
+
+    const handleDocChange = React.useCallback((content: string) => {
+        setResumeContent(content)
+        if (docTimeoutRef.current) clearTimeout(docTimeoutRef.current)
+        docTimeoutRef.current = setTimeout(() => {
+            if (dataConnectionRef.current) {
+                dataConnectionRef.current.send({ type: 'doc-update', payload: content })
+            }
+        }, 500)
+    }, [])
 
     const handleWhiteboardPointerMove = React.useCallback((e: React.PointerEvent) => {
         if (!isWhiteboardOpen || !dataConnectionRef.current || !dataConnectionRef.current.open) return
@@ -4065,6 +4605,8 @@ export default function OmegleMentorshipUI(props: Props) {
 
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
+            } else if (data.type === 'doc-update') {
+                setResumeContent(data.payload)
             } else if (data.type === 'tldraw-start') {
                 log("Received tldraw-start command")
                 if (isScreenSharingRef.current) stopLocalScreenShare()
@@ -4208,7 +4750,6 @@ export default function OmegleMentorshipUI(props: Props) {
             }
 
             // Map peer messages to 'user' for Gemini context
-            // Limit history to prevent excessive context
             const history = messages
                 .slice(-MAX_HISTORY_MESSAGES)
                 .map(m => ({
@@ -4216,15 +4757,37 @@ export default function OmegleMentorshipUI(props: Props) {
                     parts: [{ text: m.text }]
                 }))
 
+            // Define Tools
+            const tools = [
+                {
+                    functionDeclarations: [
+                        {
+                            name: "update_resume",
+                            description: "Updates the user's resume content. Use this when the user asks to add, edit, or create resume sections. Provide the FULL content in HTML format suitable for a resume.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    content: {
+                                        type: "STRING",
+                                        description: "The full HTML content of the resume. Use <h1> for name, <h2> for sections, <ul>/<li> for lists, <b>/<strong> for bold, etc."
+                                    }
+                                },
+                                required: ["content"]
+                            }
+                        }
+                    ]
+                }
+            ]
+
             const payload: any = {
                 contents: [
                     ...history,
                     { role: "user", parts: userContent }
                 ],
+                tools: tools,
                 generationConfig: {
-                    thinkingConfig: {
-                        thinkingBudget: 0
-                    }
+                    temperature: 0.7,
+                    maxOutputTokens: 2048,
                 }
             }
 
@@ -4232,12 +4795,12 @@ export default function OmegleMentorshipUI(props: Props) {
 
             if (currentSystemPrompt.trim()) {
                 payload.systemInstruction = {
-                    parts: [{ text: currentSystemPrompt }]
+                    parts: [{ text: currentSystemPrompt + " If the user asks to edit their resume, use the update_resume tool. Always maintain a professional, clean structure." }]
                 }
             }
 
             const fetchPromise = fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}&alt=sse`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -4264,63 +4827,48 @@ export default function OmegleMentorshipUI(props: Props) {
                 return
             }
 
-            if (!response.body) {
-                setMessages(prev => [...prev, { role: "model", text: "Error: No response from Gemini." }])
-                return
+            const data = await response.json()
+            
+            if (!data.candidates || data.candidates.length === 0) {
+                throw new Error("No response from AI")
             }
 
-            setMessages(prev => [...prev, { role: "model", text: "" }])
+            const candidate = data.candidates[0]
+            const content = candidate.content
+            const messageParts = content.parts || []
+            
+            let aiText = ""
+            let functionCall = null
 
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-            let buffer = ""
+            for (const part of messageParts) {
+                if (part.text) aiText += part.text
+                if (part.functionCall) functionCall = part.functionCall
+            }
 
-            while (true) {
-                if (controller.signal.aborted) break
-                const { done, value } = await reader.read()
-                if (done) break
-
-                const chunk = decoder.decode(value, { stream: true })
-                buffer += chunk
-                const lines = buffer.split("\n")
-                buffer = lines.pop() || ""
-
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        try {
-                            const jsonStr = line.substring(5).trim()
-                            if (!jsonStr) continue
-                            const json = JSON.parse(jsonStr)
-                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text
-                            if (text) {
-                                setMessages(prev => {
-                                    const newMessages = [...prev]
-                                    const lastMsg = newMessages[newMessages.length - 1]
-                                    if (lastMsg && lastMsg.role === "model") {
-                                        newMessages[newMessages.length - 1] = {
-                                            ...lastMsg,
-                                            text: lastMsg.text + text
-                                        }
-                                        return newMessages
-                                    }
-                                    return prev
-                                })
-                            }
-                        } catch (e) {
-                            console.error("Error parsing stream line", e)
-                        }
-                    }
+            // Handle Tool Call
+            if (functionCall) {
+                if (functionCall.name === "update_resume") {
+                    const newContent = functionCall.args.content
+                    setResumeContent(newContent)
+                    if (!isResumeOpen) setIsResumeOpen(true) // Auto-open
+                    
+                    if (!aiText) aiText = "I've updated your resume."
                 }
             }
-        } catch (error: any) {
-            if (error.name === 'AbortError') return
-            console.error("Network Error:", error)
-            setMessages(prev => [...prev, { role: "model", text: `Error connecting to Gemini: ${error.message}` }])
+
+            if (aiText) {
+                setMessages(prev => [...prev, { role: "model", text: aiText }])
+            }
+            
+        } catch (err: any) {
+            if (err.name === 'AbortError') return
+            console.error("AI Error:", err)
+            setMessages(prev => [...prev, { role: "model", text: "Sorry, I encountered an error processing that request." }])
         } finally {
             setIsLoading(false)
             abortControllerRef.current = null
         }
-    }, [geminiApiKey, messages, model, getSystemPromptWithContext])
+    }, [messages, systemPrompt, model, geminiApiKey, isResumeOpen, getSystemPromptWithContext])
 
     const handleIncomingPeerMessage = React.useCallback((payload: any) => {
         const peerMsg: Message = {
@@ -4480,9 +5028,14 @@ export default function OmegleMentorshipUI(props: Props) {
                 sharedScreenSize
             )
 
-            setChatHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)))
+            // When overlay is active (resume, screen share, whiteboard), allow pulling down further
+            // Default minHeight is typically strict (e.g. 200px), but if we want to show more of the top content, we need a smaller min height for chat
+            const isOverlayActive = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isResumeOpen
+            const effectiveMinHeight = isOverlayActive ? 100 : minHeight
+
+            setChatHeight(Math.max(effectiveMinHeight, Math.min(newHeight, maxHeight)))
         })
-    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, sharedScreenSize, calculateHeightConstraints])
+    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isResumeOpen, sharedScreenSize, calculateHeightConstraints])
 
     const handlePointerUp = React.useCallback(() => {
         isDragging.current = false
@@ -4513,6 +5066,10 @@ export default function OmegleMentorshipUI(props: Props) {
                 activeWidth = 1920
                 activeHeight = 1080
             }
+        } else if (isResumeOpen) {
+             // A4 aspect ratio (595 x 842)
+             activeWidth = 595
+             activeHeight = 842
         } else {
             activeWidth = sharedScreenSize?.width
             activeHeight = sharedScreenSize?.height
@@ -4555,7 +5112,7 @@ export default function OmegleMentorshipUI(props: Props) {
             height: finalH,
             flex: "none" // Disable flex growing to enforce size
         }
-    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize, isWhiteboardOpen])
+    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize, isWhiteboardOpen, isResumeOpen])
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
     const videoSectionHeight = containerSize.height - chatHeight - 40
@@ -4761,7 +5318,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen) ? (
+            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isResumeOpen) ? (
                 // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
                 <div style={{
                     flex: "1 1 0",
@@ -4906,7 +5463,9 @@ export default function OmegleMentorshipUI(props: Props) {
                     </div>
 
                     {/* MAIN AREA: SCREEN SHARE */}
-                    <div style={{
+                    <div 
+                        onPointerDown={handlePointerDown}
+                        style={{
                         flex: 1, // Take up all remaining space
                         width: "100%",
                         overflow: "hidden",
@@ -4917,7 +5476,9 @@ export default function OmegleMentorshipUI(props: Props) {
                         justifyContent: "center"
                     }}>
                         {/* Wrapper to enforce aspect ratio */}
-                        <div style={{
+                        <div 
+                            onPointerDown={(e) => e.stopPropagation()}
+                            style={{
                             position: "relative",
                             // Use calculated dimensions if available, otherwise 100%
                             ...screenShareContainerStyle,
@@ -4925,9 +5486,18 @@ export default function OmegleMentorshipUI(props: Props) {
                             maxWidth: "100%",
                             maxHeight: "100%",
                             borderRadius: 14, // Added rounded corners
-                            overflow: "hidden"
+                            overflow: "hidden",
+                            marginTop: 0,
+                            marginBottom: 0
                         }}>
-                            {isWhiteboardOpen ? (
+                            {isResumeOpen ? (
+                                <DocEditor 
+                                    content={resumeContent} 
+                                    onChange={handleDocChange}
+                                    settings={resumeSettings}
+                                    onSettingsChange={setResumeSettings}
+                                />
+                            ) : isWhiteboardOpen ? (
                                 <div 
                                     ref={whiteboardContainerRef}
                                     onPointerMove={handleWhiteboardPointerMove}
@@ -5243,6 +5813,8 @@ export default function OmegleMentorshipUI(props: Props) {
                         isScreenSharing={isScreenSharing}
                         isWhiteboardOpen={isWhiteboardOpen}
                         toggleWhiteboard={toggleWhiteboard}
+                        isResumeOpen={isResumeOpen}
+                        toggleResume={toggleResume}
                         isConnected={status === "connected" && !isLiveMode}
                         isMobileLayout={isMobileLayout}
                         isLiveMode={isLiveMode}
