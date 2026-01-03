@@ -5545,6 +5545,34 @@ export default function OmegleMentorshipUI(props: Props) {
                             marginTop: 0,
                             marginBottom: 0
                         }}>
+                            {/* Drag Handles (Left/Right) - Re-enable drag on edges for vertical resizing */}
+                            <div 
+                                onPointerDown={handlePointerDown}
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    bottom: 0,
+                                    left: 0,
+                                    width: 24, 
+                                    cursor: "ns-resize",
+                                    zIndex: 100, 
+                                    touchAction: "none"
+                                }}
+                            />
+                            <div 
+                                onPointerDown={handlePointerDown}
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    bottom: 0,
+                                    right: 0,
+                                    width: 24,
+                                    cursor: "ns-resize",
+                                    zIndex: 100,
+                                    touchAction: "none"
+                                }}
+                            />
+
                             {isResumeOpen ? (
                                 <DocEditor 
                                     content={resumeContent} 
