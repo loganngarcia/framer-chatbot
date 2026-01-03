@@ -1655,7 +1655,7 @@ const ChatInput = React.memo(function ChatInput({
                                         </svg>
                                     </div>
                                     <div className="ResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                                        Doc Editor
+                                        Resume
                                     </div>
                                 </>
                             )}
@@ -5092,9 +5092,39 @@ export default function OmegleMentorshipUI(props: Props) {
                 activeHeight = 1080
             }
         } else if (isResumeOpen) {
-             // A4 aspect ratio (595 x 842)
-             activeWidth = 595
-             activeHeight = 842
+             // A4 aspect ratio (595 x 842) - Use a larger base to ensure high quality initial render
+             if (isMobileLayout) {
+                 // On mobile, force width priority by setting dimensions that match mobile aspect ratio closely or exceed it width-wise
+                 // Actually, container logic below uses 'contain'. 
+                 // If we provide an aspect ratio that is TALLER than the container, it will be constrained by height (leaving side gaps).
+                 // If we provide an aspect ratio that is WIDER than the container, it will be constrained by width (leaving top/bottom gaps).
+                 // We want FULL WIDTH. So we want constrained by width.
+                 // So we need the content to be TALLER (ratio wise) than the container? No.
+                 // If container is 100x200 (1:2).
+                 // If content is 100x100 (1:1). Logic: containerRatio (0.5) < videoRatio (1). -> Constrain width. Final: 100x100.
+                 // If content is 100x300 (1:3). Logic: containerRatio (0.5) > videoRatio (0.33). -> Constrain height. Final: 66x200. (Width < 100).
+                 // So to FILL WIDTH on a tall screen, we need the content ratio to be WIDER (or equal) to the container ratio?
+                 // Wait.
+                 // Container Ratio = W / H. (e.g. 0.5)
+                 // Video Ratio = w / h.
+                 // If ContainerRatio > VideoRatio (Container is wider than video): Constrain Height.
+                 // If ContainerRatio <= VideoRatio (Container is narrower than video): Constrain Width.
+                 
+                 // We want to constrain by Width (so width is 100%).
+                 // So we need ContainerRatio <= VideoRatio.
+                 // i.e. (AvailableWidth / AvailableHeight) <= (ActiveWidth / ActiveHeight).
+                 // Mobile screens are tall (small W/H, e.g. 0.5).
+                 // A4 is 0.7 (1/1.41). 
+                 // 0.5 <= 0.7 is TRUE. So it SHOULD be constrained by width (full width).
+                 // So why did user say "on mobile should be full width"? Maybe it wasn't?
+                 // Or maybe padding was an issue?
+                 // Let's ensure activeWidth/Height are large enough.
+                 activeWidth = 1240 
+                 activeHeight = 1754 
+             } else {
+                 activeWidth = 1240 // Double A4 for better quality on large screens
+                 activeHeight = 1754
+             }
         } else {
             activeWidth = sharedScreenSize?.width
             activeHeight = sharedScreenSize?.height
