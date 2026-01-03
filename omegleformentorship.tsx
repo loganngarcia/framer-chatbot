@@ -1645,17 +1645,17 @@ const ChatInput = React.memo(function ChatInput({
                                         <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </svg>
                                     </div>
-                                    <div className="StopResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop resume</div>
+                                    <div className="StopResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop notes</div>
                                 </>
                             ) : (
                                 <>
-                                    <div data-svg-wrapper className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M9.33333 1.33333H2.66667C1.93029 1.33333 1.33333 1.93029 1.33333 2.66667V13.3333C1.33333 14.0697 1.93029 14.6667 2.66667 14.6667H11.3333C12.0697 14.6667 12.6667 14.0697 12.6667 13.3333V4.66667M9.33333 1.33333L12.6667 4.66667M9.33333 1.33333V4.66667H12.6667M10.6667 8.66667H3.33333M10.6667 11.3333H3.33333" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <div data-svg-wrapper data-layer="Vector" className="Vector" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                        <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M0.599609 11.0021L8.48004 11.0018M0.599609 5.64345H15.0996M0.599609 0.599976H15.0996" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </svg>
                                     </div>
                                     <div className="ResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                                        Resume
+                                        Notes
                                     </div>
                                 </>
                             )}
