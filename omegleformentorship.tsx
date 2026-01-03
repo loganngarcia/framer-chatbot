@@ -3697,7 +3697,10 @@ export default function OmegleMentorshipUI(props: Props) {
     const [sharedScreenSize, setSharedScreenSize] = React.useState<{ width: number, height: number } | null>(null)
     const isDragging = React.useRef(false)
     const dragStartY = React.useRef(0)
+    const dragStartX = React.useRef(0) // Added for horizontal drag
     const dragStartHeight = React.useRef(0)
+    const dragMode = React.useRef<'vertical' | 'left' | 'right'>('vertical') // Added mode
+    const dragStartRatio = React.useRef(1) // Added ratio capture
     const containerRef = React.useRef<HTMLDivElement>(null)
     const rafRef = React.useRef<number | null>(null)
     const hasInitialResized = React.useRef(false)
@@ -5019,11 +5022,27 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- DRAG-TO-RESIZE LOGIC ---
 
-    const handlePointerDown = React.useCallback((e: React.PointerEvent) => {
+    const handlePointerDown = React.useCallback((e: React.PointerEvent, mode: 'vertical' | 'left' | 'right' = 'vertical') => {
         e.preventDefault()
+        e.stopPropagation() // Prevent bubbling to parent handlers
+        
         isDragging.current = true
+        dragMode.current = mode
         dragStartY.current = e.clientY
+        dragStartX.current = e.clientX
         dragStartHeight.current = chatHeight
+        
+        // Calculate current aspect ratio if needed
+        // Ratio = Width / Height
+        // We can get this from the screenShareContainerStyle logic or element, 
+        // but here we just need a snapshot.
+        // Let's approximate from current state.
+        
+        // Find the active element to measure? Or use the stored active dimensions?
+        // We have `screenShareContainerStyle` memoized, but not accessible here directly?
+        // Actually we do since this is inside the component.
+        // But `screenShareContainerStyle` is calculated during render.
+        // We can use a ref to store the last calculated ratio.
         
         window.addEventListener("pointermove", handlePointerMove)
         window.addEventListener("pointerup", handlePointerUp)
@@ -5037,9 +5056,6 @@ export default function OmegleMentorshipUI(props: Props) {
         if (rafRef.current) cancelAnimationFrame(rafRef.current)
         
         rafRef.current = requestAnimationFrame(() => {
-            const deltaY = dragStartY.current - e.clientY
-            const newHeight = dragStartHeight.current + deltaY
-            
             const containerHeight = containerRef.current?.clientHeight || window.innerHeight
             const containerWidth = containerRef.current?.clientWidth || window.innerWidth
 
@@ -5054,9 +5070,55 @@ export default function OmegleMentorshipUI(props: Props) {
             )
 
             // When overlay is active (resume, screen share, whiteboard), allow pulling down further
-            // Default minHeight is typically strict (e.g. 200px), but if we want to show more of the top content, we need a smaller min height for chat
             const isOverlayActive = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isResumeOpen
             const effectiveMinHeight = isOverlayActive ? 100 : minHeight
+
+            let newHeight = dragStartHeight.current
+
+            if (dragMode.current === 'vertical') {
+                const deltaY = dragStartY.current - e.clientY
+                newHeight = dragStartHeight.current + deltaY
+            } else {
+                // Horizontal Drag Logic
+                // We need to map horizontal pixels to vertical pixels via aspect ratio.
+                // Current Width / Current Content Height (Height of the view area, NOT chat height)
+                
+                // ContentHeight = ContainerHeight - ChatHeight - TopUI
+                // But this depends on ChatHeight! Circular?
+                // StartContentHeight = ContainerHeight - dragStartHeight.current - TopUI
+                
+                // Let's get the active ratio (W/H)
+                let ratio = 16/9
+                if (isWhiteboardOpen) {
+                    ratio = isMobileLayout ? 1080/1350 : 1920/1080
+                } else if (isResumeOpen) {
+                    ratio = 1240/1754
+                } else if (sharedScreenSize) {
+                    ratio = sharedScreenSize.width / sharedScreenSize.height
+                }
+
+                // Delta X
+                let deltaX = 0
+                if (dragMode.current === 'left') {
+                    deltaX = dragStartX.current - e.clientX // Left expands
+                } else {
+                    deltaX = e.clientX - dragStartX.current // Right expands
+                }
+                
+                // Delta Height (Content) = Delta Width / Ratio
+                // If width increases, height increases (to maintain ratio).
+                // If content height increases, chat height decreases.
+                
+                // But wait, the container logic CONSTRAINS dimensions.
+                // If we increase "requested" size, the container logic fits it.
+                // We are essentially changing the "split".
+                
+                // Let's assume 1px width change ~= 1/Ratio px height change.
+                const deltaContentHeight = deltaX / ratio
+                
+                // New Chat Height = Start Chat Height - Delta Content Height
+                newHeight = dragStartHeight.current - deltaContentHeight
+            }
 
             setChatHeight(Math.max(effectiveMinHeight, Math.min(newHeight, maxHeight)))
         })
@@ -5540,39 +5602,40 @@ export default function OmegleMentorshipUI(props: Props) {
                             // Ensure it never exceeds the parent flex container
                             maxWidth: "100%",
                             maxHeight: "100%",
-                            borderRadius: 14, // Added rounded corners
-                            overflow: "hidden",
+                            // borderRadius: 14, // Removed from here to allow handles to bleed
+                            // overflow: "hidden", // Removed from here
                             marginTop: 0,
                             marginBottom: 0
                         }}>
                             {/* Drag Handles (Left/Right) - Re-enable drag on edges for vertical resizing */}
                             <div 
-                                onPointerDown={handlePointerDown}
+                                onPointerDown={(e) => handlePointerDown(e, 'left')}
                                 style={{
                                     position: "absolute",
                                     top: 0,
                                     bottom: 0,
-                                    left: 0,
+                                    left: -12, // Extend outside
                                     width: 24, 
-                                    cursor: "ns-resize",
+                                    cursor: "ew-resize", // Changed to ew-resize
                                     zIndex: 100, 
                                     touchAction: "none"
                                 }}
                             />
                             <div 
-                                onPointerDown={handlePointerDown}
+                                onPointerDown={(e) => handlePointerDown(e, 'right')}
                                 style={{
                                     position: "absolute",
                                     top: 0,
                                     bottom: 0,
-                                    right: 0,
+                                    right: -12, // Extend outside
                                     width: 24,
-                                    cursor: "ns-resize",
+                                    cursor: "ew-resize", // Changed to ew-resize
                                     zIndex: 100,
                                     touchAction: "none"
                                 }}
                             />
 
+                            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: 14, position: "relative" }}>
                             {isResumeOpen ? (
                                 <DocEditor 
                                     content={resumeContent} 
@@ -5622,6 +5685,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     />
                                 </>
                             )}
+                            </div>
                         </div>
                     </div>
                 </div>
