@@ -3094,6 +3094,9 @@ export default function OmegleMentorshipUI(props: Props) {
     const isWhiteboardOpenRef = React.useRef(false)
     const docTimeoutRef = React.useRef<any>(null) // Debounce/Throttle for doc editor
     const lastDocSendTimeRef = React.useRef<number>(0)
+    const inputTimeoutRef = React.useRef<any>(null)
+    const lastInputSendTimeRef = React.useRef<number>(0)
+    const lastAISendTimeRef = React.useRef<number>(0)
     React.useEffect(() => { isWhiteboardOpenRef.current = isWhiteboardOpen }, [isWhiteboardOpen])
 
     const hasWhiteboardStartedRef = React.useRef(false)
@@ -4971,9 +4974,33 @@ Do not include markdown formatting or explanations.`
 
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
+            } else if (data.type === 'ai-stream') {
+                // Handle streaming AI text
+                setMessages(prev => {
+                    const newArr = [...prev]
+                    if (newArr.length > 0 && newArr[newArr.length - 1].role === "model") {
+                        newArr[newArr.length - 1] = { 
+                            ...newArr[newArr.length - 1], 
+                            text: data.payload.text 
+                        }
+                        return newArr
+                    } else {
+                        return [...prev, { role: "model", text: data.payload.text }]
+                    }
+                })
             } else if (data.type === 'ai-response') {
-                // Handle incoming AI response broadcasted from peer
-                setMessages(prev => [...prev, { role: "model", text: data.payload.text }])
+                // Handle final AI response (ensure consistency)
+                setMessages(prev => {
+                    const newArr = [...prev]
+                    if (newArr.length > 0 && newArr[newArr.length - 1].role === "model") {
+                         newArr[newArr.length - 1] = { 
+                            ...newArr[newArr.length - 1], 
+                            text: data.payload.text 
+                        }
+                        return newArr
+                    }
+                    return [...prev, { role: "model", text: data.payload.text }]
+                })
             } else if (data.type === 'doc-start') {
                 if (isScreenSharingRef.current) stopLocalScreenShare()
                 if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
@@ -4982,6 +5009,8 @@ Do not include markdown formatting or explanations.`
                 setIsDocOpen(false)
             } else if (data.type === 'doc-update') {
                 setDocContent(data.payload)
+            } else if (data.type === 'input-sync') {
+                setInputText(data.payload)
             } else if (data.type === 'tldraw-start') {
                 log("Received tldraw-start command")
                 if (isScreenSharingRef.current) stopLocalScreenShare()
@@ -5250,6 +5279,18 @@ Do not include markdown formatting or explanations.`
                                         }
                                         return newArr
                                     })
+
+                                    // Broadcast stream update (Throttled)
+                                    const now = Date.now()
+                                    if (now - lastAISendTimeRef.current > 50) { // 20fps throttle
+                                        if (dataConnectionRef.current?.open) {
+                                            dataConnectionRef.current.send({ 
+                                                type: 'ai-stream', 
+                                                payload: { text: accumulatedText } 
+                                            })
+                                            lastAISendTimeRef.current = now
+                                        }
+                                    }
                                 }
                                 if (part.functionCall) {
                                     accumulatedFunctionCall = part.functionCall
@@ -5446,6 +5487,9 @@ Do not include markdown formatting or explanations.`
                      attachments: [] 
                  }
              })
+
+             // Clear peer's input bar as well
+             dataConnectionRef.current.send({ type: 'input-sync', payload: "" })
         }
 
         await generateAIResponse(textToSend, attachmentsToSend, "user")
@@ -5850,7 +5894,7 @@ Do not include markdown formatting or explanations.`
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? (
+            {!isBanned && ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? (
                 // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
                 <div style={{
                     flex: "1 1 0",
@@ -6255,10 +6299,10 @@ Do not include markdown formatting or explanations.`
                         )}
                     </div>
                 </div>
-            )}
+            ))}
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
-            <div
+            {!isBanned && <div
                 onPointerDown={handlePointerDown}
                 style={{
                     height: 24,
@@ -6279,13 +6323,14 @@ Do not include markdown formatting or explanations.`
                         background: (isDocOpen || isWhiteboardOpen) ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
                     }}
                 />
-            </div>
+            </div>}
 
             {/* 3. AI CHAT HISTORY LAYER */}
-            <div style={{ width: "100%", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
+            <div style={{ width: "100%", height: isBanned ? "100%" : "auto", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
             <div 
                 style={{
-                    height: chatHeight,
+                    height: isBanned ? "100%" : chatHeight,
+                    paddingTop: isBanned ? 24 : 0,
                     width: "100%",
                     maxWidth: 728,
                     position: "relative",
@@ -6354,7 +6399,7 @@ Do not include markdown formatting or explanations.`
                 {/* 4. CHAT INPUT INTERFACE */}
                 <div
                     style={{
-                        position: "absolute",
+                        position: isBanned ? "fixed" : "absolute",
                         bottom: 0,
                         left: 0,
                         right: 0,
@@ -6369,7 +6414,31 @@ Do not include markdown formatting or explanations.`
                 >
                     <ChatInput 
                         value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
+                        onChange={(e) => {
+                            const newValue = e.target.value
+                            setInputText(newValue)
+                            
+                            // Broadcast input change
+                            const now = Date.now()
+                            const interval = 50 // Throttle updates
+                            const timeSinceLastSend = now - lastInputSendTimeRef.current
+                            
+                            if (inputTimeoutRef.current) clearTimeout(inputTimeoutRef.current)
+
+                            if (timeSinceLastSend > interval) {
+                                if (dataConnectionRef.current?.open) {
+                                    dataConnectionRef.current.send({ type: 'input-sync', payload: newValue })
+                                    lastInputSendTimeRef.current = now
+                                }
+                            } else {
+                                inputTimeoutRef.current = setTimeout(() => {
+                                    if (dataConnectionRef.current?.open) {
+                                        dataConnectionRef.current.send({ type: 'input-sync', payload: newValue })
+                                        lastInputSendTimeRef.current = Date.now()
+                                    }
+                                }, interval - timeSinceLastSend)
+                            }
+                        }}
                         onSend={handleSendMessage}
                         onConnectWithAI={handleConnectWithAI}
                         onStop={handleStop}
