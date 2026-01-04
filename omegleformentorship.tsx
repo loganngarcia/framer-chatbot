@@ -938,120 +938,177 @@ interface DocEditorProps {
     onSettingsChange: (settings: { fontStyle: 'serif' | 'sans', fontSize: number, h1Size: number, h2Size: number, pSize: number }) => void
     themeColors?: typeof darkColors
     isMobileLayout?: boolean
+    remoteCursor?: { x: number, y: number, color: string } | null
+    onCursorMove?: (x: number, y: number) => void
 }
 
-const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange, themeColors = lightColors, isMobileLayout = false }: DocEditorProps) {
+
+const ToolbarButton = React.memo(({ 
+    id, 
+    icon, 
+    onClick, 
+    tooltip, 
+    isActive = false,
+    isHovered,
+    onHoverChange
+}: { 
+    id: string, 
+    icon: React.ReactNode, 
+    onClick: (e: React.MouseEvent) => void, 
+    tooltip: string, 
+    isActive?: boolean,
+    isHovered: boolean,
+    onHoverChange: (isHovered: boolean) => void
+}) => (
+    <button 
+        className={id}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onClick}
+        onMouseEnter={() => onHoverChange(true)}
+        onMouseLeave={() => onHoverChange(false)}
+        style={{
+            width: 36, 
+            height: 36, 
+            background: isActive ? '#E5E5E5' : '#F5F5F5', 
+            borderRadius: 31.5, 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            display: 'flex', 
+            cursor: 'pointer', 
+            position: 'relative',
+            border: 'none',
+            padding: 0
+        }}
+        type="button"
+        aria-label={tooltip}
+        aria-pressed={isActive}
+    >
+        {icon}
+        {isHovered && (
+            <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 8px)", zIndex: 100 }}>{tooltip}</Tooltip>
+        )}
+    </button>
+))
+
+// --- P2P Helper Functions ---
+function getCaretCharacterOffsetWithin(element: HTMLElement): number {
+    let caretOffset = 0;
+    const doc = element.ownerDocument || document;
+    const win = doc.defaultView || window;
+    const sel = win.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        caretOffset = preCaretRange.toString().length;
+    }
+    return caretOffset;
+}
+
+function setCaretPosition(element: HTMLElement, offset: number) {
+    const createRange = (node: Node, chars: { count: number }, range?: Range): Range | undefined => {
+        if (!range) {
+            range = document.createRange();
+            range.selectNode(node);
+            range.setStart(node, 0);
+        }
+
+        if (chars.count === 0) {
+            range.setEnd(node, chars.count);
+        }
+
+        if (node && chars.count > 0) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (node.textContent && node.textContent.length < chars.count) {
+                    chars.count -= node.textContent.length;
+                } else {
+                    range.setEnd(node, chars.count);
+                    chars.count = 0;
+                }
+            } else {
+                for (let lp = 0; lp < node.childNodes.length; lp++) {
+                    range = createRange(node.childNodes[lp], chars, range);
+                    if (chars.count === 0) {
+                        break;
+                    }
+                }
+            }
+        }
+        return range;
+    }
+    
+    if (offset >= 0) {
+        const selection = window.getSelection();
+        const range = createRange(element, { count: offset });
+        if (range) {
+            range.collapse(false);
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+        }
+    }
+}
+
+const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange, themeColors = lightColors, isMobileLayout = false, remoteCursor, onCursorMove }: DocEditorProps) {
     const editorRef = React.useRef<HTMLDivElement>(null)
-    const [showFontMenu, setShowFontMenu] = React.useState(false)
+    const linkDropdownRef = React.useRef<HTMLDivElement>(null)
+    const savedSelectionRef = React.useRef<Range | null>(null)
+    
+    const [selectedFontSize, setSelectedFontSize] = React.useState(settings.pSize)
+    const [fontSizeInput, setFontSizeInput] = React.useState(settings.pSize.toString())
+    const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
+    const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
+    const [isLinkActive, setIsLinkActive] = React.useState(false)
+    const [hoveredToolbarItem, setHoveredToolbarItem] = React.useState<string | null>(null)
 
-    // Sync content updates
-    const handleInput = () => {
+    // CSS Variables for performance
+    const styleVariables = React.useMemo(() => ({
+        '--doc-h1-size': `${settings.h1Size}px`,
+        '--doc-h2-size': `${settings.h2Size}px`,
+        '--doc-p-size': `${settings.pSize}px`,
+        '--doc-font-serif': '"Times New Roman", serif',
+        '--doc-font-sans': 'Inter, sans-serif',
+        '--doc-accent': themeColors.state.accent,
+        '--doc-current-font': settings.fontStyle === 'serif' ? 'var(--doc-font-serif)' : 'var(--doc-font-sans)'
+    } as React.CSSProperties), [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle, themeColors.state.accent])
+
+    // --- Core Editor Logic ---
+    
+    // Sync content to parent
+    const handleInput = React.useCallback(() => {
         if (editorRef.current) {
-            onChange(editorRef.current.innerHTML)
+            const html = editorRef.current.innerHTML
+            if (html !== content) {
+                onChange(html)
+            }
         }
-    }
+    }, [onChange, content])
 
-    // Handle markdown shortcuts (# for H1, ## for H2, - for bullet list)
-    const handleMarkdownShortcuts = (e: React.KeyboardEvent) => {
-        if (!editorRef.current || e.key !== ' ') return
-        
-        const selection = window.getSelection()
-        if (!selection || !selection.rangeCount) return
-        
-        const range = selection.getRangeAt(0)
-        let node = range.startContainer
-        
-        // Get the parent block element to find the full line text
-        let blockElement: Node | null = node
-        if (node.nodeType === Node.TEXT_NODE) {
-            blockElement = node.parentElement
-        }
-        
-        // Traverse up to find block element
-        while (blockElement && blockElement !== editorRef.current) {
-            const tag = (blockElement as HTMLElement).tagName
-            if (tag && ['P', 'DIV', 'H1', 'H2', 'LI'].includes(tag.toUpperCase())) {
-                break
-            }
-            blockElement = blockElement.parentElement
-        }
-        
-        if (!blockElement || blockElement === editorRef.current) {
-            blockElement = node
-        }
-        
-        // Get the full text of the current block/line
-        const fullText = (blockElement.textContent || '').trim()
-        
-        // Check for markdown patterns at the start of the line - check ## before # (longer pattern first)
-        if (fullText === '##') {
-            e.preventDefault()
-            
-            // Clear the content of the block
-            if (blockElement.nodeType === Node.ELEMENT_NODE) {
-                (blockElement as HTMLElement).textContent = ''
-            }
-            
-            // Convert to H2
-            document.execCommand('formatBlock', false, 'h2')
-            handleInput()
-            saveSelection()
-            return
-        }
-        
-        if (fullText === '#') {
-            e.preventDefault()
-            
-            // Clear the content of the block
-            if (blockElement.nodeType === Node.ELEMENT_NODE) {
-                (blockElement as HTMLElement).textContent = ''
-            }
-            
-            // Convert to H1
-            document.execCommand('formatBlock', false, 'h1')
-            handleInput()
-            saveSelection()
-            return
-        }
-        
-        if (fullText === '-') {
-            e.preventDefault()
-            
-            // Clear the content of the block
-            if (blockElement.nodeType === Node.ELEMENT_NODE) {
-                (blockElement as HTMLElement).textContent = ''
-            }
-            
-            // Convert to bullet list
-            document.execCommand('insertUnorderedList', false)
-            handleInput()
-            saveSelection()
-            return
-        }
-    }
-
-    // Initialize content only once or when radically changed externally (avoid cursor jumps)
+    // Initialize content
     React.useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== content) {
-            // Only update if significantly different to avoid cursor reset
-             // Simple check: if empty or strict mismatch when not focused
-            if (document.activeElement !== editorRef.current) {
-                editorRef.current.innerHTML = content
+            const editor = editorRef.current;
+            // Preserves cursor position if focused
+            if (document.activeElement === editor) {
+                 const currentOffset = getCaretCharacterOffsetWithin(editor);
+                 editor.innerHTML = content;
+                 setCaretPosition(editor, currentOffset);
+            } else {
+                 editor.innerHTML = content;
             }
         }
     }, [content])
 
-    // Store the last selection so we can restore it when toolbar buttons are clicked
-    const savedSelectionRef = React.useRef<Range | null>(null)
+    // --- Selection Management ---
 
-    const saveSelection = () => {
+    const saveSelection = React.useCallback(() => {
         const selection = window.getSelection()
         if (selection && selection.rangeCount > 0) {
             savedSelectionRef.current = selection.getRangeAt(0).cloneRange()
         }
-    }
+    }, [])
 
-    const restoreSelection = () => {
+    const restoreSelection = React.useCallback(() => {
         if (savedSelectionRef.current && editorRef.current) {
             const selection = window.getSelection()
             if (selection) {
@@ -1060,356 +1117,237 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
             }
             editorRef.current.focus()
         }
-    }
+    }, [])
 
-    const handleFormat = (command: string, value?: string) => {
-        restoreSelection()
-        document.execCommand(command, false, value)
-        handleInput() // Sync immediately
-        saveSelection()
-    }
+    // --- Formatting Logic ---
 
-    // Logic: If selection exists, it applies to selection. If collapsed (cursor), find the parent block element and apply class/style?
-    // standard execCommand 'bold' works on selection or toggles style for future typing. 
-    // To "bold the whole line" if no selection, we need custom logic.
-    const handleSmartFormat = (command: string) => {
-        restoreSelection()
-        const selection = window.getSelection()
-        if (!selection || !editorRef.current) return
-
-        if (selection.isCollapsed) {
-            // No text selected -> Apply to current block/line
-            const range = selection.getRangeAt(0)
-            let node = range.commonAncestorContainer as HTMLElement | null
-            
-            // Traverse up to find the block element (P, LI, H1, H2, DIV) inside the editor
-            while (node && node !== editorRef.current) {
-                const tag = node.nodeName.toUpperCase()
-                if (['P', 'LI', 'H1', 'H2', 'DIV'].includes(tag)) {
-                    break
-                }
-                node = node.parentElement
-            }
-
-            if (node && node !== editorRef.current) {
-                // Select the whole node content
-                const newRange = document.createRange()
-                newRange.selectNodeContents(node)
-                selection.removeAllRanges()
-                selection.addRange(newRange)
-                
-                // Execute command
-                document.execCommand(command, false)
-                
-                // Collapse to end (optional, usually better UX)
-                selection.collapseToEnd()
-                handleInput()
-                saveSelection()
-                return
-            }
-        }
-        
-        // Default behavior (selected text or inline toggle)
-        document.execCommand(command, false)
-        handleInput()
-        saveSelection()
-    }
-
-    const downloadDoc = () => {
-        // Extract Name from H1 if possible
-        let filename = "Resume.doc"
-        if (editorRef.current) {
-            const h1 = editorRef.current.querySelector('h1')
-            if (h1 && h1.innerText.trim()) {
-                const name = h1.innerText.trim().replace(/[^a-z0-9]/gi, '_')
-                filename = `${name}_Resume.doc`
-            }
-        }
-
-        // Simple HTML-to-Word export
-        const header = `
-            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head>
-                <meta charset='utf-8'>
-                <title>Document</title>
-                <style>
-                    @page {
-                        size: 8.5in 11in;
-                        margin: 0.5in;
-                        mso-header-margin: 0.5in;
-                        mso-footer-margin: 0.5in;
-                        mso-page-orientation: portrait;
-                    }
-                    body { 
-                        font-family: ${settings.fontStyle === 'serif' ? '"Times New Roman", serif' : 'Inter, sans-serif'}; 
-                        font-size: ${settings.pSize}pt; 
-                        margin: 0.5in;
-                        text-align: left;
-                    }
-                    h1 { 
-                        font-size: ${settings.h1Size}pt; 
-                        font-weight: bold; 
-                        text-align: left;
-                        margin: 0.5em 0 0.25em 0;
-                    }
-                    h2 { 
-                        font-size: ${settings.h2Size}pt; 
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        border-bottom: 1px solid #000;
-                        padding-bottom: 2px;
-                        text-align: left;
-                        margin: 1em 0 0.5em 0;
-                    }
-                    p, li, div { 
-                        font-size: ${settings.pSize}pt; 
-                        text-align: left;
-                        margin: 0.25em 0;
-                    }
-                    ul, ol { 
-                        padding-left: 20px; 
-                        margin: 8px 0; 
-                    }
-                </style>
-            </head><body>`
-        const footer = "</body></html>"
-        const sourceHTML = header + content + footer
-        
-        const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML)
-        const fileDownload = document.createElement("a")
-        document.body.appendChild(fileDownload)
-        fileDownload.href = source
-        fileDownload.download = filename
-        fileDownload.click()
-        document.body.removeChild(fileDownload)
-    }
-
-    // Determine current block type and size
-    const getSelectionInfo = () => {
+    const getSelectionInfo = React.useCallback(() => {
         const selection = window.getSelection()
         if (!selection || !selection.rangeCount) return { tag: 'P', size: settings.pSize }
         
         let node = selection.anchorNode
-        // Traverse up to find block
         while (node && node !== editorRef.current) {
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tag = (node as HTMLElement).tagName
                 if (tag === 'H1') return { tag: 'H1', size: settings.h1Size }
                 if (tag === 'H2') return { tag: 'H2', size: settings.h2Size }
-                if (tag === 'P' || tag === 'LI' || tag === 'DIV') return { tag: 'P', size: settings.pSize }
+                if (['P', 'LI', 'DIV'].includes(tag)) return { tag: 'P', size: settings.pSize }
             }
             node = node.parentNode
         }
         return { tag: 'P', size: settings.pSize }
-    }
+    }, [settings, editorRef])
 
-    const [selectedFontSize, setSelectedFontSize] = React.useState(settings.pSize)
-    const [fontSizeInput, setFontSizeInput] = React.useState(settings.pSize.toString())
-    const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
-    const toolbarRef = React.useRef<HTMLDivElement>(null)
-    const [toolbarWidth, setToolbarWidth] = React.useState(0)
-    const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
-    const [isLinkActive, setIsLinkActive] = React.useState(false)
-    const linkDropdownRef = React.useRef<HTMLDivElement>(null)
-    
-    // Watch for selection changes to update font size display and save selection
-    React.useEffect(() => {
-        const handleSelectionChange = () => {
-            const selection = window.getSelection()
-            if (!selection || !selection.rangeCount) return
-            
-            // Check if the selection is inside our editor
-            const isInsideEditor = editorRef.current?.contains(selection.anchorNode || null)
-            if (isInsideEditor) {
-                saveSelection()
-
-                // Check if selection is a link
-                let linkFound = false
-                let node = selection.anchorNode
-                while (node && node !== editorRef.current) {
-                    if (node.nodeName === 'A') {
-                        linkFound = true
-                        break
-                    }
-                    node = node.parentNode
-                }
-                setIsLinkActive(linkFound)
-            }
-            
-            // Try to detect font size of selection (for inline spans)
-            // If no inline span, fall back to Category size
-            const range = selection.getRangeAt(0)
-            const parent = range.commonAncestorContainer.parentElement
-            
-            let size = 0
-            // Check if parent has inline style fontSize (override)
-            if (parent && parent.style.fontSize) {
-                 const parsed = parseFloat(parent.style.fontSize)
-                 if (!isNaN(parsed)) {
-                     size = Math.round(parsed)
-                 }
-            }
-            
-            // Otherwise use category size
-            if (!size) {
-                const info = getSelectionInfo()
-                size = info.size
-            }
-
-            setSelectedFontSize(size)
-            if (!isEditingFontSize) {
-                setFontSizeInput(size.toString())
-            }
-        }
-        
-        document.addEventListener('selectionchange', handleSelectionChange)
-        return () => document.removeEventListener('selectionchange', handleSelectionChange)
-    }, [settings.h1Size, settings.h2Size, settings.pSize, isEditingFontSize])
-
-    // Watch toolbar width for responsive layout
-    React.useEffect(() => {
-        if (!toolbarRef.current) return
-        const observer = new ResizeObserver(entries => {
-            for (const entry of entries) {
-                setToolbarWidth(entry.contentRect.width)
-            }
-        })
-        observer.observe(toolbarRef.current)
-        return () => observer.disconnect()
-    }, [])
-
-    const updateFontSize = (newSize: number) => {
+    const updateFontSize = React.useCallback((newSize: number) => {
         const size = Math.max(8, Math.min(72, newSize))
-        
         restoreSelection()
+        
         const selection = window.getSelection()
         if (selection && !selection.isCollapsed) {
-            // 1. Text Selection -> Apply inline span override
+            document.execCommand('styleWithCSS', false, 'true')
+            // Using execCommand fontSize is tricky as it uses 1-7 scale.
+            // Better to use span wrapping for precision.
             const span = document.createElement("span")
             span.style.fontSize = `${size}px`
             const range = selection.getRangeAt(0)
             const content = range.extractContents()
             span.appendChild(content)
             range.insertNode(span)
-            handleInput()
-            saveSelection()
+            
         } else {
-            // 2. Cursor (Collapsed) -> Update Category Setting
+            // Update Category Setting
             const info = getSelectionInfo()
-            if (info.tag === 'H1') {
-                onSettingsChange({ ...settings, h1Size: size })
-            } else if (info.tag === 'H2') {
-                onSettingsChange({ ...settings, h2Size: size })
-            } else {
-                onSettingsChange({ ...settings, pSize: size })
-            }
+            if (info.tag === 'H1') onSettingsChange({ ...settings, h1Size: size })
+            else if (info.tag === 'H2') onSettingsChange({ ...settings, h2Size: size })
+            else onSettingsChange({ ...settings, pSize: size })
         }
-        setSelectedFontSize(size)
-        // If not manually editing input, sync the input
-        if (!isEditingFontSize) {
-            setFontSizeInput(size.toString())
-        }
-    }
-
-    const handleFontSizeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value
-        setFontSizeInput(val)
         
-        if (val === "") return
-
-        const num = parseInt(val)
-        if (!isNaN(num)) {
-            // Update the font size but don't force-sync input (let user type)
-            updateFontSize(num)
-        }
-    }
-
-    const handleBlur = () => {
-        setIsEditingFontSize(false)
-        let num = parseInt(fontSizeInput)
-        if (isNaN(num)) {
-             num = selectedFontSize // Revert to current actual size if invalid
-        }
-        // Apply clamp on blur
-        const clamped = Math.max(8, Math.min(72, num))
-        updateFontSize(clamped)
-        setFontSizeInput(clamped.toString())
-    }
-
-    const isCompact = toolbarWidth < 400 // Adjusted threshold
-
-    const [hoveredToolbarItem, setHoveredToolbarItem] = React.useState<string | null>(null)
-
-    const renderTooltip = (text: string) => (
-        <Tooltip style={{
-            top: "100%",
-            left: "50%",
-            transform: "translate(-50%, 8px)",
-            zIndex: 100
-        }}>
-            {text}
-        </Tooltip>
-    )
-
-    const handleLink = () => {
-        restoreSelection()
-        const selection = window.getSelection()
-        if (!selection || !selection.rangeCount) return
-
-        let node = selection.anchorNode
-        let isLink = false
-        while (node && node !== editorRef.current) {
-            if (node.nodeName === 'A') {
-                isLink = true
-                break
-            }
-            node = node.parentNode
-        }
-
-        if (isLink) {
-             document.execCommand('unlink')
-        } else {
-            const url = prompt("Enter URL:", "https://")
-            if (url) {
-                document.execCommand('createLink', false, url)
-            }
-        }
         handleInput()
         saveSelection()
-    }
+        setSelectedFontSize(size)
+        if (!isEditingFontSize) setFontSizeInput(size.toString())
+    }, [handleInput, saveSelection, restoreSelection, getSelectionInfo, settings, onSettingsChange, isEditingFontSize])
 
-    const handleInsertLink = (url: string) => {
-        if (!url || !url.trim()) return
-        
+    const handleSmartFormat = React.useCallback((command: string) => {
         restoreSelection()
         const selection = window.getSelection()
         if (!selection || !editorRef.current) return
 
-        // If no selection (collapsed), select the whole line/block
         if (selection.isCollapsed) {
             const range = selection.getRangeAt(0)
             let node = range.commonAncestorContainer as HTMLElement | null
-            
-            // Traverse up to find the block element
             while (node && node !== editorRef.current) {
-                const tag = node.nodeName.toUpperCase()
-                if (['P', 'LI', 'H1', 'H2', 'DIV'].includes(tag)) {
-                    break
-                }
+                if (['P', 'LI', 'H1', 'H2', 'DIV'].includes(node.nodeName.toUpperCase())) break
                 node = node.parentElement
             }
 
             if (node && node !== editorRef.current) {
-                // Select the whole node content
                 const newRange = document.createRange()
                 newRange.selectNodeContents(node)
                 selection.removeAllRanges()
                 selection.addRange(newRange)
+                document.execCommand(command, false)
+                selection.collapseToEnd()
+            }
+        } else {
+            document.execCommand(command, false)
+        }
+        handleInput()
+        saveSelection()
+    }, [restoreSelection, handleInput, saveSelection])
+
+    const handleFormat = React.useCallback((command: string, value?: string) => {
+        restoreSelection()
+        document.execCommand(command, false, value)
+        handleInput()
+        saveSelection()
+    }, [restoreSelection, handleInput, saveSelection])
+
+    // --- Markdown Shortcuts ---
+
+    const handleMarkdownShortcuts = React.useCallback((e: React.KeyboardEvent) => {
+        if (!editorRef.current || e.key !== ' ') return
+        
+        const selection = window.getSelection()
+        if (!selection || !selection.rangeCount) return
+        
+        const range = selection.getRangeAt(0)
+        let node = range.startContainer
+        let blockElement = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Node
+        
+        while (blockElement && blockElement !== editorRef.current) {
+            const tag = (blockElement as HTMLElement).tagName
+            if (tag && ['P', 'DIV', 'H1', 'H2', 'LI'].includes(tag.toUpperCase())) break
+            blockElement = blockElement.parentElement
+        }
+        
+        if (!blockElement || blockElement === editorRef.current) blockElement = node
+        
+        const fullText = (blockElement.textContent || '').trim()
+        
+        if (fullText === '##') {
+            e.preventDefault()
+            if (blockElement.nodeType === Node.ELEMENT_NODE) (blockElement as HTMLElement).textContent = ''
+            document.execCommand('formatBlock', false, 'h2')
+            handleInput()
+            saveSelection()
+        } else if (fullText === '#') {
+            e.preventDefault()
+            if (blockElement.nodeType === Node.ELEMENT_NODE) (blockElement as HTMLElement).textContent = ''
+            document.execCommand('formatBlock', false, 'h1')
+            handleInput()
+            saveSelection()
+        } else if (fullText === '-') {
+            e.preventDefault()
+            if (blockElement.nodeType === Node.ELEMENT_NODE) (blockElement as HTMLElement).textContent = ''
+            document.execCommand('insertUnorderedList', false)
+            handleInput()
+            saveSelection()
+        }
+    }, [handleInput, saveSelection])
+
+    // --- Event Listeners ---
+
+    // Selection Change Listener
+    React.useEffect(() => {
+        let rafId: number
+        const handleSelectionChange = () => {
+            cancelAnimationFrame(rafId)
+            rafId = requestAnimationFrame(() => {
+                const selection = window.getSelection()
+                if (!selection || !selection.rangeCount) return
+                
+                const anchor = selection.anchorNode
+                if (!editorRef.current?.contains(anchor)) return
+
+                saveSelection()
+                
+                let linkFound = false
+                let size = 0
+                
+                let node: Node | null = anchor
+                while (node && node !== editorRef.current) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const el = node as HTMLElement
+                        const tag = el.tagName
+                        
+                        if (tag === 'A') linkFound = true
+                        
+                        if (!size && el.style.fontSize) {
+                            const parsed = parseFloat(el.style.fontSize)
+                            if (!isNaN(parsed)) size = Math.round(parsed)
+                        }
+                        
+                        if (!size) {
+                             if (tag === 'H1') size = settings.h1Size
+                             else if (tag === 'H2') size = settings.h2Size
+                             else if (['P', 'LI', 'DIV'].includes(tag)) size = settings.pSize
+                        }
+                    }
+                    node = node.parentNode
+                }
+                
+                setIsLinkActive(linkFound)
+                if (!size) size = settings.pSize
+                
+                setSelectedFontSize(size)
+                if (!isEditingFontSize) setFontSizeInput(size.toString())
+            })
+        }
+        document.addEventListener('selectionchange', handleSelectionChange)
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange)
+            cancelAnimationFrame(rafId)
+        }
+    }, [isEditingFontSize, saveSelection, settings])
+
+    // Keyboard Shortcuts
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (document.activeElement !== editorRef.current) return
+            const cmd = e.metaKey || e.ctrlKey
+            
+            if (cmd) {
+                switch(e.key.toLowerCase()) {
+                    case 'k': e.preventDefault(); setShowLinkDropdown(true); break;
+                    case 'b': e.preventDefault(); handleSmartFormat('bold'); break;
+                    case 'i': e.preventDefault(); document.execCommand('italic'); handleInput(); break;
+                    case 'z': 
+                        e.preventDefault(); 
+                        document.execCommand(e.shiftKey ? 'redo' : 'undo'); 
+                        handleInput(); 
+                        break;
+                }
+            } else if (e.shiftKey) {
+                 if (e.key === '8') { e.preventDefault(); handleFormat('insertUnorderedList'); }
             }
         }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [handleSmartFormat, handleFormat, handleInput])
 
-        document.execCommand('createLink', false, url)
+
+    // Outside Click for Link Dropdown
+    React.useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (linkDropdownRef.current && !linkDropdownRef.current.contains(e.target as Node)) {
+                setShowLinkDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    // --- Link Handling ---
+    const handleInsertLink = (url: string) => {
+        if (!url || !url.trim()) return
+        restoreSelection()
+        const selection = window.getSelection()
+        if (selection && selection.isCollapsed) {
+             document.execCommand('createLink', false, url)
+        } else {
+             document.execCommand('createLink', false, url)
+        }
         handleInput()
         saveSelection()
         setShowLinkDropdown(false)
@@ -1423,433 +1361,203 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         setShowLinkDropdown(false)
     }
 
-    React.useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (document.activeElement !== editorRef.current) return
-            
-            const cmd = e.metaKey || e.ctrlKey // Support both Mac and Windows/Android
-            
-            if (cmd) {
-                if (e.key.toLowerCase() === 'k') {
-                    e.preventDefault()
-                    setShowLinkDropdown(true)
-                }
-                if (e.key.toLowerCase() === 'b') {
-                    e.preventDefault()
-                    handleSmartFormat('bold')
-                }
-                if (e.key.toLowerCase() === 'i') {
-                    e.preventDefault()
-                    // Explicitly do nothing to disable italics
-                }
-                if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
-                    e.preventDefault()
-                    document.execCommand('undo')
-                    handleInput()
-                }
-                if (e.key.toLowerCase() === 'z' && e.shiftKey) {
-                    e.preventDefault()
-                    document.execCommand('redo')
-                    handleInput()
-                }
-                if (e.shiftKey) {
-                    if (e.key === '8') { // Bullet list
-                         e.preventDefault()
-                         handleFormat('insertUnorderedList')
-                    }
-                    if (e.key === ',' || e.key === '<') { // Decrease font
-                         e.preventDefault()
-                         updateFontSize(selectedFontSize - 1)
-                    }
-                    if (e.key === '.' || e.key === '>') { // Increase font
-                         e.preventDefault()
-                         updateFontSize(selectedFontSize + 1)
-                    }
-                }
+    // --- File Export ---
+    const downloadDoc = () => {
+        let filename = "Resume.doc"
+        if (editorRef.current) {
+            const h1 = editorRef.current.querySelector('h1')
+            if (h1 && h1.innerText.trim()) {
+                filename = `${h1.innerText.trim().replace(/[^a-z0-9]/gi, '_')}_Resume.doc`
             }
         }
-
-        document.addEventListener('keydown', handleKeyDown)
-        return () => document.removeEventListener('keydown', handleKeyDown)
-    }, [selectedFontSize])
-
-    // Handle clicking outside link dropdown to close it
-    React.useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (linkDropdownRef.current && !linkDropdownRef.current.contains(e.target as Node)) {
-                setShowLinkDropdown(false)
-            }
-        }
-
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
-
-    const handlePaste = (e: React.ClipboardEvent) => {
-        e.preventDefault()
-        const text = e.clipboardData.getData('text/plain')
-        if (text) {
-             document.execCommand('insertText', false, text)
-        }
+        
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{font-family:${settings.fontStyle === 'serif' ? '"Times New Roman", serif' : 'Inter, sans-serif'};font-size:${settings.pSize}pt;}</style></head><body>`
+        const footer = "</body></html>"
+        const sourceHTML = header + content + footer
+        const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML)
+        const link = document.createElement("a")
+        link.href = source
+        link.download = filename
+        link.click()
     }
 
-    const handleEditorClick = (e: React.MouseEvent) => {
-        let target = e.target as HTMLElement
-        // Traverse up in case click is on inner element of A
-        while (target && target !== editorRef.current) {
-            if (target.tagName === 'A') {
-                 // Select the link
-                 const selection = window.getSelection()
-                 const range = document.createRange()
-                 range.selectNodeContents(target)
-                 selection?.removeAllRanges()
-                 selection?.addRange(range)
-                 saveSelection()
-                 setIsLinkActive(true)
-                 setShowLinkDropdown(true)
-                 break
-            }
-            target = target.parentElement as HTMLElement
-        }
-    }
+
+    const handleEditorPointerMove = React.useCallback((e: React.PointerEvent) => {
+        if (!onCursorMove || !editorRef.current) return
+        
+        const rect = editorRef.current.getBoundingClientRect()
+        // Calculate relative position (0-1) within the A4-like page
+        // We use the editorRef (the page itself) not the container
+        const x = (e.clientX - rect.left) / rect.width
+        const y = (e.clientY - rect.top) / rect.height
+        
+        onCursorMove(x, y)
+    }, [onCursorMove])
 
     return (
-        <div data-layer="doc editor" className="DocEditor" style={{
-            width: '100%',
-            height: '100%',
-            paddingTop: 8,
-            paddingLeft: 0,
-            paddingRight: 0,
-            paddingBottom: 0,
-            background: 'white',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            gap: 0,
-            boxSizing: 'border-box',
-            position: 'relative'
-        }}>
-          {/* Toolbar */}
-          <div data-layer="toolbar-container" className="ToolbarContainer" style={{
-              justifyContent: 'space-between',
-              alignItems: isMobileLayout ? 'center' : 'flex-start', 
-              gap: isMobileLayout ? 0 : 8, 
-              display: 'flex',
-              width: '100%',
-              maxWidth: 728, // Matches ChatInput max-width
-              position: 'absolute', 
-              top: 12, 
-              left: '50%', 
-              transform: 'translateX(-50%)', 
-              zIndex: 100,
-              boxSizing: 'border-box'
-          }}>
-            <div data-layer="left" className="Left" style={{
-                maxWidth: 728, 
-                background: '#F5F5F5', 
-                borderRadius: 28, 
-                justifyContent: 'flex-start', 
-                alignItems: 'center', 
-                gap: 4, 
-                display: 'flex', 
-                flexWrap: 'wrap', 
-                alignContent: 'center'
+        <div className="DocEditor" style={{ ...styleVariables, width: '100%', height: '100%', position: 'relative', background: 'white', display: 'flex', flexDirection: 'column' }}>
+            {/* Toolbar */}
+            <div className="ToolbarContainer" style={{
+                position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', 
+                zIndex: 100, width: '100%', maxWidth: 728, 
+                display: 'flex', justifyContent: 'space-between', alignItems: isMobileLayout ? 'center' : 'flex-start'
             }}>
-                {/* Font Size */}
-                <div data-layer="font size" className="FontSize" style={{width: 81, height: 36, background: '#F5F5F5', borderRadius: 31.50, justifyContent: 'center', alignItems: 'center', gap: 9, display: 'flex'}}>
-                <div 
-                    data-svg-wrapper 
-                    data-layer="minus" 
-                    className="Minus"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => updateFontSize(selectedFontSize - 1)}
-                    onMouseEnter={() => setHoveredToolbarItem('minus')}
-                    onMouseLeave={() => setHoveredToolbarItem(null)}
-                    style={{cursor: 'pointer', position: 'relative'}}
-                >
-                    <svg width="12" height="32" viewBox="0 0 12 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M0.675781 15.75H10.8008" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {hoveredToolbarItem === 'minus' && renderTooltip("Decrease font size")}
+                <div className="Left" style={{
+                     background: '#F5F5F5', borderRadius: 28, display: 'flex', alignItems: 'center', gap: 4, padding: 2
+                }}>
+                    {/* Font Size Control */}
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#F5F5F5', borderRadius: 28, padding: '0 8px', height: 36 }}>
+                        <div 
+                            onClick={() => updateFontSize(selectedFontSize - 1)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            style={{ cursor: 'pointer', padding: '0 4px' }}
+                        >
+                            <svg width="12" height="32" viewBox="0 0 12 32" fill="none"><path d="M0.675781 15.75H10.8008" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                        <div style={{ position: 'relative', width: 24, textAlign: 'center', fontSize: 14 }}>
+                             <input 
+                                type="number" 
+                                value={fontSizeInput}
+                                onChange={(e) => { setFontSizeInput(e.target.value); const v = parseInt(e.target.value); if(!isNaN(v)) updateFontSize(v); }}
+                                onFocus={() => setIsEditingFontSize(true)}
+                                onBlur={() => { setIsEditingFontSize(false); setFontSizeInput(selectedFontSize.toString()) }}
+                                style={{ width: '100%', opacity: 0, position: 'absolute', left: 0, top: 0, height: '100%', cursor: 'text' }}
+                            />
+                            {fontSizeInput}
+                        </div>
+                        <div 
+                            onClick={() => updateFontSize(selectedFontSize + 1)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            style={{ cursor: 'pointer', padding: '0 4px' }}
+                        >
+                             <svg width="12" height="32" viewBox="0 0 12 32" fill="none"><path d="M10.8008 15.75H5.73828M5.73828 15.75H0.675781M5.73828 15.75V10.6875M5.73828 15.75V20.8125" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                    </div>
+
+                    {/* Bold */}
+                    <ToolbarButton 
+                        id="bold" 
+                        onClick={() => handleSmartFormat('bold')} 
+                        tooltip="Bold (⌘+B)"
+                        icon={<div style={{fontWeight: 700, fontSize: 16}}>B</div>}
+                        isHovered={hoveredToolbarItem === 'bold'}
+                        onHoverChange={(hovered) => setHoveredToolbarItem(hovered ? 'bold' : null)}
+                    />
+
+                    {/* List */}
+                    <ToolbarButton 
+                        id="list" 
+                        onClick={() => handleFormat('insertUnorderedList')} 
+                        tooltip="Bullet List"
+                        icon={
+                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                                <rect width="36" height="36" rx="18" fill="none"/>
+                                <path d="M10.125 13.05C10.125 12.871 10.1961 12.6993 10.3227 12.5727C10.4493 12.4461 10.621 12.375 10.8 12.375H11.7C11.879 12.375 12.0507 12.4461 12.1773 12.5727C12.3039 12.6993 12.375 12.871 12.375 13.05C12.375 13.229 12.3039 13.4007 12.1773 13.5273C12.0507 13.6539 11.879 13.725 11.7 13.725H10.8C10.621 13.725 10.4493 13.6539 10.3227 13.5273C10.1961 13.4007 10.125 13.229 10.125 13.05ZM13.725 13.05C13.725 12.871 13.7961 12.6993 13.9227 12.5727C14.0493 12.4461 14.221 12.375 14.4 12.375H25.2C25.379 12.375 25.5507 12.4461 25.6773 12.5727C25.8039 12.6993 25.875 12.871 25.875 13.05C25.875 13.229 25.8039 13.4007 25.6773 13.5273C25.5507 13.6539 25.379 13.725 25.2 13.725H14.4C14.221 13.725 14.0493 13.6539 13.9227 13.5273C13.7961 13.4007 13.725 13.229 13.725 13.05ZM10.125 18C10.125 17.821 10.1961 17.6493 10.3227 17.5227C10.4493 17.3961 10.621 17.325 10.8 17.325H11.7C11.879 17.325 12.0507 17.3961 12.1773 17.5227C12.3039 17.6493 12.375 17.821 12.375 18C12.375 18.179 12.3039 18.3507 12.1773 18.4773C12.0507 18.6039 11.879 18.675 11.7 18.675H10.8C10.621 18.675 10.4493 18.6039 10.3227 18.4773C10.1961 18.3507 10.125 18.179 10.125 18ZM13.725 18C13.725 17.821 13.7961 17.6493 13.9227 17.5227C14.0493 17.3961 14.221 17.325 14.4 17.325H25.2C25.379 17.325 25.5507 17.3961 25.6773 17.5227C25.8039 17.6493 25.875 17.821 25.875 18C25.875 18.179 25.8039 18.3507 25.6773 18.4773C25.5507 18.6039 25.379 18.675 25.2 18.675H14.4C14.221 18.675 14.0493 18.6039 13.9227 18.4773C13.7961 18.3507 13.725 18.179 13.725 18ZM10.125 22.95C10.125 22.771 10.1961 22.5993 10.3227 22.4727C10.4493 22.3461 10.621 22.275 10.8 22.275H11.7C11.879 22.275 12.0507 22.3461 12.1773 22.4727C12.3039 22.5993 12.375 22.771 12.375 22.95C12.375 23.129 12.3039 23.3007 12.1773 23.4273C12.0507 23.5539 11.879 23.625 11.7 23.625H10.8C10.621 23.625 10.4493 23.5539 10.3227 23.4273C10.1961 23.3007 10.125 23.129 10.125 22.95ZM13.725 22.95C13.725 22.771 13.7961 22.5993 13.9227 22.4727C14.0493 22.3461 14.221 22.275 14.4 22.275H25.2C25.379 22.275 25.5507 22.3461 25.6773 22.4727C25.8039 22.5993 25.875 22.771 25.875 22.95C25.875 23.129 25.8039 23.3007 25.6773 23.4273C25.5507 23.5539 25.379 23.625 25.2 23.625H14.4C14.221 23.625 14.0493 23.5539 13.9227 23.4273C13.7961 23.3007 13.725 23.129 13.725 22.95Z" fill="black" fillOpacity="0.95"/>
+                            </svg>
+                        }
+                        isHovered={hoveredToolbarItem === 'list'}
+                        onHoverChange={(hovered) => setHoveredToolbarItem(hovered ? 'list' : null)}
+                    />
+
+                    {/* Link */}
+                    <div ref={linkDropdownRef} style={{ position: 'relative' }}>
+                        <ToolbarButton 
+                            id="link" 
+                            onClick={() => setShowLinkDropdown(!showLinkDropdown)} 
+                            tooltip="Link (⌘+K)"
+                            isActive={showLinkDropdown || isLinkActive}
+                            icon={
+                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                                    <rect width="36" height="36" rx="18" fill="none"/>
+                                    <path d="M21.2686 18.87L23.2815 16.8571C24.4584 15.6801 24.4851 13.7981 23.3407 12.6537C22.1963 11.5093 20.3143 11.536 19.1373 12.7129L17.1244 14.7258M18.9005 21.2381L16.8853 23.245C15.7071 24.4196 13.8819 24.5599 12.6795 23.3042C11.4777 22.0491 11.5618 20.2849 12.7399 19.1103L14.7552 17.1034M15.5005 20.4939L20.5244 15.47" stroke="black" strokeOpacity="0.95" strokeWidth="1.2375" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            }
+                            isHovered={hoveredToolbarItem === 'link'}
+                            onHoverChange={(hovered) => setHoveredToolbarItem(hovered ? 'link' : null)}
+                        />
+                        {showLinkDropdown && (
+                             <div style={{
+                                position: 'absolute', top: '120%', left: 0, 
+                                background: 'white', border: '1px solid #eee', borderRadius: 12, 
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: 8, minWidth: 220, zIndex: 200
+                             }}>
+                                <input 
+                                    autoFocus
+                                    placeholder="Paste URL..."
+                                    className="link-input"
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleInsertLink((e.target as HTMLInputElement).value) }}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', marginBottom: 4 }}
+                                />
+                                {isLinkActive && (
+                                    <button onClick={handleRemoveLink} style={{ width: '100%', padding: '6px', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                                        Remove Link
+                                    </button>
+                                )}
+                             </div>
+                        )}
+                    </div>
                 </div>
-                <div data-layer="font size number" className="FontSizeNumber" style={{width: 22.50, textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', position: 'relative'}}>
-                     {/* Hidden Input Overlay */}
-                     <input 
-                        value={fontSizeInput} 
-                        onChange={handleFontSizeInput}
-                        onFocus={() => setIsEditingFontSize(true)}
-                        onBlur={handleBlur}
-                        type="number"
-                        style={{
-                            width: '100%', 
-                            height: '100%', 
-                            opacity: 0, 
-                            position: 'absolute', 
-                            top: 0, 
-                            left: 0,
-                            cursor: 'text',
-                            margin: 0,
-                            padding: 0
+
+                {/* Download */}
+                <div onClick={downloadDoc} style={{ 
+                    cursor: 'pointer', background: themeColors.state.accent, padding: '8px 16px', borderRadius: 20, 
+                    color: 'white', display: 'flex', alignItems: 'center', gap: 6 
+                }}>
+                     <svg width={isMobileLayout ? "36" : "15"} height={isMobileLayout ? "36" : "14"} viewBox={isMobileLayout ? "0 0 36 36" : "0 0 15 14"} fill="none" xmlns="http://www.w3.org/2000/svg">
+                        {isMobileLayout ? (
+                            <>
+                                <rect width="35.2742" height="36" rx="17.6371" fill={themeColors.state.accent}/>
+                                <path d="M11.25 20.9971V21.7923C11.25 22.4276 11.5023 23.0368 11.9515 23.486C12.4007 23.9352 13.0099 24.1875 13.6452 24.1875H21.629C22.2643 24.1875 22.8735 23.9352 23.3227 23.486C23.7718 23.0368 24.0242 22.4276 24.0242 21.7923V20.994M17.6371 11.8125V20.5948M17.6371 20.5948L20.4315 17.8004M17.6371 20.5948L14.8427 17.8004" stroke="white" strokeOpacity="0.95" strokeWidth="1.4625" strokeLinecap="round" strokeLinejoin="round"/>
+                            </>
+                        ) : (
+                            <path d="M0.699219 9.88464V10.6798C0.699219 11.3151 0.951565 11.9243 1.40075 12.3735C1.84993 12.8227 2.45914 13.075 3.09438 13.075H11.0783C11.7135 13.075 12.3227 12.8227 12.7719 12.3735C13.2211 11.9243 13.4734 11.3151 13.4734 10.6798V9.88145M7.08632 0.699997V9.48226M7.08632 9.48226L9.88067 6.6879M7.08632 9.48226L4.29196 6.6879" stroke="white" strokeOpacity="0.95" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                        )}
+                    </svg>
+                    {!isMobileLayout && <span style={{ fontSize: 14, fontWeight: 500 }}>Download</span>}
+                </div>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '60px 20px 20px', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: '100%', maxWidth: 600, position: 'relative' }}>
+                     <div 
+                        ref={editorRef}
+                        contentEditable
+                        onInput={handleInput}
+                        onBlur={() => {
+                            if (editorRef.current && editorRef.current.innerHTML !== content) {
+                                editorRef.current.innerHTML = content
+                            }
+                        }}
+                        onKeyDown={handleMarkdownShortcuts}
+                        onPaste={(e) => {
+                             e.preventDefault();
+                             const text = e.clipboardData.getData('text/plain');
+                             document.execCommand('insertText', false, text);
+                        }}
+                        onPointerMove={handleEditorPointerMove}
+                        onPointerLeave={() => onCursorMove?.(-1, -1)}
+                        style={{ 
+                            outline: 'none', minHeight: '80vh', 
+                            fontSize: 'var(--doc-p-size)', 
+                            fontFamily: 'var(--doc-current-font)',
+                            lineHeight: 1.6,
+                            position: 'relative',
+                            zIndex: 1
                         }}
                     />
-                    {fontSizeInput}
-                </div>
-                <div 
-                    data-svg-wrapper 
-                    data-layer="plus" 
-                    className="Plus"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => updateFontSize(selectedFontSize + 1)}
-                    onMouseEnter={() => setHoveredToolbarItem('plus')}
-                    onMouseLeave={() => setHoveredToolbarItem(null)}
-                    style={{cursor: 'pointer', position: 'relative'}}
-                >
-                    <svg width="12" height="32" viewBox="0 0 12 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M10.8008 15.75H5.73828M5.73828 15.75H0.675781M5.73828 15.75V10.6875M5.73828 15.75V20.8125" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {hoveredToolbarItem === 'plus' && renderTooltip("Increase font size")}
-                </div>
-                </div>
-
-                {/* Bold */}
-                <div 
-                    data-layer="bold" 
-                    className="Bold" 
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleSmartFormat('bold')} 
-                    onMouseEnter={() => setHoveredToolbarItem('bold')}
-                    onMouseLeave={() => setHoveredToolbarItem(null)}
-                    style={{width: 36, height: 36, background: '#F5F5F5', borderRadius: 31.50, justifyContent: 'center', alignItems: 'center', display: 'flex', cursor: 'pointer', position: 'relative'}}
-                >
-                <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 15.75, fontFamily: 'Inter', fontWeight: '700', lineHeight: "21.73px", wordWrap: 'break-word'}}>B</div>
-                {hoveredToolbarItem === 'bold' && renderTooltip("Bold (⌘+B)")}
-                </div>
-
-                {/* List */}
-                <div 
-                    data-svg-wrapper 
-                    data-layer="list" 
-                    className="List"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleFormat('insertUnorderedList')} 
-                    onMouseEnter={() => setHoveredToolbarItem('list')}
-                    onMouseLeave={() => setHoveredToolbarItem(null)}
-                    style={{cursor: 'pointer', position: 'relative'}}
-                >
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="36" height="36" rx="18" fill="#F5F5F5"/>
-                <path d="M10.125 13.05C10.125 12.871 10.1961 12.6993 10.3227 12.5727C10.4493 12.4461 10.621 12.375 10.8 12.375H11.7C11.879 12.375 12.0507 12.4461 12.1773 12.5727C12.3039 12.6993 12.375 12.871 12.375 13.05C12.375 13.229 12.3039 13.4007 12.1773 13.5273C12.0507 13.6539 11.879 13.725 11.7 13.725H10.8C10.621 13.725 10.4493 13.6539 10.3227 13.5273C10.1961 13.4007 10.125 13.229 10.125 13.05ZM13.725 13.05C13.725 12.871 13.7961 12.6993 13.9227 12.5727C14.0493 12.4461 14.221 12.375 14.4 12.375H25.2C25.379 12.375 25.5507 12.4461 25.6773 12.5727C25.8039 12.6993 25.875 12.871 25.875 13.05C25.875 13.229 25.8039 13.4007 25.6773 13.5273C25.5507 13.6539 25.379 13.725 25.2 13.725H14.4C14.221 13.725 14.0493 13.6539 13.9227 13.5273C13.7961 13.4007 13.725 13.229 13.725 13.05ZM10.125 18C10.125 17.821 10.1961 17.6493 10.3227 17.5227C10.4493 17.3961 10.621 17.325 10.8 17.325H11.7C11.879 17.325 12.0507 17.3961 12.1773 17.5227C12.3039 17.6493 12.375 17.821 12.375 18C12.375 18.179 12.3039 18.3507 12.1773 18.4773C12.0507 18.6039 11.879 18.675 11.7 18.675H10.8C10.621 18.675 10.4493 18.6039 10.3227 18.4773C10.1961 18.3507 10.125 18.179 10.125 18ZM13.725 18C13.725 17.821 13.7961 17.6493 13.9227 17.5227C14.0493 17.3961 14.221 17.325 14.4 17.325H25.2C25.379 17.325 25.5507 17.3961 25.6773 17.5227C25.8039 17.6493 25.875 17.821 25.875 18C25.875 18.179 25.8039 18.3507 25.6773 18.4773C25.5507 18.6039 25.379 18.675 25.2 18.675H14.4C14.221 18.675 14.0493 18.6039 13.9227 18.4773C13.7961 18.3507 13.725 18.179 13.725 18ZM10.125 22.95C10.125 22.771 10.1961 22.5993 10.3227 22.4727C10.4493 22.3461 10.621 22.275 10.8 22.275H11.7C11.879 22.275 12.0507 22.3461 12.1773 22.4727C12.3039 22.5993 12.375 22.771 12.375 22.95C12.375 23.129 12.3039 23.3007 12.1773 23.4273C12.0507 23.5539 11.879 23.625 11.7 23.625H10.8C10.621 23.625 10.4493 23.5539 10.3227 23.4273C10.1961 23.3007 10.125 23.129 10.125 22.95ZM13.725 22.95C13.725 22.771 13.7961 22.5993 13.9227 22.4727C14.0493 22.3461 14.221 22.275 14.4 22.275H25.2C25.379 22.275 25.5507 22.3461 25.6773 22.4727C25.8039 22.5993 25.875 22.771 25.875 22.95C25.875 23.129 25.8039 23.3007 25.6773 23.4273C25.5507 23.5539 25.379 23.625 25.2 23.625H14.4C14.221 23.625 14.0493 23.5539 13.9227 23.4273C13.7961 23.3007 13.725 23.129 13.725 22.95Z" fill="black" fillOpacity="0.95"/>
-                </svg>
-                {hoveredToolbarItem === 'list' && renderTooltip("Bullet List")}
-                </div>
-
-                {/* Link */}
-                <div ref={linkDropdownRef} style={{position: 'relative'}}>
-                    <div 
-                        data-svg-wrapper 
-                        data-layer="link" 
-                        className="Link"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setShowLinkDropdown(!showLinkDropdown)} 
-                        onMouseEnter={() => setHoveredToolbarItem('link')}
-                        onMouseLeave={() => setHoveredToolbarItem(null)}
-                        style={{cursor: 'pointer', position: 'relative'}}
-                    >
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="36" height="36" rx="18" fill="#F5F5F5"/>
-                    <path d="M21.2686 18.87L23.2815 16.8571C24.4584 15.6801 24.4851 13.7981 23.3407 12.6537C22.1963 11.5093 20.3143 11.536 19.1373 12.7129L17.1244 14.7258M18.9005 21.2381L16.8853 23.245C15.7071 24.4196 13.8819 24.5599 12.6795 23.3042C11.4777 22.0491 11.5618 20.2849 12.7399 19.1103L14.7552 17.1034M15.5005 20.4939L20.5244 15.47" stroke="black" strokeOpacity="0.95" strokeWidth="1.2375" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    </div>
-                    {hoveredToolbarItem === 'link' && renderTooltip("Insert Link")}
-                    {showLinkDropdown && (
-                        <div style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        left: 0,
-                        padding: 10,
-                        background: themeColors.surfaceMenu,
-                        boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)',
-                        borderRadius: 28,
-                        outline: `0.33px ${themeColors.border.subtle} solid`,
-                        outlineOffset: '-0.33px',
-                        zIndex: 1000,
-                        minWidth: 200,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 4
-                        }}>
-                        <input
-                            type="text"
-                            placeholder="Enter URL..."
-                            autoFocus
-                            onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleInsertLink((e.target as HTMLInputElement).value)
-                                ;(e.target as HTMLInputElement).value = ''
-                            }
-                            }}
-                            style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: themeColors.surface,
-                            border: 'none',
-                            borderRadius: 20,
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                            fontWeight: '400',
-                            lineHeight: '19.32px',
-                            color: themeColors.text.primary,
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                            }}
-                        />
-                        {isLinkActive && (
-                            <div
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={handleRemoveLink}
-                                className="remove-link-btn"
-                                style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: 14,
-                                fontFamily: 'Inter',
-                                fontWeight: '400',
-                                lineHeight: '19.32px',
-                                color: themeColors.text.primary,
-                                background: 'transparent',
-                                borderRadius: 28,
-                                transition: 'all 0.2s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#FF3B301A' // Red tint
-                                    e.currentTarget.style.color = '#FF3B30' // Red text
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'transparent'
-                                    e.currentTarget.style.color = themeColors.text.primary
-                                }}
-                            >
-                                Remove Link
-                            </div>
-                        )}
-                        </div>
+                    {remoteCursor && remoteCursor.x >= 0 && remoteCursor.x <= 1 && remoteCursor.y >= 0 && (
+                        <LiveCursor x={remoteCursor.x} y={remoteCursor.y} color={remoteCursor.color} />
                     )}
                 </div>
             </div>
-
-            <div data-layer="download" className="Download" style={{justifyContent: 'flex-end', alignItems: 'center', gap: 11.25, display: 'flex'}}>
-                <div 
-                    data-layer="font family" 
-                    className="FontFamily"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={downloadDoc} 
-                    onMouseEnter={() => setHoveredToolbarItem('download')}
-                    onMouseLeave={() => setHoveredToolbarItem(null)}
-                    style={{
-                        height: isMobileLayout ? 36 : 36,
-                        paddingLeft: isMobileLayout ? 0 : 12,
-                        paddingRight: isMobileLayout ? 0 : 12,
-                        background: themeColors.state.accent,
-                        borderRadius: 31.50,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: 8,
-                        display: 'inline-flex',
-                        cursor: 'pointer',
-                        position: 'relative',
-                        width: isMobileLayout ? 36 : 'auto'
-                    }}
-                >
-                    <div data-svg-wrapper data-layer="download icon" className="DownloadIcon">
-                        <svg width={isMobileLayout ? "36" : "15"} height={isMobileLayout ? "36" : "14"} viewBox={isMobileLayout ? "0 0 36 36" : "0 0 15 14"} fill="none" xmlns="http://www.w3.org/2000/svg">
-                            {isMobileLayout ? (
-                                <>
-                                    <rect width="35.2742" height="36" rx="17.6371" fill={themeColors.state.accent}/>
-                                    <path d="M11.25 20.9971V21.7923C11.25 22.4276 11.5023 23.0368 11.9515 23.486C12.4007 23.9352 13.0099 24.1875 13.6452 24.1875H21.629C22.2643 24.1875 22.8735 23.9352 23.3227 23.486C23.7718 23.0368 24.0242 22.4276 24.0242 21.7923V20.994M17.6371 11.8125V20.5948M17.6371 20.5948L20.4315 17.8004M17.6371 20.5948L14.8427 17.8004" stroke="white" strokeOpacity="0.95" strokeWidth="1.4625" strokeLinecap="round" strokeLinejoin="round"/>
-                                </>
-                            ) : (
-                                <path d="M0.699219 9.88464V10.6798C0.699219 11.3151 0.951565 11.9243 1.40075 12.3735C1.84993 12.8227 2.45914 13.075 3.09438 13.075H11.0783C11.7135 13.075 12.3227 12.8227 12.7719 12.3735C13.2211 11.9243 13.4734 11.3151 13.4734 10.6798V9.88145M7.08632 0.699997V9.48226M7.08632 9.48226L9.88067 6.6879M7.08632 9.48226L4.29196 6.6879" stroke="white" strokeOpacity="0.95" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                            )}
-                        </svg>
-                    </div>
-                    {!isMobileLayout && (
-                        <div data-layer="Download" className="Download" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '500', lineHeight: 19.32, wordWrap: 'break-word'}}>Download</div>
-                    )}
-                    {hoveredToolbarItem === 'download' && renderTooltip("Download")}
-                </div>
-            </div>
-          </div>
-          
-          {/* Content Area */}
-          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 540, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flex: 1, overflow: 'hidden'}}>
-            <div 
-                className="DocContentArea"
-                style={{
-                    flex: '1 1 0', 
-                    height: '100%',
-                    paddingTop: 48,
-                    justifyContent: 'flex-start', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    color: 'rgba(0, 0, 0, 0.95)', 
-                    fontSize: `${settings.pSize}px`, // Use setting size
-                    fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif',
-                    fontStyle: 'normal',
-                    fontWeight: '400', 
-                    lineHeight: 1.5, 
-                    wordWrap: 'break-word',
-                    overflowY: 'auto'
-                }}
-            >
-                <div 
-                    ref={editorRef}
-                    contentEditable
-                    onInput={handleInput}
-                    onKeyDown={handleMarkdownShortcuts}
-                    onPaste={handlePaste}
-                    onClick={handleEditorClick}
-                    suppressContentEditableWarning={true}
-                    style={{ minHeight: "100%", outline: "none" }}
-                />
-            </div>
-          </div>
-
-          <style>{`
-                .DocContentArea em, .DocContentArea i { font-style: normal !important; }
-                .DocContentArea ul { padding-left: 20px; margin: 8px 0; }
-                .DocContentArea ol { padding-left: 20px; margin: 8px 0; }
-                .DocContentArea * { color: rgba(0, 0, 0, 0.95) !important; }
-                .DocContentArea img { display: none !important; }
-                .DocContentArea h1 { 
-                    font-size: ${settings.h1Size}px; 
-                    font-weight: bold; 
-                    margin: 0.5em 0 0.25em 0; 
-                    text-align: left;
-                }
-                .DocContentArea h2 { 
-                    font-size: ${settings.h2Size}px; 
-                    font-weight: bold; 
-                    margin: 1em 0 0.5em 0; 
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    border-bottom: 1px solid #000;
-                    padding-bottom: 2px;
-                    text-align: left;
-                }
-                .DocContentArea p { margin: 0.25em 0; text-align: left; }
-                .DocContentArea li { text-align: left; }
-                /* Hide number input spinners */
-                input[type=number]::-webkit-inner-spin-button, 
-                input[type=number]::-webkit-outer-spin-button { 
-                    -webkit-appearance: none; 
-                    margin: 0; 
-                }
-                input[type=number] {
-                    -moz-appearance: textfield;
-                }
-          `}</style>
+            
+            <style>{`
+                .DocEditor h1 { font-size: var(--doc-h1-size); font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; }
+                .DocEditor h2 { font-size: var(--doc-h2-size); font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 1.2em; margin-bottom: 0.5em; }
+                .DocEditor ul, .DocEditor ol { padding-left: 24px; margin: 12px 0; }
+                .DocEditor a { color: var(--doc-accent); text-decoration: underline; cursor: pointer; }
+            `}</style>
         </div>
     )
 })
@@ -1912,6 +1620,17 @@ const ChatInput = React.memo(function ChatInput({
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
     const [isAddFilesTooltipHovered, setIsAddFilesTooltipHovered] = React.useState(false)
     const [isEndCallTooltipHovered, setIsEndCallTooltipHovered] = React.useState(false)
+    const [showGradient, setShowGradient] = React.useState(true)
+
+    // Handle gradient animation when transitioning into/out of doc editor
+    React.useEffect(() => {
+        setShowGradient(false) // Instantly hide gradient
+        const timeout = setTimeout(() => {
+            setShowGradient(true) // Show gradient after 0.2s
+        }, 200)
+        return () => clearTimeout(timeout)
+    }, [isResumeOpen])
+
     const [showMenu, setShowMenu] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
     const menuRef = React.useRef<HTMLDivElement>(null)
@@ -2206,14 +1925,19 @@ const ChatInput = React.memo(function ChatInput({
                 </>
             )}
 
-          <motion.div 
-            key={isResumeOpen ? 'resume-open' : 'resume-closed'}
+          <div 
             data-layer="overlay" 
             className="Overlay" 
-            style={{width: "100%", padding: "24px 0 16px 0", background: isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`, justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0, delay: 0.2 }}
+            style={{
+                width: "100%", 
+                padding: "24px 0 16px 0", 
+                background: showGradient ? (isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`) : 'transparent',
+                justifyContent: 'center',
+                alignItems: 'flex-end',
+                gap: 10,
+                display: 'flex',
+                transition: showGradient ? 'background 0.2s ease' : 'none'
+            }}
           >
             
             {/* INPUT BOX */}
@@ -2539,7 +2263,7 @@ const ChatInput = React.memo(function ChatInput({
               </div>
             )}
 
-          </motion.div>
+          </div>
         </div>
     )
 })
@@ -4655,6 +4379,19 @@ export default function OmegleMentorshipUI(props: Props) {
         }, 500)
     }, [])
 
+    const handleDocPointerMove = React.useCallback((x: number, y: number) => {
+        if (!dataConnectionRef.current || !dataConnectionRef.current.open) return
+        
+        const now = Date.now()
+        if (now - lastCursorUpdate.current < 50) return // Limit to 20fps
+        lastCursorUpdate.current = now
+
+        dataConnectionRef.current.send({
+            type: 'cursor-update',
+            payload: { x, y, color: myCursorColor.current }
+        })
+    }, [])
+
     const handleWhiteboardPointerMove = React.useCallback((e: React.PointerEvent) => {
         if (!isWhiteboardOpen || !dataConnectionRef.current || !dataConnectionRef.current.open) return
         
@@ -6188,6 +5925,8 @@ export default function OmegleMentorshipUI(props: Props) {
                                     onSettingsChange={setResumeSettings}
                                     themeColors={themeColors}
                                     isMobileLayout={isMobileLayout}
+                                    remoteCursor={remoteCursor}
+                                    onCursorMove={handleDocPointerMove}
                                 />
                             ) : isWhiteboardOpen ? (
                                 <div 
