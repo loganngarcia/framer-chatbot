@@ -967,10 +967,10 @@ const ToolbarButton = React.memo(({
         onMouseEnter={() => onHoverChange(true)}
         onMouseLeave={() => onHoverChange(false)}
         style={{
-            width: 36, 
-            height: 36, 
-            background: isActive ? '#E5E5E5' : '#F5F5F5', 
-            borderRadius: 31.5, 
+            width: 40, 
+            height: 40, 
+            background: isActive ? '#E5E5E5' : '#F6F6F6', 
+            borderRadius: 35, 
             justifyContent: 'center', 
             alignItems: 'center', 
             display: 'flex', 
@@ -1068,9 +1068,9 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         '--doc-p-size': `${settings.pSize}px`,
         '--doc-font-serif': '"Times New Roman", serif',
         '--doc-font-sans': 'Inter, sans-serif',
-        '--doc-accent': themeColors.state.accent,
+        '--doc-accent': '#0099FF',
         '--doc-current-font': settings.fontStyle === 'serif' ? 'var(--doc-font-serif)' : 'var(--doc-font-sans)'
-    } as React.CSSProperties), [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle, themeColors.state.accent])
+    } as React.CSSProperties), [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle])
 
     // --- Core Editor Logic ---
     
@@ -1396,42 +1396,47 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
     }, [onCursorMove])
 
     return (
-        <div className="DocEditor" style={{ ...styleVariables, width: '100%', height: '100%', position: 'relative', background: 'white', display: 'flex', flexDirection: 'column' }}>
+        <div className="DocEditor" style={{ ...styleVariables, width: '100%', height: '100%', position: 'relative', background: 'white', color: 'rgba(0, 0, 0, 0.95)', display: 'flex', flexDirection: 'column' }}>
             {/* Toolbar */}
             <div className="ToolbarContainer" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', 
-                zIndex: 100, width: '100%', maxWidth: 728, 
-                display: 'flex', justifyContent: 'space-between', alignItems: isMobileLayout ? 'center' : 'flex-start'
+                zIndex: 100, width: '100%', maxWidth: 1800, 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                paddingLeft: 16, paddingRight: 16
             }}>
                 <div className="Left" style={{
-                     background: '#F5F5F5', borderRadius: 28, display: 'flex', alignItems: 'center', gap: 4, padding: 2
+                     maxWidth: 808.89, background: '#F6F6F6', borderRadius: 31.11, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex', flexWrap: 'wrap', alignContent: 'center'
                 }}>
                     {/* Font Size Control */}
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#F5F5F5', borderRadius: 28, padding: '0 8px', height: 36 }}>
+                    <div style={{ height: 40, paddingLeft: 8, paddingRight: 4, background: '#F6F6F6', borderRadius: 35, justifyContent: 'center', alignItems: 'center', gap: 4, display: 'flex' }}>
                         <div 
                             onClick={() => updateFontSize(selectedFontSize - 1)}
                             onMouseDown={(e) => e.preventDefault()}
-                            style={{ cursor: 'pointer', padding: '0 4px' }}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
-                            <svg width="12" height="32" viewBox="0 0 12 32" fill="none"><path d="M0.675781 15.75H10.8008" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            <svg width="16" height="40" viewBox="0 0 16 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ pointerEvents: 'none' }}>
+                                <path d="M2 20H14" stroke="black" strokeOpacity="0.95" strokeWidth="1.23935" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                         </div>
-                        <div style={{ position: 'relative', width: 24, textAlign: 'center', fontSize: 14 }}>
+                        <div style={{ width: 24, textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: '19.32px', wordWrap: 'break-word' }}>
                              <input 
                                 type="number" 
                                 value={fontSizeInput}
                                 onChange={(e) => { setFontSizeInput(e.target.value); const v = parseInt(e.target.value); if(!isNaN(v)) updateFontSize(v); }}
                                 onFocus={() => setIsEditingFontSize(true)}
                                 onBlur={() => { setIsEditingFontSize(false); setFontSizeInput(selectedFontSize.toString()) }}
-                                style={{ width: '100%', opacity: 0, position: 'absolute', left: 0, top: 0, height: '100%', cursor: 'text' }}
+                                style={{ width: '100%', opacity: 0, position: 'absolute', cursor: 'text' }}
                             />
                             {fontSizeInput}
                         </div>
                         <div 
                             onClick={() => updateFontSize(selectedFontSize + 1)}
                             onMouseDown={(e) => e.preventDefault()}
-                            style={{ cursor: 'pointer', padding: '0 4px' }}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
-                             <svg width="12" height="32" viewBox="0 0 12 32" fill="none"><path d="M10.8008 15.75H5.73828M5.73828 15.75H0.675781M5.73828 15.75V10.6875M5.73828 15.75V20.8125" stroke="black" strokeOpacity="0.95" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            <svg width="16" height="40" viewBox="0 0 16 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ pointerEvents: 'none' }}>
+                                <path d="M14 20H8M8 20H2M8 20V14M8 20V26" stroke="black" strokeOpacity="0.95" strokeWidth="1.28" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                         </div>
                     </div>
 
@@ -1440,9 +1445,23 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                         id="bold" 
                         onClick={() => handleSmartFormat('bold')} 
                         tooltip="Bold (⌘+B)"
-                        icon={<div style={{fontWeight: 700, fontSize: 16}}>B</div>}
+                        icon={<div style={{fontWeight: 700, fontSize: 17.50, lineHeight: '24.15px'}}>B</div>}
                         isHovered={hoveredToolbarItem === 'bold'}
                         onHoverChange={(hovered) => setHoveredToolbarItem(hovered ? 'bold' : null)}
+                    />
+
+                    {/* Italic */}
+                    <ToolbarButton 
+                        id="italic" 
+                        onClick={() => handleFormat('italic')} 
+                        tooltip="Italic (⌘+I)"
+                        icon={
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20.2782 10.5H14.1671M17.8338 21.5H11.7227M17.5282 10.5L14.7782 21.5" stroke="black" strokeOpacity="0.95" strokeWidth="1.32" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        }
+                        isHovered={hoveredToolbarItem === 'italic'}
+                        onHoverChange={(hovered) => setHoveredToolbarItem(hovered ? 'italic' : null)}
                     />
 
                     {/* List */}
@@ -1451,9 +1470,9 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                         onClick={() => handleFormat('insertUnorderedList')} 
                         tooltip="Bullet List"
                         icon={
-                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                                <rect width="36" height="36" rx="18" fill="none"/>
-                                <path d="M10.125 13.05C10.125 12.871 10.1961 12.6993 10.3227 12.5727C10.4493 12.4461 10.621 12.375 10.8 12.375H11.7C11.879 12.375 12.0507 12.4461 12.1773 12.5727C12.3039 12.6993 12.375 12.871 12.375 13.05C12.375 13.229 12.3039 13.4007 12.1773 13.5273C12.0507 13.6539 11.879 13.725 11.7 13.725H10.8C10.621 13.725 10.4493 13.6539 10.3227 13.5273C10.1961 13.4007 10.125 13.229 10.125 13.05ZM13.725 13.05C13.725 12.871 13.7961 12.6993 13.9227 12.5727C14.0493 12.4461 14.221 12.375 14.4 12.375H25.2C25.379 12.375 25.5507 12.4461 25.6773 12.5727C25.8039 12.6993 25.875 12.871 25.875 13.05C25.875 13.229 25.8039 13.4007 25.6773 13.5273C25.5507 13.6539 25.379 13.725 25.2 13.725H14.4C14.221 13.725 14.0493 13.6539 13.9227 13.5273C13.7961 13.4007 13.725 13.229 13.725 13.05ZM10.125 18C10.125 17.821 10.1961 17.6493 10.3227 17.5227C10.4493 17.3961 10.621 17.325 10.8 17.325H11.7C11.879 17.325 12.0507 17.3961 12.1773 17.5227C12.3039 17.6493 12.375 17.821 12.375 18C12.375 18.179 12.3039 18.3507 12.1773 18.4773C12.0507 18.6039 11.879 18.675 11.7 18.675H10.8C10.621 18.675 10.4493 18.6039 10.3227 18.4773C10.1961 18.3507 10.125 18.179 10.125 18ZM13.725 18C13.725 17.821 13.7961 17.6493 13.9227 17.5227C14.0493 17.3961 14.221 17.325 14.4 17.325H25.2C25.379 17.325 25.5507 17.3961 25.6773 17.5227C25.8039 17.6493 25.875 17.821 25.875 18C25.875 18.179 25.8039 18.3507 25.6773 18.4773C25.5507 18.6039 25.379 18.675 25.2 18.675H14.4C14.221 18.675 14.0493 18.6039 13.9227 18.4773C13.7961 18.3507 13.725 18.179 13.725 18ZM10.125 22.95C10.125 22.771 10.1961 22.5993 10.3227 22.4727C10.4493 22.3461 10.621 22.275 10.8 22.275H11.7C11.879 22.275 12.0507 22.3461 12.1773 22.4727C12.3039 22.5993 12.375 22.771 12.375 22.95C12.375 23.129 12.3039 23.3007 12.1773 23.4273C12.0507 23.5539 11.879 23.625 11.7 23.625H10.8C10.621 23.625 10.4493 23.5539 10.3227 23.4273C10.1961 23.3007 10.125 23.129 10.125 22.95ZM13.725 22.95C13.725 22.771 13.7961 22.5993 13.9227 22.4727C14.0493 22.3461 14.221 22.275 14.4 22.275H25.2C25.379 22.275 25.5507 22.3461 25.6773 22.4727C25.8039 22.5993 25.875 22.771 25.875 22.95C25.875 23.129 25.8039 23.3007 25.6773 23.4273C25.5507 23.5539 25.379 23.625 25.2 23.625H14.4C14.221 23.625 14.0493 23.5539 13.9227 23.4273C13.7961 23.3007 13.725 23.129 13.725 22.95Z" fill="black" fillOpacity="0.95"/>
+                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="40" height="40" rx="20" fill="#F6F6F6"/>
+                                <path d="M12.5 15.2857C12.5 15.1152 12.5677 14.9517 12.6883 14.8311C12.8088 14.7106 12.9724 14.6429 13.1429 14.6429H14C14.1705 14.6429 14.334 14.7106 14.4546 14.8311C14.5751 14.9517 14.6429 15.1152 14.6429 15.2857C14.6429 15.4562 14.5751 15.6197 14.4546 15.7403C14.334 15.8608 14.1705 15.9286 14 15.9286H13.1429C12.9724 15.9286 12.8088 15.8608 12.6883 15.7403C12.5677 15.6197 12.5 15.4562 12.5 15.2857ZM15.9286 15.2857C15.9286 15.1152 15.9963 14.9517 16.1169 14.8311C16.2374 14.7106 16.4009 14.6429 16.5714 14.6429H26.8571C27.0276 14.6429 27.1912 14.7106 27.3117 14.8311C27.4323 14.9517 27.5 15.1152 27.5 15.2857C27.5 15.4562 27.4323 15.6197 27.3117 15.7403C27.1912 15.8608 27.0276 15.9286 26.8571 15.9286H16.5714C16.4009 15.9286 16.2374 15.8608 16.1169 15.7403C15.9963 15.6197 15.9286 15.4562 15.9286 15.2857ZM12.5 20C12.5 19.8295 12.5677 19.666 12.6883 19.5454C12.8088 19.4249 12.9724 19.3571 13.1429 19.3571H14C14.1705 19.3571 14.334 19.4249 14.4546 19.5454C14.5751 19.666 14.6429 19.8295 14.6429 20C14.6429 20.1705 14.5751 20.334 14.4546 20.4546C14.334 20.5751 14.1705 20.6429 14 20.6429H13.1429C12.9724 20.6429 12.8088 20.5751 12.6883 20.4546C12.5677 20.334 12.5 20.1705 12.5 20ZM15.9286 20C15.9286 19.8295 15.9963 19.666 16.1169 19.5454C16.2374 19.4249 16.4009 19.3571 16.5714 19.3571H26.8571C27.0276 19.3571 27.1912 19.4249 27.3117 19.5454C27.4323 19.666 27.5 19.8295 27.5 20C27.5 20.1705 27.4323 20.334 27.3117 20.4546C27.1912 20.5751 27.0276 20.6429 26.8571 20.6429H16.5714C16.4009 20.6429 16.2374 20.5751 16.1169 20.4546C15.9963 20.334 15.9286 20.1705 15.9286 20ZM12.5 24.7143C12.5 24.5438 12.5677 24.3803 12.6883 24.2597C12.8088 24.1392 12.9724 24.0714 13.1429 24.0714H14C14.1705 24.0714 14.334 24.1392 14.4546 24.2597C14.5751 24.3803 14.6429 24.5438 14.6429 24.7143C14.6429 24.8848 14.5751 25.0483 14.4546 25.1689C14.334 25.2894 14.1705 25.3571 14 25.3571H13.1429C12.9724 25.3571 12.8088 25.2894 12.6883 25.1689C12.5677 25.0483 12.5 24.8848 12.5 24.7143ZM15.9286 24.7143C15.9286 24.5438 15.9963 24.3803 16.1169 24.2597C16.2374 24.1392 16.4009 24.0714 16.5714 24.0714H26.8571C27.0276 24.0714 27.1912 24.1392 27.3117 24.2597C27.4323 24.3803 27.5 24.5438 27.5 24.7143C27.5 24.8848 27.4323 25.0483 27.3117 25.1689C27.1912 25.2894 27.0276 25.3571 26.8571 25.3571H16.5714C16.4009 25.3571 16.2374 25.2894 16.1169 25.1689C15.9963 25.0483 15.9286 24.8848 15.9286 24.7143Z" fill="black" fillOpacity="0.95"/>
                             </svg>
                         }
                         isHovered={hoveredToolbarItem === 'list'}
@@ -1468,9 +1487,9 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                             tooltip="Link (⌘+K)"
                             isActive={showLinkDropdown || isLinkActive}
                             icon={
-                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                                    <rect width="36" height="36" rx="18" fill="none"/>
-                                    <path d="M21.2686 18.87L23.2815 16.8571C24.4584 15.6801 24.4851 13.7981 23.3407 12.6537C22.1963 11.5093 20.3143 11.536 19.1373 12.7129L17.1244 14.7258M18.9005 21.2381L16.8853 23.245C15.7071 24.4196 13.8819 24.5599 12.6795 23.3042C11.4777 22.0491 11.5618 20.2849 12.7399 19.1103L14.7552 17.1034M15.5005 20.4939L20.5244 15.47" stroke="black" strokeOpacity="0.95" strokeWidth="1.2375" strokeLinecap="round" strokeLinejoin="round"/>
+                                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="40" height="40" rx="20" fill="#F6F6F6"/>
+                                    <path d="M23.4335 20.9139L25.548 18.7993C26.7844 17.563 26.8124 15.5859 25.6102 14.3837C24.408 13.1815 22.4309 13.2095 21.1946 14.4459L19.08 16.5604M20.9458 23.4016L18.8288 25.5099C17.5911 26.7438 15.6737 26.8912 14.4106 25.5721C13.1481 24.2536 13.2364 22.4003 14.474 21.1664L16.5911 19.0581M17.3741 22.6198L22.6517 17.3422" stroke="black" strokeOpacity="0.95" strokeWidth="1.13455" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             }
                             isHovered={hoveredToolbarItem === 'link'}
@@ -1501,20 +1520,13 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
 
                 {/* Download */}
                 <div onClick={downloadDoc} style={{ 
-                    cursor: 'pointer', background: themeColors.state.accent, padding: '8px 16px', borderRadius: 20, 
-                    color: 'white', display: 'flex', alignItems: 'center', gap: 6 
+                    height: 40, paddingLeft: 14, paddingRight: 14, background: '#0099FF', borderRadius: 35, 
+                    justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex', cursor: 'pointer'
                 }}>
-                     <svg width={isMobileLayout ? "36" : "15"} height={isMobileLayout ? "36" : "14"} viewBox={isMobileLayout ? "0 0 36 36" : "0 0 15 14"} fill="none" xmlns="http://www.w3.org/2000/svg">
-                        {isMobileLayout ? (
-                            <>
-                                <rect width="35.2742" height="36" rx="17.6371" fill={themeColors.state.accent}/>
-                                <path d="M11.25 20.9971V21.7923C11.25 22.4276 11.5023 23.0368 11.9515 23.486C12.4007 23.9352 13.0099 24.1875 13.6452 24.1875H21.629C22.2643 24.1875 22.8735 23.9352 23.3227 23.486C23.7718 23.0368 24.0242 22.4276 24.0242 21.7923V20.994M17.6371 11.8125V20.5948M17.6371 20.5948L20.4315 17.8004M17.6371 20.5948L14.8427 17.8004" stroke="white" strokeOpacity="0.95" strokeWidth="1.4625" strokeLinecap="round" strokeLinejoin="round"/>
-                            </>
-                        ) : (
-                            <path d="M0.699219 9.88464V10.6798C0.699219 11.3151 0.951565 11.9243 1.40075 12.3735C1.84993 12.8227 2.45914 13.075 3.09438 13.075H11.0783C11.7135 13.075 12.3227 12.8227 12.7719 12.3735C13.2211 11.9243 13.4734 11.3151 13.4734 10.6798V9.88145M7.08632 0.699997V9.48226M7.08632 9.48226L9.88067 6.6879M7.08632 9.48226L4.29196 6.6879" stroke="white" strokeOpacity="0.95" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                        )}
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ pointerEvents: 'none' }}>
+                        <path d="M0.699219 10.3485V11.1839C0.699219 11.8512 0.96431 12.4912 1.43618 12.963C1.90804 13.4349 2.54803 13.7 3.21535 13.7H11.6024C12.2698 13.7 12.9097 13.4349 13.3816 12.963C13.8535 12.4912 14.1186 11.8512 14.1186 11.1839V10.3452M7.4089 0.699997V9.9258M7.4089 9.9258L10.3444 6.99032M7.4089 9.9258L4.47341 6.99032" stroke="white" strokeOpacity="0.95" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    {!isMobileLayout && <span style={{ fontSize: 14, fontWeight: 500 }}>Download</span>}
+                    {!isMobileLayout && <div style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '600', lineHeight: '19.32px', wordWrap: 'break-word', pointerEvents: 'none' }}>Download</div>}
                 </div>
             </div>
 
@@ -2972,8 +2984,9 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isDocOpen, setIsDocOpen] = React.useState(false)
     
     // --- THEME LOGIC ---
-    const isLightMode = isDocOpen
+    const isLightMode = false // Always dark mode for shell, DocEditor handles its own light theme
     const themeColors = isLightMode ? lightColors : darkColors
+    const chatThemeColors = isDocOpen ? lightColors : themeColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(`
@@ -5710,8 +5723,8 @@ Do not include markdown formatting or explanations.`
                     flexDirection: "column",
                     gap: 8, // Reduced gap
                     paddingTop: 16, 
-                    paddingLeft: 16,
-                    paddingRight: 16,
+                    paddingLeft: isDocOpen ? 0 : 16,
+                    paddingRight: isDocOpen ? 0 : 16,
                     paddingBottom: 0,
                     boxSizing: "border-box",
                     minHeight: 0,
@@ -5725,7 +5738,10 @@ Do not include markdown formatting or explanations.`
                         height: isMobileLayout ? "auto" : 140, 
                         width: "100%",
                         justifyContent: "center",
-                        flexShrink: 0
+                        flexShrink: 0,
+                        paddingLeft: isDocOpen ? 16 : 0,
+                        paddingRight: isDocOpen ? 16 : 0,
+                        boxSizing: "border-box"
                     }}>
                         {/* CAMERA 1: Left (Student Position) */}
                         <div style={{ 
@@ -5905,7 +5921,7 @@ Do not include markdown formatting or explanations.`
                                 </>
                             )}
 
-                            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: 14, position: "relative" }}>
+                            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: isDocOpen ? "28px 28px 0 0" : 14, position: "relative", background: isDocOpen ? "white" : "transparent" }}>
                             {isDocOpen ? (
                                 <DocEditor 
                                     content={docContent} 
@@ -6111,8 +6127,7 @@ Do not include markdown formatting or explanations.`
                 style={{
                     height: 24,
                     width: "100%",
-                    maxWidth: 728,
-                    margin: "0 auto",
+                    background: isDocOpen ? "white" : "transparent",
                     ...styles.flexCenter,
                     cursor: "ns-resize",
                     flexShrink: 0,
@@ -6131,12 +6146,12 @@ Do not include markdown formatting or explanations.`
             </div>
 
             {/* 3. AI CHAT HISTORY LAYER */}
+            <div style={{ width: "100%", background: isDocOpen ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
             <div 
                 style={{
                     height: chatHeight,
                     width: "100%",
                     maxWidth: 728,
-                    margin: "0 auto",
                     position: "relative",
                     display: "flex",
                     flexDirection: "column",
@@ -6162,7 +6177,7 @@ Do not include markdown formatting or explanations.`
                     }}
                 >
                     {messages.map((msg, idx) => (
-                        <MessageBubble key={idx} id={`msg-${idx}`} msg={msg} isMobileLayout={isMobileLayout} isLast={idx === messages.length - 1} themeColors={themeColors} />
+                        <MessageBubble key={idx} id={`msg-${idx}`} msg={msg} isMobileLayout={isMobileLayout} isLast={idx === messages.length - 1} themeColors={chatThemeColors} />
                     ))}
                     {isLoading && (!messages.length || messages[messages.length - 1].role !== "model" || messages[messages.length - 1].text.length === 0) && (
                         <div style={{ 
@@ -6182,7 +6197,7 @@ Do not include markdown formatting or explanations.`
                                     <g clipPath="url(#clipLoadAnimMentorship)">
                                         <path
                                             d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                            fill={isDocOpen ? themeColors.text.primary : "white"}
+                                            fill={chatThemeColors.text.primary}
                                         />
                                     </g>
                                     <defs>
@@ -6190,7 +6205,7 @@ Do not include markdown formatting or explanations.`
                                             <rect
                                                 width="20"
                                                 height="20"
-                                                fill={isDocOpen ? themeColors.text.primary : "white"}
+                                                fill={chatThemeColors.text.primary}
                                             />
                                         </clipPath>
                                     </defs>
@@ -6241,9 +6256,10 @@ Do not include markdown formatting or explanations.`
                         isMobileLayout={isMobileLayout}
                         isLiveMode={isLiveMode}
                         onPasteFile={processFiles}
-                        themeColors={themeColors}
+                        themeColors={chatThemeColors}
                     />
                 </div>
+            </div>
             </div>
 
             {/* REPORT MODAL */}
