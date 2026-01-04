@@ -1966,7 +1966,7 @@ const ChatInput = React.memo(function ChatInput({
                 minHeight: 56, 
                 maxHeight: 384, 
                 padding: 10, 
-                background: (isDocOpen || isWhiteboardOpen) ? 'transparent' : themeColors.surface, 
+                background: themeColors === lightColors ? themeColors.background : ((isDocOpen || isWhiteboardOpen) ? 'transparent' : themeColors.surface), 
                 outline: (isDocOpen || isWhiteboardOpen) ? `0.33px ${themeColors.border.subtle} solid` : 'none',
                 outlineOffset: (isDocOpen || isWhiteboardOpen) ? '-0.33px' : 0,
                 overflow: 'visible',
@@ -3290,6 +3290,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const activeAudioSourcesRef = React.useRef<AudioBufferSourceNode[]>([])
     const liveNextPlayTimeRef = React.useRef<number>(0)
     const transcriptionTimeoutRef = React.useRef<any>(null)
+    const silenceTimerRef = React.useRef<any | null>(null)
     const isUserMessageInProgressRef = React.useRef(false)
     const suggestionsGeneratedForTurnRef = React.useRef(false)
     const lastUserSpeechTimeRef = React.useRef(0)
@@ -3450,6 +3451,10 @@ Do not include markdown formatting or explanations.`
     )
 
     const stopLiveSession = React.useCallback(() => {
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current)
+            silenceTimerRef.current = null
+        }
         stopAllAudio()
         if (liveClientRef.current) {
             liveClientRef.current.close()
@@ -3470,6 +3475,7 @@ Do not include markdown formatting or explanations.`
         
         // Clear local stream if it was set by live session
         if (localStreamRef.current) {
+             localStreamRef.current.getTracks().forEach(track => track.stop())
              setLocalStream(null)
              localStreamRef.current = null
         }
@@ -3491,6 +3497,73 @@ Do not include markdown formatting or explanations.`
         isUserMessageInProgressRef.current = false
     }, [stopAllAudio])
 
+    const cleanup = React.useCallback(() => {
+        const isAiSession = isLiveMode || !!liveClientRef.current
+
+        // Always attempt to stop live session to ensure state is reset
+        stopLiveSession()
+        
+        if (localStreamRef.current)
+            localStreamRef.current.getTracks().forEach((t) => t.stop())
+        
+        // Stop screen share when call ends
+        // Manually stop screen share logic here instead of calling function that might not be defined
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach((track: any) => track.stop())
+            screenStreamRef.current = null
+        }
+        if (screenCallRef.current) {
+            screenCallRef.current.close()
+            screenCallRef.current = null
+        }
+        setIsScreenSharing(false)
+        if (isWhiteboardOpenRef.current) {
+             // Re-open whiteboard if it was closed due to screen share
+             // But here we are cleaning up everything, so no need.
+        }
+
+        if (activeCall.current) activeCall.current.close()
+        if (dataConnectionRef.current) dataConnectionRef.current.close()
+        
+        if (peerInstance.current) peerInstance.current.destroy()
+        if (mqttClient.current) mqttClient.current.end()
+        
+        // Clear state ONLY if it was NOT an AI session (P2P Reset)
+        if (!isAiSession) {
+            // Clear whiteboard state
+            setIsWhiteboardOpen(false)
+            setHasWhiteboardStarted(false)
+            setEditor(null) 
+            setIsDocOpen(false)
+            setDocContent(`
+<h1>Welcome to your notes 🩵 </h1>
+<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
+            `.trim())
+
+            setMessages([])
+            setAttachments([])
+            setLogs([])
+        }
+
+        setStatus("idle")
+        setRole(null)
+        setLocalStream(null)
+        setRemoteStream(null)
+        setRemoteScreenStream(null)
+        
+        if (typeof window !== "undefined") {
+            window.location.hash = ""
+        }
+    }, [isLiveMode, stopLiveSession])
+
+    const resetSilenceTimer = React.useCallback(() => {
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = setTimeout(() => {
+            log("AI Silence timeout (30s) - hanging up")
+            cleanup()
+        }, 30000)
+    }, [cleanup])
+
     const startLiveSession = React.useCallback(async () => {
         if (!geminiApiKey) return
 
@@ -3502,6 +3575,7 @@ Do not include markdown formatting or explanations.`
             liveClientRef.current = ws
 
             ws.onopen = async () => {
+                resetSilenceTimer()
                 const currentSystemPrompt = getSystemPromptWithContext()
                 // Append doc context if available
                 const docContext = isDocOpen ? `\n\n[Current Document Content]:\n${docContent}` : ""
@@ -3654,6 +3728,11 @@ Do not include markdown formatting or explanations.`
                         data = JSON.parse(await event.data.text())
                     } else {
                         data = JSON.parse(event.data)
+                    }
+
+                    // Reset silence timer on any AI activity
+                    if (data.serverContent?.modelTurn || data.serverContent?.turnComplete) {
+                        resetSilenceTimer()
                     }
 
                     if (data.serverContent?.interrupted) {
@@ -4267,53 +4346,6 @@ Do not include markdown formatting or explanations.`
     /**
      * Resets all connections and stops media tracks.
      */
-    const cleanup = React.useCallback(() => {
-        if (isLiveMode) {
-            stopLiveSession()
-        }
-        
-        if (localStreamRef.current)
-            localStreamRef.current.getTracks().forEach((t) => t.stop())
-        
-        // Stop screen share when call ends
-        // Manually stop screen share logic here instead of calling function that might not be defined
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach((track: any) => track.stop())
-            screenStreamRef.current = null
-        }
-        if (screenCallRef.current) {
-            screenCallRef.current.close()
-            screenCallRef.current = null
-        }
-        setIsScreenSharing(false)
-        if (isWhiteboardOpenRef.current) {
-             // Re-open whiteboard if it was closed due to screen share
-             // But here we are cleaning up everything, so no need.
-        }
-
-        if (activeCall.current) activeCall.current.close()
-        if (dataConnectionRef.current) dataConnectionRef.current.close()
-        
-        if (peerInstance.current) peerInstance.current.destroy()
-        if (mqttClient.current) mqttClient.current.end()
-        
-        // Clear whiteboard state
-        setIsWhiteboardOpen(false)
-        setHasWhiteboardStarted(false)
-        setEditor(null) 
-
-        setStatus("idle")
-        setRole(null)
-        setLocalStream(null)
-        setRemoteStream(null)
-        setRemoteScreenStream(null)
-        setMessages([])
-        setAttachments([])
-        setLogs([])
-        if (typeof window !== "undefined") {
-            window.location.hash = ""
-        }
-    }, [isLiveMode, stopLiveSession])
 
     // --- SCREEN SHARING LOGIC ---
     
