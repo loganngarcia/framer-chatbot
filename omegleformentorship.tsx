@@ -1642,7 +1642,7 @@ const ChatInput = React.memo(function ChatInput({
             setShowGradient(true) // Show gradient after 0.2s
         }, 200)
         return () => clearTimeout(timeout)
-    }, [isDocOpen])
+    }, [isDocOpen, isWhiteboardOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
@@ -1944,7 +1944,7 @@ const ChatInput = React.memo(function ChatInput({
             style={{
                 width: "100%", 
                 padding: "24px 0 16px 0", 
-                background: showGradient ? (isDocOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`) : 'transparent',
+                background: showGradient ? ((isDocOpen || isWhiteboardOpen) ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`) : 'transparent',
                 justifyContent: 'center',
                 alignItems: 'flex-end',
                 gap: 10,
@@ -1959,9 +1959,9 @@ const ChatInput = React.memo(function ChatInput({
                 minHeight: 56, 
                 maxHeight: 384, 
                 padding: 10, 
-                background: isDocOpen ? 'transparent' : themeColors.surface, 
-                outline: isDocOpen ? `0.33px ${themeColors.border.subtle} solid` : 'none',
-                outlineOffset: isDocOpen ? '-0.33px' : 0,
+                background: (isDocOpen || isWhiteboardOpen) ? 'transparent' : themeColors.surface, 
+                outline: (isDocOpen || isWhiteboardOpen) ? `0.33px ${themeColors.border.subtle} solid` : 'none',
+                outlineOffset: (isDocOpen || isWhiteboardOpen) ? '-0.33px' : 0,
                 overflow: 'visible',
                 borderRadius: 28, 
                 display: 'flex', 
@@ -2519,7 +2519,7 @@ function sanitizeMessage(text: string): string {
 
     // 8. Safety & Profanity Filter
     const badWords = [
-        "amateur", "anal", "anus", "ass", "balls", "barely legal", "bj", "blowjob", "boobs", "bondage",
+        "amateur", "anus", "ass", "balls", "barely legal", "bj", "blowjob", "boobs", "bondage",
         "boner", "breasts", "bukkake", "bush", "busty", "cam girl", "catfish", "climax", "clit", "clitoris",
         "cock", "cocksucker", "cp", "creampie", "cum", "cumshot", "curvy", "deepthroat", "dick", "dickhead",
         "dickwad", "dickweed", "dildo", "dilf", "dom", "dp", "dripping", "ejaculate", "ejaculation",
@@ -2527,12 +2527,12 @@ function sanitizeMessage(text: string): string {
         "fingering", "foreplay", "gangbang", "groomer", "grooming", "handjob", "hard on", "hardcore",
         "hentai", "hj", "hooker", "horny", "incest", "jacking", "jerking", "jizz", "kink", "labia",
         "lolita", "masturbate", "masturbation", "masturbating", "masochist", "milf", "molest", "molested",
-        "molester", "molesting", "moan", "necrophilia", "nude", "nudes", "nudity", "nsfw", "OF", "onlyfans",
+        "molester", "molesting", "moan", "necrophilia", "nude", "nudes", "nudity", "nsfw", "onlyfans",
         "oral", "orgasm", "pedo", "pedophile", "penetrate", "penetration", "penis", "precum", "prostitute",
         "pubes", "pubic", "pounding", "pussy", "rape", "raped", "rapist", "raping", "rectum", "revenge porn",
         "rimjob", "rimming", "sack", "sadist", "scat", "scrotum", "semen", "sex", "sext", "sexting",
         "sexy", "softcore", "sperm", "squirt", "stalker", "stalking", "stripper", "sub", "teen", "testicles",
-        "thicc", "thot", "threesome", "thrust", "tits", "twerk", "underage", "vagina", "vibrator", "voyeur",
+        "thicc", "thot", "threesome", "thrust", "tits", "titties", "twerk", "underage", "vagina", "vibrator", "voyeur",
         "wanking", "watersports", "xxx", "zoophilia",
         
         // Profanity / Vulgar Language
@@ -2648,7 +2648,7 @@ function sanitizeMessage(text: string): string {
     const combinedRegex = new RegExp(`(${badPatterns.join('|')})`, 'gi')
     
     sanitized = sanitized.replace(combinedRegex, (match) => {
-        return "*".repeat(match.length)
+        return match.split('').map((char, index) => index % 3 === 0 ? char : '*').join('')
     })
 
     return sanitized
@@ -2988,12 +2988,12 @@ export default function OmegleMentorshipUI(props: Props) {
     // --- THEME LOGIC ---
     const isLightMode = false // Always dark mode for shell, DocEditor handles its own light theme
     const themeColors = isLightMode ? lightColors : darkColors
-    const chatThemeColors = isDocOpen ? lightColors : themeColors
+    const chatThemeColors = (isDocOpen || isWhiteboardOpen) ? lightColors : themeColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(`
 <h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, draft emails, make study guides, and so much more. </p>
+<p>You can start typing or ask AI to write resumes, make study guides, draft emails, and so much more. </p>
     `.trim())
     interface DocSettings {
         fontStyle: 'serif' | 'sans';
@@ -3005,10 +3005,10 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const [docSettings, setDocSettings] = React.useState<DocSettings>({ 
         fontStyle: 'sans', 
-        fontSize: 12,
+        fontSize: 15,
         h1Size: 24, 
-        h2Size: 14,
-        pSize: 12 
+        h2Size: 17,
+        pSize: 15 
     })
     const [remoteCursor, setRemoteCursor] = React.useState<{ x: number, y: number, color: string } | null>(null)
     const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)
@@ -4183,12 +4183,12 @@ Do not include markdown formatting or explanations.`
 
     }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isDocOpen, sharedScreenSize, calculateHeightConstraints])
 
-    // --- EFFECT: MINIMIZE CHAT WHEN DOC OPENS ---
+    // --- EFFECT: MINIMIZE CHAT WHEN DOC OR WHITEBOARD OPENS ---
     React.useEffect(() => {
-        if (isDocOpen) {
-             setChatHeight(100) // Minimize chat to allow doc editor to be full height
+        if (isDocOpen || isWhiteboardOpen) {
+             setChatHeight(100) // Minimize chat to allow doc/whiteboard to be full height
         }
-    }, [isDocOpen])
+    }, [isDocOpen, isWhiteboardOpen])
 
     const handleRoleSelect = React.useCallback((selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
@@ -5116,7 +5116,7 @@ Do not include markdown formatting or explanations.`
                     functionDeclarations: [
                         {
                             name: "update_doc",
-                            description: "Updates the shared document content. Use this to write notes, create summaries, draft emails, build resumes, or any other text content. You have full control over HTML formatting.",
+                            description: "Updates the document and email content. Use this to write notes, create summaries, draft emails, build resumes, or any other text content. You have full control over HTML formatting.",
                             parameters: {
                                 type: "OBJECT",
                                 properties: {
@@ -5148,12 +5148,12 @@ Do not include markdown formatting or explanations.`
 
             if (currentSystemPrompt.trim()) {
                 payload.systemInstruction = {
-                    parts: [{ text: currentSystemPrompt + " If the user asks to edit the document or take notes, use the update_doc tool." }]
+                    parts: [{ text: currentSystemPrompt + " If the user asks to create, make, edit the document or take notes, use the update_doc tool." }]
                 }
             }
 
             const fetchPromise = fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}&alt=sse`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -5180,44 +5180,113 @@ Do not include markdown formatting or explanations.`
                 return
             }
 
-            const data = await response.json()
+            // Start streaming response - append placeholder
+            setMessages(prev => [...prev, { role: "model", text: "" }])
             
-            if (!data.candidates || data.candidates.length === 0) {
-                throw new Error("No response from AI")
-            }
-
-            const candidate = data.candidates[0]
-            const content = candidate.content
-            const messageParts = content.parts || []
+            const reader = response.body?.getReader()
+            if (!reader) throw new Error("No response body")
             
-            let aiText = ""
-            let functionCall = null
-
-            for (const part of messageParts) {
-                if (part.text) aiText += part.text
-                if (part.functionCall) functionCall = part.functionCall
+            const decoder = new TextDecoder()
+            let buffer = ""
+            let accumulatedText = ""
+            let accumulatedFunctionCall: any = null
+            
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                
+                const chunk = decoder.decode(value, { stream: true })
+                buffer += chunk
+                
+                const lines = buffer.split("\n")
+                buffer = lines.pop() || "" 
+                
+                for (const line of lines) {
+                    const trimmed = line.trim()
+                    if (!trimmed.startsWith("data:")) continue
+                    
+                    const jsonStr = trimmed.slice(5).trim()
+                    if (!jsonStr) continue
+                    
+                    try {
+                        const data = JSON.parse(jsonStr)
+                        const candidate = data.candidates?.[0]
+                        if (candidate) {
+                            const parts = candidate.content?.parts || []
+                            for (const part of parts) {
+                                if (part.text) {
+                                    accumulatedText += part.text
+                                    // Optimistic update
+                                    setMessages(prev => {
+                                        const newArr = [...prev]
+                                        if (newArr.length > 0 && newArr[newArr.length - 1].role === "model") {
+                                            newArr[newArr.length - 1] = { 
+                                                ...newArr[newArr.length - 1], 
+                                                text: accumulatedText 
+                                            }
+                                        }
+                                        return newArr
+                                    })
+                                }
+                                if (part.functionCall) {
+                                    accumulatedFunctionCall = part.functionCall
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error parsing stream chunk", e)
+                    }
+                }
             }
 
             // Handle Tool Call
-            if (functionCall) {
-                if (functionCall.name === "update_doc") {
-                    const args = functionCall.args as any
+            if (accumulatedFunctionCall) {
+                if (accumulatedFunctionCall.name === "update_doc") {
+                    const args = accumulatedFunctionCall.args as any
                     const newContent = args.content || ""
                     setDocContent(newContent)
                     if (!isDocOpen) setIsDocOpen(true) // Auto-open
                     
-                    if (!aiText) aiText = "I've updated the document."
+                    if (!accumulatedText) {
+                        accumulatedText = "I've updated the document."
+                        setMessages(prev => {
+                            const newArr = [...prev]
+                            if (newArr.length > 0 && newArr[newArr.length - 1].role === "model") {
+                                newArr[newArr.length - 1] = { 
+                                    ...newArr[newArr.length - 1], 
+                                    text: accumulatedText 
+                                }
+                            }
+                            return newArr
+                        })
+                    }
                 }
             }
-
-            if (aiText) {
-                setMessages(prev => [...prev, { role: "model", text: aiText }])
+            
+            // Clean up empty message if valid response was empty (rare)
+            if (!accumulatedText && !accumulatedFunctionCall) {
+                 setMessages(prev => {
+                    const newArr = [...prev]
+                    if (newArr.length > 0 && newArr[newArr.length - 1].role === "model" && !newArr[newArr.length - 1].text) {
+                        return newArr.slice(0, -1)
+                    }
+                    return newArr
+                })
             }
             
         } catch (err: any) {
             if (err.name === 'AbortError') return
             console.error("AI Error:", err)
-            setMessages(prev => [...prev, { role: "model", text: "Sorry, I encountered an error processing that request." }])
+            setMessages(prev => {
+                const newArr = [...prev]
+                const last = newArr[newArr.length - 1]
+                if (last?.role === "model" && !last.text) {
+                    last.text = "Sorry, I encountered an error processing that request."
+                } else {
+                     newArr.push({ role: "model", text: "Sorry, I encountered an error processing that request." })
+                }
+                return newArr
+            })
         } finally {
             setIsLoading(false)
             abortControllerRef.current = null
@@ -5470,17 +5539,7 @@ Do not include markdown formatting or explanations.`
         let activeWidth: number
         let activeHeight: number
         
-        if (isWhiteboardOpen) {
-            if (isMobileLayout) {
-                // 4:5 aspect ratio for mobile
-                activeWidth = 1080
-                activeHeight = 1350
-            } else {
-                // 16:9 aspect ratio for desktop
-                activeWidth = 1920
-                activeHeight = 1080
-            }
-        } else if (isDocOpen) {
+        if (isDocOpen || isWhiteboardOpen) {
              return {
                  width: "100%",
                  height: "100%",
@@ -5657,6 +5716,25 @@ Do not include markdown formatting or explanations.`
             50% { opacity: 1; transform: scale(1.0); }
             100% { opacity: 0.5; transform: scale(0.85); }
         }
+
+        /* Tldraw Whiteboard Overrides */
+        .tl-container {
+            background-color: #FFFFFF !important;
+        }
+        .tl-background {
+            background-color: #FFFFFF !important;
+            fill: #FFFFFF !important;
+        }
+        .tl-grid {
+            opacity: 0.15 !important;
+        }
+        /* Force light theme variables */
+        .tl-theme__dark, .tl-theme__light {
+            --color-background: #FFFFFF !important;
+            --color-text: #000000 !important;
+            --color-text-main: #000000 !important;
+            --color-panel: #FFFFFF !important;
+        }
     `, [accentColor])
 
 
@@ -5745,8 +5823,8 @@ Do not include markdown formatting or explanations.`
                     flexDirection: "column",
                     gap: 8, // Reduced gap
                     paddingTop: 16, 
-                    paddingLeft: isDocOpen ? 0 : 16,
-                    paddingRight: isDocOpen ? 0 : 16,
+                    paddingLeft: (isDocOpen || isWhiteboardOpen) ? 0 : 16,
+                    paddingRight: (isDocOpen || isWhiteboardOpen) ? 0 : 16,
                     paddingBottom: 0,
                     boxSizing: "border-box",
                     minHeight: 0,
@@ -5761,8 +5839,8 @@ Do not include markdown formatting or explanations.`
                         width: "100%",
                         justifyContent: "center",
                         flexShrink: 0,
-                        paddingLeft: isDocOpen ? 16 : 0,
-                        paddingRight: isDocOpen ? 16 : 0,
+                        paddingLeft: (isDocOpen || isWhiteboardOpen) ? 16 : 0,
+                        paddingRight: (isDocOpen || isWhiteboardOpen) ? 16 : 0,
                         boxSizing: "border-box"
                     }}>
                         {/* CAMERA 1: Left (Student Position) */}
@@ -5943,7 +6021,7 @@ Do not include markdown formatting or explanations.`
                                 </>
                             )}
 
-                            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: isDocOpen ? "28px 28px 0 0" : 14, position: "relative", background: isDocOpen ? "white" : "transparent" }}>
+                            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: (isDocOpen || isWhiteboardOpen) ? "28px 28px 0 0" : 14, position: "relative", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent" }}>
                             {isDocOpen ? (
                                 <DocEditor 
                                     content={docContent} 
@@ -6149,7 +6227,7 @@ Do not include markdown formatting or explanations.`
                 style={{
                     height: 24,
                     width: "100%",
-                    background: isDocOpen ? "white" : "transparent",
+                    background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent",
                     ...styles.flexCenter,
                     cursor: "ns-resize",
                     flexShrink: 0,
@@ -6162,13 +6240,13 @@ Do not include markdown formatting or explanations.`
                         width: 32,
                         height: 4,
                         borderRadius: 2,
-                        background: isDocOpen ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
+                        background: (isDocOpen || isWhiteboardOpen) ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
                     }}
                 />
             </div>
 
             {/* 3. AI CHAT HISTORY LAYER */}
-            <div style={{ width: "100%", background: isDocOpen ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
+            <div style={{ width: "100%", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
             <div 
                 style={{
                     height: chatHeight,
