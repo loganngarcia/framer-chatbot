@@ -1402,7 +1402,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', 
                 zIndex: 100, width: '100%', maxWidth: 1800, 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                paddingLeft: 16, paddingRight: 16
+                paddingLeft: 12, paddingRight: 12
             }}>
                 <div className="Left" style={{
                      maxWidth: 808.89, background: '#F6F6F6', borderRadius: 31.11, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex', flexWrap: 'wrap', alignContent: 'center'
@@ -2982,6 +2982,8 @@ export default function OmegleMentorshipUI(props: Props) {
     
     // --- STATE: DOC EDITOR ---
     const [isDocOpen, setIsDocOpen] = React.useState(false)
+    const isDocOpenRef = React.useRef(isDocOpen)
+    React.useEffect(() => { isDocOpenRef.current = isDocOpen }, [isDocOpen])
     
     // --- THEME LOGIC ---
     const isLightMode = false // Always dark mode for shell, DocEditor handles its own light theme
@@ -2990,8 +2992,8 @@ export default function OmegleMentorshipUI(props: Props) {
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(`
-<h1>Welcome to your notes 🩵</h1>
-<p>You can start typing or ask AI to generate content for you.</p>
+<h1>Welcome to your notes 🩵 </h1>
+<p>You can start typing or ask AI to write resumes, draft emails, make study guides, and so much more. </p>
     `.trim())
     interface DocSettings {
         fontStyle: 'serif' | 'sans';
@@ -4323,6 +4325,16 @@ Do not include markdown formatting or explanations.`
     const toggleDoc = React.useCallback(() => {
         setIsDocOpen(v => {
             const willBeOpen = !v
+
+            // Notify peer of state change
+            if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                if (willBeOpen) {
+                    dataConnectionRef.current.send({ type: 'doc-start' })
+                } else {
+                    dataConnectionRef.current.send({ type: 'doc-stop' })
+                }
+            }
+
             if (willBeOpen) {
                 if (isWhiteboardOpen) {
                     setIsWhiteboardOpen(false)
@@ -4660,8 +4672,11 @@ Do not include markdown formatting or explanations.`
                 }
 
                 // Close whiteboard if open (Screen share overrides whiteboard)
-                if (isWhiteboardOpen) {
+                if (isWhiteboardOpenRef.current) {
                     setIsWhiteboardOpen(false)
+                }
+                if (isDocOpenRef.current) {
+                    setIsDocOpen(false)
                 }
 
                 call.answer() // Answer without sending a stream back
@@ -4936,11 +4951,18 @@ Do not include markdown formatting or explanations.`
 
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
+            } else if (data.type === 'doc-start') {
+                if (isScreenSharingRef.current) stopLocalScreenShare()
+                if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
+                setIsDocOpen(true)
+            } else if (data.type === 'doc-stop') {
+                setIsDocOpen(false)
             } else if (data.type === 'doc-update') {
                 setDocContent(data.payload)
             } else if (data.type === 'tldraw-start') {
                 log("Received tldraw-start command")
                 if (isScreenSharingRef.current) stopLocalScreenShare()
+                setIsDocOpen(false)
                 setIsWhiteboardOpen(true)
                 setHasWhiteboardStarted(true)
             } else if (data.type === 'tldraw-stop') {
