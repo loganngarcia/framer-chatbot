@@ -196,7 +196,7 @@ const darkColors = {
         hover: "rgba(255, 255, 255, 0.12)",
         destructive: "#EC1313", // Red
         accent: "#0B87DA", // Blue, default student card color
-        overlay: "rgba(0, 0, 0, 0.8)",
+        overlay: "rgba(0, 0, 0, 0.7)",
     },
     
     file: {
@@ -4927,6 +4927,56 @@ Do not include markdown formatting or explanations.`
         if (fileInputRef.current) fileInputRef.current.value = ""
     }, [])
 
+    const [isDraggingFile, setIsDraggingFile] = React.useState(false)
+
+    // --- EFFECT: GLOBAL DRAG & DROP FOR FILES ---
+    React.useEffect(() => {
+        const handleDragOver = (e: DragEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+            // Check if dragging files
+            if (e.dataTransfer?.types?.includes("Files")) {
+                 setIsDraggingFile(true)
+            }
+        }
+
+        const handleDragLeave = (e: DragEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+            // Basic check: if leaving the window (relatedTarget is null) or moving into a child (handled by bubbling, but we use a simple overlay check)
+            // A more robust way is using a counter or checking coordinate bounds, but for a fullscreen overlay:
+            if (e.relatedTarget === null) {
+                setIsDraggingFile(false)
+            }
+        }
+
+        const handleDrop = (e: DragEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setIsDraggingFile(false)
+
+            // Exclude whiteboard from global drop to allow tldraw's native handling
+            if (isWhiteboardOpenRef.current && whiteboardContainerRef.current && whiteboardContainerRef.current.contains(e.target as Node)) {
+                return
+            }
+
+            if (e.dataTransfer?.files?.length) {
+                const files = Array.from(e.dataTransfer.files)
+                processFiles(files)
+            }
+        }
+
+        window.addEventListener('dragover', handleDragOver)
+        window.addEventListener('dragleave', handleDragLeave)
+        window.addEventListener('drop', handleDrop)
+
+        return () => {
+            window.removeEventListener('dragover', handleDragOver)
+            window.removeEventListener('dragleave', handleDragLeave)
+            window.removeEventListener('drop', handleDrop)
+        }
+    }, [processFiles])
+
     // --- AI CHAT (GEMINI) LOGIC ---
     
     const handleStop = React.useCallback(() => {
@@ -6506,6 +6556,41 @@ Do not include markdown formatting or explanations.`
                 onClose={() => setShowReportModal(false)} 
                 onSubmit={onSubmitReport} 
             />
+
+            {/* FILE DRAG OVERLAY */}
+            <div style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                zIndex: 99999,
+                background: themeColors.state.overlay,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                opacity: isDraggingFile ? 1 : 0,
+                visibility: isDraggingFile ? "visible" : "hidden"
+            }}>
+                <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 16
+                }}>
+                    <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z" fill="#0099FF" fillOpacity="0.95"/>
+                        </svg>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 16,  lineHeight: 1.4 }}>Add anything</div>
+                        <div style={{ fontSize: 14, opacity: 0.65, fontWeight: 400, lineHeight: 1.4 }}>Drop any file here to add it to the conversation</div>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
