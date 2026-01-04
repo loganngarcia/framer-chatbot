@@ -1363,11 +1363,12 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
 
     // --- File Export ---
     const downloadDoc = () => {
-        let filename = "Resume.doc"
+        let filename = "Note.doc"
         if (editorRef.current) {
-            const h1 = editorRef.current.querySelector('h1')
-            if (h1 && h1.innerText.trim()) {
-                filename = `${h1.innerText.trim().replace(/[^a-z0-9]/gi, '_')}_Resume.doc`
+            const text = editorRef.current.innerText.trim()
+            const firstLine = text.split('\n')[0].trim()
+            if (firstLine) {
+                filename = `${firstLine.replace(/\s+/g, '_')}.doc`
             }
         }
         
@@ -4044,7 +4045,7 @@ Do not include markdown formatting or explanations.`
             const calculatedMinChatHeight = cHeight - 40 - maxVideoHeightNeeded
             minHeight = Math.max(100, calculatedMinChatHeight)
         } else {
-            // Screen Share / Whiteboard / Resume Mode
+            // Screen Share / Whiteboard / Document Mode
              let activeWidth = _sharedScreenSize?.width
              let activeHeight = _sharedScreenSize?.height
              
