@@ -135,10 +135,15 @@ function downsampleBuffer(
     return result
 }
 
+function isHoverCapable() {
+    if (typeof window === "undefined") return false
+    return window.matchMedia("(hover: hover)").matches
+}
+
 // --- SHARED STYLES / STYLE GUIDE ---
 // Use for all colors and styles
 
-const colors = {
+const darkColors = {
     background: "#212121",
     surface: "#303030",
     surfaceHighlight: "#3D3D3D",
@@ -172,7 +177,43 @@ const colors = {
     }
 }
 
-const styles = {
+const lightColors = {
+    background: "#FFFFFF",
+    surface: "#F2F5F8",
+    surfaceHighlight: "#E2E8F0",
+    surfaceMenu: "#F1F5F9",
+    surfaceModal: "#FFFFFF",
+    card: "#FFFFFF",
+    
+    text: {
+        primary: "rgba(0, 0, 0, 0.95)",
+        secondary: "rgba(0, 0, 0, 0.65)",
+        tertiary: "rgba(0, 0, 0, 0.45)",
+        link: "#0099FF"
+    },
+    
+    border: {
+        subtle: "rgba(0, 0, 0, 0.1)",
+    },
+    
+    state: {
+        hover: "rgba(0, 0, 0, 0.05)",
+        destructive: "#EF4444", // Red
+        accent: "#0EA5E9", // Sky Blue
+        overlay: "rgba(255, 255, 255, 0.8)",
+    },
+    
+    file: {
+        pdf: "#EA4335",
+        excel: "#34A853",
+        ppt: "#FBBC04",
+        default: "#4285F4"
+    }
+}
+
+const colors = darkColors
+
+const getStyles = (theme: typeof darkColors) => ({
     flexCenter: {
         display: "flex",
         alignItems: "center",
@@ -198,20 +239,21 @@ const styles = {
         display: 'flex',
         cursor: "pointer",
         transition: "background 0.2s",
-        background: "transparent"
+        background: "transparent",
+        color: theme.text.primary,
     } as React.CSSProperties,
     menuItemHover: {
-        background: "rgba(255, 255, 255, 0.12)"
+        background: theme.state.hover
     } as React.CSSProperties,
     menuItemDestructiveHover: {
-        background: "rgba(251, 106, 106, 0.12)"
+        background: "rgba(251, 106, 106, 0.12)" // Keep consistent red tint
     } as React.CSSProperties,
     videoCardSmall: {
         height: "100%", 
         aspectRatio: "4/3", 
         borderRadius: 16, 
         overflow: "hidden", 
-        background: colors.card,
+        background: theme.card,
         position: "relative",
         boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
     } as React.CSSProperties,
@@ -231,7 +273,9 @@ const styles = {
         border: "none",
         zIndex: 10
     } as React.CSSProperties
-}
+})
+
+const styles = getStyles(colors)
 
 // --- MARKDOWN & PARSING UTILITIES ---
 
@@ -855,9 +899,10 @@ interface DocEditorProps {
     onChange: (content: string) => void
     settings: { fontStyle: 'serif' | 'sans', fontSize: number, h1Size: number, h2Size: number, pSize: number }
     onSettingsChange: (settings: { fontStyle: 'serif' | 'sans', fontSize: number, h1Size: number, h2Size: number, pSize: number }) => void
+    themeColors?: typeof darkColors
 }
 
-const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange }: DocEditorProps) {
+const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange, themeColors = lightColors }: DocEditorProps) {
     const editorRef = React.useRef<HTMLDivElement>(null)
     const [showFontMenu, setShowFontMenu] = React.useState(false)
 
@@ -1099,166 +1144,111 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         setFontSizeInput(clamped.toString())
     }
 
-    const isCompact = toolbarWidth < 300 // Hide text if very narrow
+    const isCompact = toolbarWidth < 400 // Adjusted threshold
+
+    const handleLink = () => {
+        const url = prompt("Enter URL:", "https://")
+        if (url) {
+            handleFormat('createLink', url)
+        }
+    }
 
     return (
         <div data-layer="doc editor" className="DocEditor" style={{
-            width: '100%', 
-            height: '100%', 
-            position: 'relative', 
-            background: 'white', 
-            overflow: 'hidden', 
-            // Removed borderRadius, padding, boxShadow to match Whiteboard/ScreenShare
+            width: '100%',
+            height: '100%',
+            padding: 16,
+            background: 'white',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            gap: 24,
+            boxSizing: 'border-box',
+            position: 'relative'
         }}>
-            <div 
-                ref={toolbarRef}
-                data-layer="Frame 1000007263" 
-                className="Frame1000007263" 
-                style={{
-                    position: 'absolute', 
-                    top: 16,
-                    left: "50%",
-                    transform: "translateX(-50%)", 
-                    width: "auto",
-                    maxWidth: "90%",
-                    justifyContent: 'center', 
-                    alignItems: 'center', 
-                    display: 'flex', 
-                    zIndex: 10,
-                    background: "#F5F5F5",
-                    borderRadius: 28,
-                    padding: 4,
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
-                }}
-            >
-                <div data-layer="Frame 1000007257" className="Frame1000007257" style={{padding: 4, background: 'transparent', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'flex-start', gap: 4, display: 'flex', flexShrink: 0}}>
-                    {/* Font Style Toggle */}
-                    <div 
-                        data-layer="Frame 1000007258" 
-                        className="Frame1000007258" 
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => onSettingsChange({...settings, fontStyle: settings.fontStyle === 'serif' ? 'sans' : 'serif'})}
-                        style={{width: 72, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}
-                    >
-                        <div data-layer="Modern" className="Modern" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                            {settings.fontStyle === 'serif' ? 'Classic' : 'Modern'}
-                        </div>
-                    </div>
-
-                    {/* Font Size Controls */}
-                    <div data-layer="Frame 1000007259" className="Frame1000007259" style={{height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex'}}>
-                        <div onMouseDown={(e) => e.preventDefault()} onClick={() => updateFontSize(selectedFontSize - 1)} style={{cursor: 'pointer', padding: '0 4px'}}>
-                            <div data-svg-wrapper data-layer="Frame 1000007260" className="Frame1000007260">
-                                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M0.599609 14H9.59961" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <input 
-                            value={fontSizeInput} 
-                            onChange={handleFontSizeInput}
-                            onFocus={() => setIsEditingFontSize(true)}
-                            onBlur={handleBlur}
-                            type="number"
-                            style={{
-                                width: 24, 
-                                border: 'none', 
-                                background: 'transparent', 
-                                textAlign: 'center', 
-                                fontSize: 14, 
-                                fontFamily: 'Inter', 
-                                outline: 'none',
-                                padding: 0,
-                                appearance: 'textfield',
-                                WebkitAppearance: 'none',
-                                margin: 0
-                            }}
-                        />
-                        <div onMouseDown={(e) => e.preventDefault()} onClick={() => updateFontSize(selectedFontSize + 1)} style={{cursor: 'pointer', padding: '0 4px'}}>
-                            <div data-svg-wrapper data-layer="Frame 1000007261" className="Frame1000007261">
-                                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M9.59961 14H5.09961M5.09961 14H0.599609M5.09961 14V9.5M5.09961 14V18.5" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Bold */}
-                    <div 
-                        data-layer="Frame 1000007260" 
-                        className="Frame1000007260" 
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handleSmartFormat('bold')}
-                        style={{width: 32, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: 'white', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}
-                    >
-                        <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '700', lineHeight: "19.32px", wordWrap: 'break-word'}}>B</div>
-                    </div>
-
-                    {/* Italic */}
-                    <div 
-                        data-svg-wrapper 
-                        data-layer="Frame 1000007261" 
-                        className="Frame1000007261"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handleSmartFormat('italic')}
-                        style={{width: 32, height: 32, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'white', borderRadius: 28, cursor: 'pointer'}}
-                    >
-                        <span style={{ color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Times New Roman', fontStyle: 'italic', fontWeight: 400 }}>I</span>
-                    </div>
-
-                    {/* List */}
-                    <div 
-                        data-svg-wrapper 
-                        data-layer="Frame 1000007262" 
-                        className="Frame1000007262"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handleFormat('insertUnorderedList')}
-                        style={{width: 32, height: 32, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'white', borderRadius: 28, cursor: 'pointer'}}
-                    >
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="32" height="32" rx="16" fill="white"/>
-                            <path d="M9 11.6C9 11.4409 9.06321 11.2883 9.17574 11.1757C9.28826 11.0632 9.44087 11 9.6 11H10.4C10.5591 11 10.7117 11.0632 10.8243 11.1757C10.9368 11.2883 11 11.4409 11 11.6C11 11.7591 10.9368 11.9117 10.8243 12.0243C10.7117 12.1368 10.5591 12.2 10.4 12.2H9.6C9.44087 12.2 9.28826 12.1368 9.17574 12.0243C9.06321 11.9117 9 11.7591 9 11.6ZM12.2 11.6C12.2 11.4409 12.2632 11.2883 12.3757 11.1757C12.4883 11.0632 12.6409 11 12.8 11H22.4C22.5591 11 22.7117 11.0632 22.8243 11.1757C22.9368 11.2883 23 11.4409 23 11.6C23 11.7591 22.9368 11.9117 22.8243 12.0243C22.7117 12.1368 22.5591 12.2 22.4 12.2H12.8C12.6409 12.2 12.4883 12.1368 12.3757 12.0243C12.2632 11.9117 12.2 11.7591 12.2 11.6ZM9 16C9 15.8409 9.06321 15.6883 9.17574 15.5757C9.28826 15.4632 9.44087 15.4 9.6 15.4H10.4C10.5591 15.4 10.7117 15.4632 10.8243 15.5757C10.9368 15.6883 11 15.8409 11 16C11 16.1591 10.9368 16.3117 10.8243 16.4243C10.7117 16.5368 10.5591 16.6 10.4 16.6H9.6C9.44087 16.6 9.28826 16.5368 9.17574 16.4243C9.06321 16.3117 9 16.1591 9 16ZM12.2 16C12.2 15.8409 12.2632 15.6883 12.3757 15.5757C12.4883 15.4632 12.6409 15.4 12.8 15.4H22.4C22.5591 15.4 22.7117 15.4632 22.8243 15.5757C22.9368 15.6883 23 15.8409 23 16C23 16.1591 22.9368 16.3117 22.8243 16.4243C22.7117 16.5368 22.5591 16.6 22.4 16.6H12.8C12.6409 16.6 12.4883 16.5368 12.3757 16.4243C12.2632 16.3117 12.2 16.1591 12.2 16ZM9 20.4C9 20.2409 9.06321 20.0883 9.17574 19.9757C9.28826 19.8632 9.44087 19.8 9.6 19.8H10.4C10.5591 19.8 10.7117 19.8632 10.8243 19.9757C10.9368 20.0883 11 20.2409 11 20.4C11 20.5591 10.9368 20.7117 10.8243 20.8243C10.7117 20.9368 10.5591 21 10.4 21H9.6C9.44087 21 9.28826 20.9368 9.17574 20.8243C9.06321 20.7117 9 20.5591 9 20.4ZM12.2 20.4C12.2 20.2409 12.2632 20.0883 12.3757 19.9757C12.4883 19.8632 12.6409 19.8 12.8 19.8H22.4C22.5591 19.8 22.7117 19.8632 22.8243 19.9757C22.9368 20.0883 23 20.2409 23 20.4C23 20.5591 22.9368 20.7117 22.8243 20.8243C22.7117 20.9368 22.5591 21 22.4 21H12.8C12.6409 21 12.4883 20.9368 12.3757 20.8243C12.2632 20.7117 12.2 20.5591 12.2 20.4Z" fill="black" fillOpacity="0.95"/>
-                        </svg>
-                    </div>
-                </div>
-
-                <div data-layer="Frame 1000007258" className="Frame1000007258" style={{height: 40, padding: 4, background: 'transparent', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 10, display: 'flex', flexShrink: 0}}>
-                    <div 
-                        data-layer="Frame 1000007258" 
-                        className="Frame1000007258" 
-                        onClick={downloadDoc}
-                        style={{height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex', cursor: 'pointer', background: 'white'}}
-                    >
-                        {!isCompact && (
-                            <div data-layer="Download" className="Download" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Download</div>
-                        )}
-                        <div data-svg-wrapper data-layer="Frame 1000007260" className="Frame1000007260">
-                            <svg width="13" height="28" viewBox="0 0 13 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0.601562 16.6641V17.371C0.601562 17.9356 0.825871 18.4771 1.22514 18.8764C1.62441 19.2757 2.16594 19.5 2.73059 19.5H9.82737C10.392 19.5 10.9336 19.2757 11.3328 18.8764C11.7321 18.4771 11.9564 17.9356 11.9564 17.371V16.6613M6.27898 8.5V16.3065M6.27898 16.3065L8.76285 13.8226M6.27898 16.3065L3.79511 13.8226" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
+          {/* Toolbar */}
+          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 728, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flexShrink: 0}}>
+            {/* Download */}
+            <div data-layer="font family" className="FontFamily" onClick={downloadDoc} style={{height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: themeColors.state.accent, borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex', cursor: 'pointer'}}>
+              <div data-svg-wrapper data-layer="download icon" className="DownloadIcon">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0.648438 8.81412V9.52096C0.648438 10.0856 0.872746 10.6271 1.27202 11.0264C1.67129 11.4257 2.21282 11.65 2.77747 11.65H9.87424C10.4389 11.65 10.9804 11.4257 11.3797 11.0264C11.779 10.6271 12.0033 10.0856 12.0033 9.52096V8.81128M6.32586 0.649994V8.45645M6.32586 8.45645L8.80973 5.97257M6.32586 8.45645L3.84199 5.97257" stroke="white" strokeOpacity="0.95" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div data-layer="Download" className="Download" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Download</div>
+            </div>
+            
+            {/* Font Style */}
+            <div data-layer="font family" className="FontFamily" onClick={() => onSettingsChange({...settings, fontStyle: settings.fontStyle === 'serif' ? 'sans' : 'serif'})} style={{width: 72, height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}>
+              <div data-layer="Modern" className="Modern" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                  {settings.fontStyle === 'serif' ? 'Classic' : 'Modern'}
+              </div>
             </div>
 
-            {/* EDITOR AREA */}
+            {/* Font Size */}
+            <div data-layer="font size" className="FontSize" style={{width: 72, height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex'}}>
+              <div data-svg-wrapper data-layer="minus" className="Minus" onClick={() => updateFontSize(selectedFontSize - 1)} style={{cursor: 'pointer'}}>
+                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0.601562 14H9.60156" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <input 
+                  value={fontSizeInput} 
+                  onChange={handleFontSizeInput}
+                  onFocus={() => setIsEditingFontSize(true)}
+                  onBlur={handleBlur}
+                  type="number"
+                  className="FontSizeNumber"
+                  style={{width: 18, textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', background: 'transparent', border: 'none', outline: 'none', padding: 0, margin: 0}}
+              />
+              <div data-svg-wrapper data-layer="plus" className="Plus" onClick={() => updateFontSize(selectedFontSize + 1)} style={{cursor: 'pointer'}}>
+                <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9.60156 14H5.10156M5.10156 14H0.601562M5.10156 14V9.5M5.10156 14V18.5" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+
+            {/* Bold */}
+            <div data-layer="bold" className="Bold" onClick={() => handleSmartFormat('bold')} style={{width: 32, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', display: 'flex', cursor: 'pointer'}}>
+              <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '700', lineHeight: "19.32px", wordWrap: 'break-word'}}>B</div>
+            </div>
+
+            {/* Italic */}
+            <div data-svg-wrapper data-layer="italic" className="Italic" onClick={() => handleSmartFormat('italic')} style={{cursor: 'pointer'}}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="16" fill="#F2F5F8"/>
+              <path d="M19.8872 11H14.3316M17.6649 21H12.1094M17.3872 11L14.8872 21" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* List */}
+            <div data-svg-wrapper data-layer="list" className="List" onClick={() => handleFormat('insertUnorderedList')} style={{cursor: 'pointer'}}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="16" fill="#F2F5F8"/>
+              <path d="M9 11.6C9 11.4409 9.06321 11.2883 9.17574 11.1757C9.28826 11.0632 9.44087 11 9.6 11H10.4C10.5591 11 10.7117 11.0632 10.8243 11.1757C10.9368 11.2883 11 11.4409 11 11.6C11 11.7591 10.9368 11.9117 10.8243 12.0243C10.7117 12.1368 10.5591 12.2 10.4 12.2H9.6C9.44087 12.2 9.28826 12.1368 9.17574 12.0243C9.06321 11.9117 9 11.7591 9 11.6ZM12.2 11.6C12.2 11.4409 12.2632 11.2883 12.3757 11.1757C12.4883 11.0632 12.6409 11 12.8 11H22.4C22.5591 11 22.7117 11.0632 22.8243 11.1757C22.9368 11.2883 23 11.4409 23 11.6C23 11.7591 22.9368 11.9117 22.8243 12.0243C22.7117 12.1368 22.5591 12.2 22.4 12.2H12.8C12.6409 12.2 12.4883 12.1368 12.3757 12.0243C12.2632 11.9117 12.2 11.7591 12.2 11.6ZM9 16C9 15.8409 9.06321 15.6883 9.17574 15.5757C9.28826 15.4632 9.44087 15.4 9.6 15.4H10.4C10.5591 15.4 10.7117 15.4632 10.8243 15.5757C10.9368 15.6883 11 15.8409 11 16C11 16.1591 10.9368 16.3117 10.8243 16.4243C10.7117 16.5368 10.5591 16.6 10.4 16.6H9.6C9.44087 16.6 9.28826 16.5368 9.17574 16.4243C9.06321 16.3117 9 16.1591 9 16ZM12.2 16C12.2 15.8409 12.2632 15.6883 12.3757 15.5757C12.4883 15.4632 12.6409 15.4 12.8 15.4H22.4C22.5591 15.4 22.7117 15.4632 22.8243 15.5757C22.9368 15.6883 23 15.8409 23 16C23 16.1591 22.9368 16.3117 22.8243 16.4243C22.7117 16.5368 22.5591 16.6 22.4 16.6H12.8C12.6409 16.6 12.4883 16.5368 12.3757 16.4243C12.2632 16.3117 12.2 16.1591 12.2 16ZM9 20.4C9 20.2409 9.06321 20.0883 9.17574 19.9757C9.28826 19.8632 9.44087 19.8 9.6 19.8H10.4C10.5591 19.8 10.7117 19.8632 10.8243 19.9757C10.9368 20.0883 11 20.2409 11 20.4C11 20.5591 10.9368 20.7117 10.8243 20.8243C10.7117 20.9368 10.5591 21 10.4 21H9.6C9.44087 21 9.28826 20.9368 9.17574 20.8243C9.06321 20.7117 9 20.5591 9 20.4ZM12.2 20.4C12.2 20.2409 12.2632 20.0883 12.3757 19.9757C12.4883 19.8632 12.6409 19.8 12.8 19.8H22.4C22.5591 19.8 22.7117 19.8632 22.8243 19.9757C22.9368 20.0883 23 20.2409 23 20.4C23 20.5591 22.9368 20.7117 22.8243 20.8243C22.7117 20.9368 22.5591 21 22.4 21H12.8C12.6409 21 12.4883 20.9368 12.3757 20.8243C12.2632 20.7117 12.2 20.5591 12.2 20.4Z" fill="black" fillOpacity="0.95"/>
+              </svg>
+            </div>
+          </div>
+          
+          {/* Content Area */}
+          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 728, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flex: 1, overflow: 'hidden'}}>
             <div 
                 className="DocContentArea"
-                style={{ 
-                    width: "100%",
-                    height: "100%",
-                    flex: 1, 
-                    marginTop: 0,
-                    paddingTop: 80,
-                    overflowY: 'auto', 
-                    color: 'black',
+                style={{
+                    flex: '1 1 0', 
+                    height: '100%',
+                    justifyContent: 'flex-start', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    color: 'rgba(0, 0, 0, 0.95)', 
+                    fontSize: `${settings.pSize}px`, // Use setting size
                     fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif',
-                    fontSize: `${settings.pSize}px`, // Use Body size as base
-                    lineHeight: 1.5,
-                    outline: 'none',
-                    paddingLeft: 24,
-                    paddingRight: 24,
-                    paddingBottom: 24
+                    fontWeight: '400', 
+                    lineHeight: 1.5, 
+                    wordWrap: 'break-word',
+                    overflowY: 'auto'
                 }}
             >
                 <div 
@@ -1269,8 +1259,9 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                     style={{ minHeight: "100%", outline: "none" }}
                 />
             </div>
-            
-             <style>{`
+          </div>
+
+          <style>{`
                 .DocContentArea ul { padding-left: 20px; margin: 8px 0; }
                 .DocContentArea ol { padding-left: 20px; margin: 8px 0; }
                 .DocContentArea h1 { font-size: ${settings.h1Size}px; font-weight: bold; margin: 0.5em 0; border-bottom: 1px solid #ddd; }
@@ -1285,7 +1276,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                 input[type=number] {
                     -moz-appearance: textfield;
                 }
-            `}</style>
+          `}</style>
         </div>
     )
 })
@@ -1315,6 +1306,7 @@ interface ChatInputProps {
     isLiveMode?: boolean
     onPasteFile?: (files: File[]) => void
     onConnectWithAI?: () => void
+    themeColors?: typeof darkColors
 }
 
 const ChatInput = React.memo(function ChatInput({ 
@@ -1340,15 +1332,25 @@ const ChatInput = React.memo(function ChatInput({
     isMobileLayout = false,
     isLiveMode = false,
     onPasteFile,
-    onConnectWithAI
+    onConnectWithAI,
+    themeColors = darkColors
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
     const [isAddFilesTooltipHovered, setIsAddFilesTooltipHovered] = React.useState(false)
     const [isEndCallTooltipHovered, setIsEndCallTooltipHovered] = React.useState(false)
     const [showMenu, setShowMenu] = React.useState(false)
+    const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
     const menuRef = React.useRef<HTMLDivElement>(null)
     const [canShareScreen, setCanShareScreen] = React.useState(false)
+
+    // Create local styles with themeColors
+    const localStyles = React.useMemo(() => getStyles(themeColors), [themeColors])
+
+    // Reset selection when menu opens/closes
+    React.useEffect(() => {
+        if (!showMenu) setSelectedMenuIndex(-1)
+    }, [showMenu])
 
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
         const items = e.clipboardData?.items
@@ -1432,21 +1434,124 @@ const ChatInput = React.memo(function ChatInput({
 
     const hasContent = value.trim() || attachments.length > 0
 
+    const menuItems = React.useMemo(() => {
+        const items = [
+            {
+                id: 'files',
+                label: 'Add files & photos',
+                icon: (
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691" stroke={themeColors.text.primary} strokeWidth="1.06918" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                ),
+                onClick: () => {
+                    onFileSelect()
+                    setShowMenu(false)
+                },
+                className: "AddFilesPhotos",
+                isDestructive: false
+            }
+        ]
+
+        if (canShareScreen) {
+            items.push({
+                id: 'share',
+                label: isScreenSharing ? 'Stop sharing' : 'Share screen',
+                icon: isScreenSharing ? (
+                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                ) : (
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke={themeColors.text.primary} strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                ),
+                onClick: () => {
+                    if (onScreenShare) onScreenShare()
+                    setShowMenu(false)
+                },
+                className: "ShareScreen",
+                isDestructive: isScreenSharing
+            })
+        }
+
+        items.push({
+            id: 'whiteboard',
+            label: isWhiteboardOpen ? 'Stop whiteboard' : 'Whiteboard',
+            icon: isWhiteboardOpen ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7.7678 12.938C7.38383 13.3223 5.11119 15.1876 4.47671 15.0968L1.08753 14.6089L0.602849 11.2417C0.511562 10.6074 2.37678 8.33438 2.76073 7.95043M7.7678 12.938L14.6179 6.08488C15.0023 5.70053 15.1668 5.12791 15.0754 4.49297C14.9841 3.85804 14.6442 3.2128 14.1306 2.69921L13.0021 1.57C12.7477 1.31548 12.4582 1.10098 12.1503 0.93875C11.8423 0.776525 11.5218 0.669761 11.2073 0.62456C10.8927 0.579359 10.5901 0.596608 10.3169 0.675321C10.0436 0.754034 9.80508 0.892667 9.61484 1.0833L2.76073 7.95043M7.7678 12.938L2.76073 7.95043" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            ),
+            onClick: () => {
+                if (toggleWhiteboard) toggleWhiteboard()
+                setShowMenu(false)
+            },
+            className: "Whiteboard",
+            isDestructive: isWhiteboardOpen
+        })
+
+        items.push({
+            id: 'resume',
+            label: isResumeOpen ? 'Stop notes' : 'Notes',
+            icon: isResumeOpen ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            ) : (
+                <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0.599609 11.0021L8.48004 11.0018M0.599609 5.64345H15.0996M0.599609 0.599976H15.0996" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            ),
+            onClick: () => {
+                if (toggleResume) toggleResume()
+                setShowMenu(false)
+            },
+            className: "Resume",
+            isDestructive: isResumeOpen
+        })
+
+        if (isConnected && !isLiveMode) {
+            items.push({
+                id: 'report',
+                label: 'Report user',
+                icon: (
+                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                ),
+                onClick: () => {
+                    if (onReport) onReport()
+                    setShowMenu(false)
+                },
+                className: "Report",
+                isDestructive: true,
+                hasSeparator: true
+            })
+        }
+
+        return items
+    }, [canShareScreen, isScreenSharing, isWhiteboardOpen, isResumeOpen, isConnected, isLiveMode, onFileSelect, onScreenShare, toggleWhiteboard, toggleResume, onReport, themeColors])
+
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: isMobileLayout ? 16 : 24, paddingRight: isMobileLayout ? 16 : 24, boxSizing: "border-box", pointerEvents: "auto"}}>
                 {/* CONVERSATION QUICK ACTIONS MENU */}
             <style>{`
                 .ChatTextInput::placeholder {
-                    color: ${colors.text.secondary};
+                    color: ${themeColors.text.secondary};
                 }
                 .ChatTextInput::-webkit-input-placeholder {
-                    color: ${colors.text.secondary};
+                    color: ${themeColors.text.secondary};
                 }
                 .ChatTextInput::-moz-placeholder {
-                    color: ${colors.text.secondary};
+                    color: ${themeColors.text.secondary};
                 }
                 .ChatTextInput:-ms-input-placeholder {
-                    color: ${colors.text.secondary};
+                    color: ${themeColors.text.secondary};
                 }
             `}</style>
             {showMenu && (
@@ -1478,10 +1583,10 @@ const ChatInput = React.memo(function ChatInput({
                     <div data-layer="conversation actions" className="ConversationActions" style={{
                         width: isMobileLayout ? "auto" : 196, 
                         padding: 10, 
-                        background: '#353535', 
+                        background: themeColors.surfaceMenu, 
                         boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', 
                         borderRadius: isMobileLayout ? "36px 36px 0px 0px" : 28, 
-                        outline: '0.33px rgba(255, 255, 255, 0.10) solid', 
+                        outline: `0.33px ${themeColors.border.subtle} solid`, 
                         outlineOffset: '-0.33px', 
                         flexDirection: 'column', 
                         justifyContent: 'flex-start', 
@@ -1489,217 +1594,46 @@ const ChatInput = React.memo(function ChatInput({
                         gap: 4, 
                         display: 'flex',
                     }}>
-                        
-                        {/* Add files & photos */}
-                            <div 
-                                data-layer="add files/photos" 
-                                className="AddFilesPhotos" 
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    onFileSelect()
-                                    setShowMenu(false)
-                                }}
-                                style={{
-                                    ...styles.menuItem,
-                                    height: isMobileLayout ? 44 : 36
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (isMobileLayout) return
-                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
-                                }}
-                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                            >
-                            <div data-svg-wrapper data-layer="center icon flexbox..." className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691" stroke="white" strokeWidth="1.06918" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                            <div data-layer="Add files & photos..." className="AddFilesPhotosText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Add files & photos</div>
-                        </div>
-
-                        {/* Share screen */}
-                        {canShareScreen && (
-                            <div 
-                                data-layer="share screen" 
-                                className="ShareScreen" 
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (onScreenShare) onScreenShare()
-                                    setShowMenu(false)
-                                }}
-                                style={{
-                                    ...styles.menuItem,
-                                    height: isMobileLayout ? 44 : 36
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (isMobileLayout) return
-                                    if (isScreenSharing) {
-                                        Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
-                                    } else {
-                                        Object.assign(e.currentTarget.style, styles.menuItemHover)
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent"
-                                }}
-                            >
-                                {isScreenSharing ? (
-                                    <>
-                                        <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 15w width to make sure text is aligned vertical on all buttons." className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
-                                        </div>
-                                        <div data-layer="Share screen. truncate if doesnt fit." className="ShareScreenTruncateIfDoesntFit" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop sharing</div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
-                                            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M0.75 10.6674V11.5078C0.75 12.1791 1.01668 12.823 1.49139 13.2977C1.96609 13.7724 2.60992 14.0391 3.28125 14.0391H11.7188C12.3901 14.0391 13.0339 13.7724 13.5086 13.2977C13.9833 12.823 14.25 12.1791 14.25 11.5078V10.6641M7.5 10.2422V0.960938M7.5 0.960938L10.4531 3.91406M7.5 0.960938L4.54688 3.91406" stroke="white" strokeWidth="1.26562" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
-                                        </div>
-                                        <div data-layer="Share screen..." className="ShareScreenText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                                            Share screen
-                                        </div>
-                                    </>
+                        {menuItems.map((item, index) => (
+                            <React.Fragment key={item.id}>
+                                {item.hasSeparator && (
+                                    <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: themeColors.border.subtle, borderRadius: 4}} />
                                 )}
-                            </div>
-                        )}
-
-                        {/* Whiteboard */}
-                        <div 
-                            data-layer="whiteboard" 
-                            className="Whiteboard" 
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (toggleWhiteboard) toggleWhiteboard()
-                                setShowMenu(false)
-                            }}
-                            style={{
-                                ...styles.menuItem,
-                                height: isMobileLayout ? 44 : 36
-                            }}
-                            onMouseEnter={(e) => {
-                                if (isMobileLayout) return
-                                if (isWhiteboardOpen) {
-                                    Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
-                                } else {
-                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent"
-                            }}
-                        >
-                            {isWhiteboardOpen ? (
-                                <>
-                                    <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 15w width to make sure text is aligned vertical on all buttons." className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </div>
-                                    <div className="StopWhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop whiteboard</div>
-                                </>
-                            ) : (
-                                <>
-                                    <div data-svg-wrapper data-layer="center icon flexbox" className="CenterIconFlexbox" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M7.7678 12.938C7.38383 13.3223 5.11119 15.1876 4.47671 15.0968L1.08753 14.6089L0.602849 11.2417C0.511562 10.6074 2.37678 8.33438 2.76073 7.95043M7.7678 12.938L14.6179 6.08488C15.0023 5.70053 15.1668 5.12791 15.0754 4.49297C14.9841 3.85804 14.6442 3.2128 14.1306 2.69921L13.0021 1.57C12.7477 1.31548 12.4582 1.10098 12.1503 0.93875C11.8423 0.776525 11.5218 0.669761 11.2073 0.62456C10.8927 0.579359 10.5901 0.596608 10.3169 0.675321C10.0436 0.754034 9.80508 0.892667 9.61484 1.0833L2.76073 7.95043M7.7678 12.938L2.76073 7.95043" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </div>
-                                    <div className="WhiteboardText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Whiteboard</div>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Resume */}
-                        <div 
-                            data-layer="resume" 
-                            className="Resume" 
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (toggleResume) toggleResume()
-                                setShowMenu(false)
-                            }}
-                            style={{
-                                ...styles.menuItem,
-                                height: isMobileLayout ? 44 : 36
-                            }}
-                            onMouseEnter={(e) => {
-                                if (isMobileLayout) return
-                                if (isResumeOpen) {
-                                    Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
-                                } else {
-                                    Object.assign(e.currentTarget.style, styles.menuItemHover)
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent"
-                            }}
-                        >
-                            {isResumeOpen ? (
-                                <>
-                                    <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 15w width to make sure text is aligned vertical on all buttons." className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </div>
-                                    <div className="StopResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FB6A6A', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Stop notes</div>
-                                </>
-                            ) : (
-                                <>
-                                    <div data-svg-wrapper data-layer="Vector" className="Vector" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                        <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M0.599609 11.0021L8.48004 11.0018M0.599609 5.64345H15.0996M0.599609 0.599976H15.0996" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </div>
-                                    <div className="ResumeText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                                        Notes
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        {isConnected && !isLiveMode && (
-                            <>
-                                <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', marginLeft: 4, marginRight: 4, marginTop: 2, marginBottom: 2, height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
-
-                                {/* Report */}
                                 <div 
-                                    data-layer="report." 
-                                    className="Report" 
+                                    className={item.className}
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        if (onReport) onReport()
-                                        setShowMenu(false)
+                                        item.onClick()
                                     }}
                                     style={{
-                                        ...styles.menuItem,
-                                        height: isMobileLayout ? 44 : 36
+                                        ...localStyles.menuItem,
+                                        height: isMobileLayout ? 44 : 36,
+                                        ...(index === selectedMenuIndex ? (item.isDestructive ? localStyles.menuItemDestructiveHover : localStyles.menuItemHover) : {})
                                     }}
-                                    onMouseEnter={(e) => {
+                                    onMouseEnter={() => {
                                         if (isMobileLayout) return
-                                        Object.assign(e.currentTarget.style, styles.menuItemDestructiveHover)
+                                        setSelectedMenuIndex(index)
                                     }}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                                    onMouseLeave={(e) => {
+                                        // Keep selection on mouse leave to support keyboard resumption
+                                        // e.currentTarget.style.background = "transparent" // Removed to let React control style
+                                    }}
                                 >
-                                    <div data-svg-wrapper data-layer="flag icon" className="FlagIcon">
-                                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.1458" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
+                                    <div data-svg-wrapper className="Icon" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                        {item.icon}
                                     </div>
-                                    <div data-layer="Report..." className="ReportText" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(251.18, 105.83, 105.83, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Report user</div>
+                                    <div className="Label" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: item.isDestructive ? '#FB6A6A' : themeColors.text.primary, fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
+                                        {item.label}
+                                    </div>
                                 </div>
-                            </>
-                        )}
-
+                            </React.Fragment>
+                        ))}
                     </div>
                 </div>
                 </>
             )}
 
-          <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: 'linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, #212121 35%)', justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
+          <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`, justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
             
             {/* INPUT BOX */}
             <div data-layer="input-box" className="InputBox" style={{
@@ -1707,7 +1641,9 @@ const ChatInput = React.memo(function ChatInput({
                 minHeight: 56, 
                 maxHeight: 384, 
                 padding: 10, 
-                background: '#303030', 
+                background: isResumeOpen ? 'transparent' : themeColors.surface, 
+                outline: isResumeOpen ? `0.33px ${themeColors.border.subtle} solid` : 'none',
+                outlineOffset: isResumeOpen ? '-0.33px' : 0,
                 overflow: 'visible',
                 borderRadius: 28, 
                 display: 'flex', 
@@ -1813,7 +1749,7 @@ const ChatInput = React.memo(function ChatInput({
                              setShowMenu(prev => !prev)
                         }
                     }}
-                    onMouseEnter={() => setIsAddFilesTooltipHovered(true)}
+                    onMouseEnter={() => isHoverCapable() && setIsAddFilesTooltipHovered(true)}
                     onMouseLeave={() => setIsAddFilesTooltipHovered(false)}
                     style={{
                       cursor: (attachments.length >= 10) ? "not-allowed" : "pointer", 
@@ -1849,7 +1785,7 @@ const ChatInput = React.memo(function ChatInput({
                         </div>
                     )}
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 5V19M5 12H19" stroke={themeColors.text.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
 
@@ -1858,9 +1794,52 @@ const ChatInput = React.memo(function ChatInput({
                     <textarea
                         ref={textareaRef}
                         value={value}
-                        onChange={onChange}
+                        onChange={(e) => {
+                            onChange(e)
+                            // Auto-open menu on trigger
+                            const val = e.target.value
+                            if (val.endsWith('/') || val.endsWith('@')) {
+                                setShowMenu(true)
+                                setSelectedMenuIndex(0) // Default to first option
+                            } else if (showMenu) {
+                                // Close if continuing to type something else without selecting
+                                setShowMenu(false)
+                            }
+                        }}
                         onPaste={handlePaste}
                         onKeyDown={(e) => {
+                            if (showMenu) {
+                                if (e.key === "ArrowUp") {
+                                    e.preventDefault()
+                                    setSelectedMenuIndex(prev => {
+                                        if (prev === -1) return menuItems.length - 1
+                                        return prev <= 0 ? menuItems.length - 1 : prev - 1
+                                    })
+                                    return
+                                }
+                                if (e.key === "ArrowDown") {
+                                    e.preventDefault()
+                                    setSelectedMenuIndex(prev => {
+                                        if (prev === -1) return 0
+                                        return prev === menuItems.length - 1 ? 0 : prev + 1
+                                    })
+                                    return
+                                }
+                                if (e.key === "Enter") {
+                                    e.preventDefault()
+                                    const index = selectedMenuIndex === -1 ? 0 : selectedMenuIndex
+                                    if (menuItems[index]) {
+                                        menuItems[index].onClick()
+                                    }
+                                    return
+                                }
+                                if (e.key === "Escape") {
+                                    e.preventDefault()
+                                    setShowMenu(false)
+                                    return
+                                }
+                            }
+
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault()
                                 if (hasContent && !isLoading) onSend()
@@ -1871,7 +1850,7 @@ const ChatInput = React.memo(function ChatInput({
                         className="ChatTextInput" 
                         style={{
                             flex: '1 1 0', 
-                            color: 'white', 
+                            color: themeColors.text.primary, 
                             fontSize: 16, 
                             fontFamily: 'Inter', 
                             fontWeight: '400', 
@@ -1910,13 +1889,13 @@ const ChatInput = React.memo(function ChatInput({
                   >
                     {isLoading ? (
                         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
-                            <rect x="12" y="12" width="12" height="12" rx="2" fill="black" fillOpacity="0.95"/>
+                            <rect width="36" height="36" rx="18" fill={themeColors.text.primary} fillOpacity="0.95"/>
+                            <rect x="12" y="12" width="12" height="12" rx="2" fill={themeColors.background} fillOpacity="0.95"/>
                         </svg>
                     ) : (
                         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="36" height="36" rx="18" fill="white" fillOpacity="0.95"/>
-                            <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill="black" fillOpacity="0.95"/>
+                            <rect width="36" height="36" rx="18" fill={themeColors.text.primary} fillOpacity="0.95"/>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M14.5611 18.1299L16.8709 15.8202V23.3716C16.8709 23.9948 17.3762 24.5 17.9994 24.5C18.6226 24.5 19.1278 23.9948 19.1278 23.3716V15.8202L21.4375 18.1299C21.8782 18.5706 22.5927 18.5706 23.0334 18.1299C23.4741 17.6893 23.4741 16.9748 23.0334 16.5341L17.9994 11.5L12.9653 16.5341C12.5246 16.9748 12.5246 17.6893 12.9653 18.1299C13.406 18.5706 14.1204 18.5706 14.5611 18.1299Z" fill={themeColors.background} fillOpacity="0.95"/>
                         </svg>
                     )}
                   </div>
@@ -1928,10 +1907,10 @@ const ChatInput = React.memo(function ChatInput({
                         data-layer="start ai live call" 
                         className="StartAiLiveCall"
                         onClick={onConnectWithAI}
-                        onMouseEnter={() => setIsAiTooltipHovered(true)}
+                        onMouseEnter={() => isHoverCapable() && setIsAiTooltipHovered(true)}
                         onMouseLeave={() => setIsAiTooltipHovered(false)}
                         style={{
-                            cursor: "pointer",
+                            cursor: "pointer", 
                             width: 36,
                             height: 36,
                             display: "block",
@@ -1959,7 +1938,7 @@ const ChatInput = React.memo(function ChatInput({
                               </div>
                           )}
                           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z" fill="white" fillOpacity="0.95"/>
+                          <path d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z" fill={themeColors.text.primary} fillOpacity="0.95"/>
                           </svg>
                       </div>
                   )}
@@ -1974,7 +1953,7 @@ const ChatInput = React.memo(function ChatInput({
                   data-layer="end call button." 
                   className="EndCallButton" 
                   onClick={onEndCall} 
-                  onMouseEnter={() => setIsEndCallTooltipHovered(true)}
+                  onMouseEnter={() => isHoverCapable() && setIsEndCallTooltipHovered(true)}
                   onMouseLeave={() => setIsEndCallTooltipHovered(false)}
                   style={{
                       cursor: "pointer", 
@@ -2439,24 +2418,26 @@ const MessageBubble = React.memo(({
     msg, 
     isMobileLayout,
     id,
-    isLast
+    isLast,
+    themeColors = darkColors
 }: { 
     msg: Message, 
     isMobileLayout: boolean,
     id?: string,
-    isLast?: boolean
+    isLast?: boolean,
+    themeColors?: typeof darkColors
 }) => {
     // Memoize base styles to avoid recreation
     const baseTextStyle = React.useMemo(() => ({ 
         fontSize: 16, 
-        color: "rgba(255,255,255,0.95)", 
+        color: themeColors.text.primary, 
         lineHeight: 1.6 
-    }), [])
+    }), [themeColors])
 
     const linkStyle = React.useMemo(() => ({ 
-        color: "#4DA6FF", 
+        color: themeColors.text.link, 
         textDecoration: "underline" 
-    }), [])
+    }), [themeColors])
 
     return (
         <div id={id} style={{ 
@@ -2530,7 +2511,7 @@ const MessageBubble = React.memo(({
                                                         borderRadius: 12,
                                                         overflow: "hidden",
                                                         position: "relative",
-                                                        background: "rgba(255,255,255,0.05)"
+                                                        background: themeColors.background === "#FFFFFF" ? "rgba(0, 0, 0, 0.05)" : "rgba(255,255,255,0.05)"
                                                     }}>
                                                         {att.url && (
                                                             <img 
@@ -2581,9 +2562,9 @@ const MessageBubble = React.memo(({
                         padding: msg.role === "user" || msg.role === "peer" ? "6px 16px" : "0", 
                         borderRadius: msg.role === "user" || msg.role === "peer" ? 20 : 0,
                         background: (msg.role === "user" || msg.role === "peer")
-                            ? "rgba(255, 255, 255, 0.08)" 
+                            ? (themeColors.background === "#FFFFFF" ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.08)")
                             : "transparent",
-                        color: "rgba(255,255,255,0.95)",
+                        color: themeColors.text.primary,
                         lineHeight: 1.6,
                         fontSize: 16,
                         alignSelf: msg.role === "user" ? "flex-end" : "flex-start"
@@ -2605,11 +2586,12 @@ const MessageBubble = React.memo(({
 
 // --- HELPER COMPONENTS ---
 
-const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { type: 'student' | 'mentor', isCompact: boolean, isMobileLayout: boolean }) => {
+const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout, colors }: { type: 'student' | 'mentor', isCompact: boolean, isMobileLayout: boolean, colors: typeof darkColors }) => {
     const isStudent = type === 'student'
     const label = isStudent ? "Get free help" : "Volunteer"
     const desc = isStudent ? "I'm a student looking for a mentor" : "I want to offer free advice"
     const textColor = isStudent ? 'white' : colors.text.primary
+    const isLightMode = colors.background === "#FFFFFF"
 
     if (isCompact) {
         return (
@@ -2620,7 +2602,7 @@ const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { t
                     justifyContent: 'center', 
                     height: '100%', 
                     width: '100%',
-                    background: isStudent ? colors.state.accent : undefined, // Keep student accent
+                    background: isStudent ? colors.state.accent : (isLightMode ? colors.surface : undefined), // Light mode: use surface color for volunteer tile
                     color: textColor, 
                     fontSize: 15,
                     fontWeight: 600,
@@ -2635,8 +2617,8 @@ const RoleSelectionButton = React.memo(({ type, isCompact, isMobileLayout }: { t
 
     return (
             <div style={{ padding: isMobileLayout ? 48 : 96, display: "flex", flexDirection: "column", gap: 24, height: "100%" }}>
-            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>{label}</div>
-            <div style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>{desc}</div>
+            <div style={{ color: textColor, fontSize: '24px', fontWeight: '600', lineHeight: '1.2' }}>{label}</div>
+            <div style={{ color: textColor, fontSize: '15px', fontWeight: '400', lineHeight: '1.4', opacity: 0.9 }}>{desc}</div>
         </div>
     )
 })
@@ -2715,6 +2697,12 @@ export default function OmegleMentorshipUI(props: Props) {
     
     // --- STATE: RESUME EDITOR ---
     const [isResumeOpen, setIsResumeOpen] = React.useState(false)
+    
+    // --- THEME LOGIC ---
+    const isLightMode = isResumeOpen
+    const themeColors = isLightMode ? lightColors : darkColors
+    // Shadow global styles with themed styles
+    const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [resumeContent, setResumeContent] = React.useState(`
 <h1 style="text-align: center;">[Your Name]</h1>
 <p style="text-align: center;">[City, State, Zip] | [Phone] | [Email]</p>
@@ -3757,12 +3745,13 @@ export default function OmegleMentorshipUI(props: Props) {
         _isScreenSharing: boolean, 
         _remoteScreenStream: MediaStream | null, 
         _isWhiteboardOpen: boolean,
+        _isResumeOpen: boolean,
         _sharedScreenSize: { width: number, height: number } | null
     ) => {
         // 1. Calculate Min Height (Max Video Height Constraint)
         let minHeight = 100
         
-        if (!_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen) {
+        if (!_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isResumeOpen) {
             const targetRatio = 1.55
             let maxVideoHeightNeeded = 0
             
@@ -3780,13 +3769,17 @@ export default function OmegleMentorshipUI(props: Props) {
             const calculatedMinChatHeight = cHeight - 40 - maxVideoHeightNeeded
             minHeight = Math.max(100, calculatedMinChatHeight)
         } else {
-            // Screen Share / Whiteboard Mode
+            // Screen Share / Whiteboard / Resume Mode
              let activeWidth = _sharedScreenSize?.width
              let activeHeight = _sharedScreenSize?.height
              
              if (_isWhiteboardOpen) {
                   if (_isMobileLayout) { activeWidth = 1080; activeHeight = 1350; }
                   else { activeWidth = 1920; activeHeight = 1080; }
+             } else if (_isResumeOpen) {
+                  // A4 Dimensions
+                  activeWidth = 1240
+                  activeHeight = 1754
              }
 
              if (activeWidth && activeHeight) {
@@ -3809,12 +3802,12 @@ export default function OmegleMentorshipUI(props: Props) {
         // 2. Calculate Max Height (Min Video Height Constraint)
         let maxHeight = cHeight - 100 // Default
 
-        if (_isMobileLayout && !_isScreenSharing && !_remoteScreenStream) {
+        if (_isMobileLayout && !_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isResumeOpen) {
              const minVideoSectionHeight = 80
              maxHeight = Math.max(100, cHeight - 40 - minVideoSectionHeight)
         }
 
-        if (_isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen) {
+        if (_isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen || _isResumeOpen) {
             let topRowHeight = 140
             if (_isMobileLayout) {
                  const availableW = Math.max(0, cWidth - 32)
@@ -3891,12 +3884,20 @@ export default function OmegleMentorshipUI(props: Props) {
             isScreenSharing,
             remoteScreenStream,
             isWhiteboardOpen,
+            isResumeOpen,
             sharedScreenSize
         )
 
         setChatHeight(prev => Math.max(minHeight, Math.min(prev, maxHeight)))
 
-    }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, sharedScreenSize, calculateHeightConstraints])
+    }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isResumeOpen, sharedScreenSize, calculateHeightConstraints])
+
+    // --- EFFECT: MINIMIZE CHAT WHEN RESUME OPENS ---
+    React.useEffect(() => {
+        if (isResumeOpen) {
+             setChatHeight(150) // Minimize chat to allow doc editor to be full height
+        }
+    }, [isResumeOpen])
 
     const handleRoleSelect = React.useCallback((selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
@@ -5066,6 +5067,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 isScreenSharing,
                 remoteScreenStream,
                 isWhiteboardOpen,
+                isResumeOpen,
                 sharedScreenSize
             )
 
@@ -5154,38 +5156,11 @@ export default function OmegleMentorshipUI(props: Props) {
                 activeHeight = 1080
             }
         } else if (isResumeOpen) {
-             // A4 aspect ratio (595 x 842) - Use a larger base to ensure high quality initial render
-             if (isMobileLayout) {
-                 // On mobile, force width priority by setting dimensions that match mobile aspect ratio closely or exceed it width-wise
-                 // Actually, container logic below uses 'contain'. 
-                 // If we provide an aspect ratio that is TALLER than the container, it will be constrained by height (leaving side gaps).
-                 // If we provide an aspect ratio that is WIDER than the container, it will be constrained by width (leaving top/bottom gaps).
-                 // We want FULL WIDTH. So we want constrained by width.
-                 // So we need the content to be TALLER (ratio wise) than the container? No.
-                 // If container is 100x200 (1:2).
-                 // If content is 100x100 (1:1). Logic: containerRatio (0.5) < videoRatio (1). -> Constrain width. Final: 100x100.
-                 // If content is 100x300 (1:3). Logic: containerRatio (0.5) > videoRatio (0.33). -> Constrain height. Final: 66x200. (Width < 100).
-                 // So to FILL WIDTH on a tall screen, we need the content ratio to be WIDER (or equal) to the container ratio?
-                 // Wait.
-                 // Container Ratio = W / H. (e.g. 0.5)
-                 // Video Ratio = w / h.
-                 // If ContainerRatio > VideoRatio (Container is wider than video): Constrain Height.
-                 // If ContainerRatio <= VideoRatio (Container is narrower than video): Constrain Width.
-                 
-                 // We want to constrain by Width (so width is 100%).
-                 // So we need ContainerRatio <= VideoRatio.
-                 // i.e. (AvailableWidth / AvailableHeight) <= (ActiveWidth / ActiveHeight).
-                 // Mobile screens are tall (small W/H, e.g. 0.5).
-                 // A4 is 0.7 (1/1.41). 
-                 // 0.5 <= 0.7 is TRUE. So it SHOULD be constrained by width (full width).
-                 // So why did user say "on mobile should be full width"? Maybe it wasn't?
-                 // Or maybe padding was an issue?
-                 // Let's ensure activeWidth/Height are large enough.
-                 activeWidth = 1240 
-                 activeHeight = 1754 
-             } else {
-                 activeWidth = 1240 // Double A4 for better quality on large screens
-                 activeHeight = 1754
+             return {
+                 width: "100%",
+                 height: "100%",
+                 flex: 1,
+                 alignSelf: "stretch"
              }
         } else {
             activeWidth = sharedScreenSize?.width
@@ -5376,8 +5351,9 @@ export default function OmegleMentorshipUI(props: Props) {
                 height: "100%",
                 // Dynamic height via visualViewport listener: this ensures the UI resizes 
                 // when the mobile keyboard opens, rather than being pushed up/off-screen.
-                background: "#212121",
-                color: "white",
+                background: themeColors.background,
+                color: themeColors.text.primary,
+                transition: "background 0.2s, color 0.2s",
                 fontFamily: "Inter, sans-serif",
                 display: "flex",
                 flexDirection: "column",
@@ -5468,16 +5444,15 @@ export default function OmegleMentorshipUI(props: Props) {
                             aspectRatio: "4/3", 
                             borderRadius: 16, 
                             overflow: "hidden", 
-                            background: "#2E2E2E",
-                            position: "relative",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                            background: themeColors.card,
+                            position: "relative"
                         }}>
                             {(!role && status === "idle" && !isLiveMode) ? (
                                 <div 
                                     style={{ width: '100%', height: '100%' }}
                                     onClick={() => handleRoleSelect("student")}
                                 >
-                                    <RoleSelectionButton type="student" isCompact={true} isMobileLayout={isMobileLayout} />
+                                    <RoleSelectionButton colors={themeColors} type="student" isCompact={true} isMobileLayout={isMobileLayout} />
                                 </div>
                             ) : (
                                 <VideoPlayer 
@@ -5498,9 +5473,8 @@ export default function OmegleMentorshipUI(props: Props) {
                             aspectRatio: "4/3", 
                             borderRadius: 16, 
                             overflow: "hidden", 
-                            background: "#2E2E2E",
-                            position: "relative",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                            background: themeColors.card,
+                            position: "relative"
                         }}>
                             {isLiveMode ? (
                                 <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
@@ -5535,7 +5509,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                         style={{ width: '100%', height: '100%' }}
                                         onClick={() => handleRoleSelect("mentor")}
                                     >
-                                        <RoleSelectionButton type="mentor" isCompact={true} isMobileLayout={isMobileLayout} />
+                                        <RoleSelectionButton colors={themeColors} type="mentor" isCompact={true} isMobileLayout={isMobileLayout} />
                                     </div>
                                 ) : (
                                 role === "student" && isLiveMode ? (
@@ -5642,6 +5616,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     onChange={handleDocChange}
                                     settings={resumeSettings}
                                     onSettingsChange={setResumeSettings}
+                                    themeColors={themeColors}
                                 />
                             ) : isWhiteboardOpen ? (
                                 <div 
@@ -5728,7 +5703,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle" && !isLiveMode) && handleRoleSelect("student")}
                     >
                         {(!role && status === "idle" && !isLiveMode) ? (
-                            <RoleSelectionButton type="student" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
+                            <RoleSelectionButton colors={themeColors} type="student" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
                         ) : (
                             (role === "student" || isLiveMode) ? (
                                 // --- LOCAL USER (STUDENT) ---
@@ -5761,7 +5736,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         onClick={() => (!role && status === "idle") && handleRoleSelect("mentor")}
                     >
                         {(!role && status === "idle") ? (
-                            <RoleSelectionButton type="mentor" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
+                            <RoleSelectionButton colors={themeColors} type="mentor" isCompact={finalHeight < (isMobileLayout ? 164 : 224)} isMobileLayout={isMobileLayout} />
                         ) : (
                             role === "mentor" ? (
                                 // --- LOCAL USER (MENTOR) ---
@@ -5850,7 +5825,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         width: 32,
                         height: 4,
                         borderRadius: 2,
-                        background: "rgba(255,255,255,0.2)"
+                        background: isResumeOpen ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
                     }}
                 />
             </div>
@@ -5887,7 +5862,7 @@ export default function OmegleMentorshipUI(props: Props) {
                     }}
                 >
                     {messages.map((msg, idx) => (
-                        <MessageBubble key={idx} id={`msg-${idx}`} msg={msg} isMobileLayout={isMobileLayout} isLast={idx === messages.length - 1} />
+                        <MessageBubble key={idx} id={`msg-${idx}`} msg={msg} isMobileLayout={isMobileLayout} isLast={idx === messages.length - 1} themeColors={themeColors} />
                     ))}
                     {isLoading && (!messages.length || messages[messages.length - 1].role !== "model" || messages[messages.length - 1].text.length === 0) && (
                         <div style={{ 
@@ -5907,7 +5882,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     <g clipPath="url(#clipLoadAnimMentorship)">
                                         <path
                                             d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                            fill="white"
+                                            fill={isResumeOpen ? themeColors.text.primary : "white"}
                                         />
                                     </g>
                                     <defs>
@@ -5915,7 +5890,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                             <rect
                                                 width="20"
                                                 height="20"
-                                                fill="white"
+                                                fill={isResumeOpen ? themeColors.text.primary : "white"}
                                             />
                                         </clipPath>
                                     </defs>
@@ -5966,6 +5941,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         isMobileLayout={isMobileLayout}
                         isLiveMode={isLiveMode}
                         onPasteFile={processFiles}
+                        themeColors={themeColors}
                     />
                 </div>
             </div>
