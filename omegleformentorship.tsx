@@ -1396,7 +1396,13 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
     }, [onCursorMove])
 
     return (
-        <div className="DocEditor" style={{ ...styleVariables, width: '100%', height: '100%', position: 'relative', background: 'white', color: 'rgba(0, 0, 0, 0.95)', display: 'flex', flexDirection: 'column' }}>
+        <div 
+            className="DocEditor" 
+            ref={containerRef}
+            onPointerMove={handleEditorPointerMove}
+            onPointerLeave={() => onCursorMove?.(-1, -1)}
+            style={{ ...styleVariables, width: '100%', height: '100%', position: 'relative', background: 'white', color: 'rgba(0, 0, 0, 0.95)', display: 'flex', flexDirection: 'column' }}
+        >
             {/* Toolbar */}
             <div className="ToolbarContainer" style={{
                 position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', 
@@ -1532,9 +1538,6 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
 
             {/* Content Area */}
             <div 
-                ref={containerRef}
-                onPointerMove={handleEditorPointerMove}
-                onPointerLeave={() => onCursorMove?.(-1, -1)}
                 style={{ flex: 1, overflowY: 'auto', padding: '60px 20px 20px', display: 'flex', justifyContent: 'center', position: 'relative' }}
             >
                 <div style={{ width: '100%', maxWidth: 600, position: 'relative' }}>
@@ -1563,9 +1566,6 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                         }}
                     />
                 </div>
-                {remoteCursor && remoteCursor.x >= 0 && remoteCursor.x <= 1 && remoteCursor.y >= 0 && (
-                    <LiveCursor x={remoteCursor.x} y={remoteCursor.y} color={remoteCursor.color} />
-                )}
             </div>
             
             <style>{`
@@ -1574,6 +1574,10 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                 .DocEditor ul, .DocEditor ol { padding-left: 24px; margin: 12px 0; }
                 .DocEditor a { color: var(--doc-accent); text-decoration: underline; cursor: pointer; }
             `}</style>
+            
+            {remoteCursor && remoteCursor.x >= 0 && remoteCursor.x <= 1 && remoteCursor.y >= 0 && (
+                <LiveCursor x={remoteCursor.x} y={remoteCursor.y} color={remoteCursor.color} />
+            )}
         </div>
     )
 })
