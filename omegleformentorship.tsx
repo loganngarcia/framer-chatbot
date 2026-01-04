@@ -1580,8 +1580,8 @@ interface ChatInputProps {
     isScreenSharing?: boolean
     isWhiteboardOpen?: boolean
     toggleWhiteboard?: () => void
-    isResumeOpen?: boolean
-    toggleResume?: () => void
+    isDocOpen?: boolean
+    toggleDoc?: () => void
     isConnected?: boolean
     isMobileLayout?: boolean
     isLiveMode?: boolean
@@ -1607,8 +1607,8 @@ const ChatInput = React.memo(function ChatInput({
     isScreenSharing = false,
     isWhiteboardOpen = false,
     toggleWhiteboard,
-    isResumeOpen = false,
-    toggleResume,
+    isDocOpen = false,
+    toggleDoc,
     isConnected = false,
     isMobileLayout = false,
     isLiveMode = false,
@@ -1629,7 +1629,7 @@ const ChatInput = React.memo(function ChatInput({
             setShowGradient(true) // Show gradient after 0.2s
         }, 200)
         return () => clearTimeout(timeout)
-    }, [isResumeOpen])
+    }, [isDocOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
@@ -1788,9 +1788,9 @@ const ChatInput = React.memo(function ChatInput({
         })
 
         items.push({
-            id: 'resume',
-            label: isResumeOpen ? 'Stop notes' : 'Notes',
-            icon: isResumeOpen ? (
+            id: 'doc',
+            label: isDocOpen ? 'Close document' : 'Document',
+            icon: isDocOpen ? (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -1800,11 +1800,11 @@ const ChatInput = React.memo(function ChatInput({
                 </svg>
             ),
             onClick: () => {
-                if (toggleResume) toggleResume()
+                if (toggleDoc) toggleDoc()
                 setShowMenu(false)
             },
-            className: "Resume",
-            isDestructive: isResumeOpen
+            className: "Doc",
+            isDestructive: isDocOpen
         })
 
         if (isConnected && !isLiveMode) {
@@ -1827,7 +1827,7 @@ const ChatInput = React.memo(function ChatInput({
         }
 
         return items
-    }, [canShareScreen, isScreenSharing, isWhiteboardOpen, isResumeOpen, isConnected, isLiveMode, onFileSelect, onScreenShare, toggleWhiteboard, toggleResume, onReport, themeColors])
+    }, [canShareScreen, isScreenSharing, isWhiteboardOpen, isDocOpen, isConnected, isLiveMode, onFileSelect, onScreenShare, toggleWhiteboard, toggleDoc, onReport, themeColors])
 
     return (
         <div data-layer="flexbox" className="Flexbox" style={{width: '100%', maxWidth: 728, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0, paddingLeft: isMobileLayout ? 16 : 24, paddingRight: isMobileLayout ? 16 : 24, boxSizing: "border-box", pointerEvents: "auto"}}>
@@ -1931,7 +1931,7 @@ const ChatInput = React.memo(function ChatInput({
             style={{
                 width: "100%", 
                 padding: "24px 0 16px 0", 
-                background: showGradient ? (isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`) : 'transparent',
+                background: showGradient ? (isDocOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`) : 'transparent',
                 justifyContent: 'center',
                 alignItems: 'flex-end',
                 gap: 10,
@@ -1946,9 +1946,9 @@ const ChatInput = React.memo(function ChatInput({
                 minHeight: 56, 
                 maxHeight: 384, 
                 padding: 10, 
-                background: isResumeOpen ? 'transparent' : themeColors.surface, 
-                outline: isResumeOpen ? `0.33px ${themeColors.border.subtle} solid` : 'none',
-                outlineOffset: isResumeOpen ? '-0.33px' : 0,
+                background: isDocOpen ? 'transparent' : themeColors.surface, 
+                outline: isDocOpen ? `0.33px ${themeColors.border.subtle} solid` : 'none',
+                outlineOffset: isDocOpen ? '-0.33px' : 0,
                 overflow: 'visible',
                 borderRadius: 28, 
                 display: 'flex', 
@@ -2967,53 +2967,19 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] = React.useState(false)
     
-    // --- STATE: RESUME EDITOR ---
-    const [isResumeOpen, setIsResumeOpen] = React.useState(false)
+    // --- STATE: DOC EDITOR ---
+    const [isDocOpen, setIsDocOpen] = React.useState(false)
     
     // --- THEME LOGIC ---
-    const isLightMode = isResumeOpen
+    const isLightMode = isDocOpen
     const themeColors = isLightMode ? lightColors : darkColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
-    const [resumeContent, setResumeContent] = React.useState(`
-<h1>Full Name</h1>
-<p>email@example.com | your-portfolio.com | github.com/your-username</p>
-<h2>EDUCATION</h2>
-<p><strong>Degree Name in Field of Study</strong></p>
-<p>University or Institution Name; GPA: X.XX</p>
-<p><em>Start Month Year – End Month Year</em></p>
-<h2>EXPERIENCE</h2>
-<p><strong>Role or Title, Organization or Program Name</strong></p>
-<p><em>Start Month Year – End Month Year</em></p>
-<ul>
-<li>Brief description of responsibility, contribution, or outcome.</li>
-<li>Summary of technical or organizational work performed.</li>
-<li>Explanation of implementation, optimization, or delivery.</li>
-</ul>
-<p><strong>Role or Title, Company or Platform Name</strong></p>
-<p><em>Start Month Year – Present</em></p>
-<ul>
-<li>Description of content creation, delivery, or ownership.</li>
-<li>Overview of concepts taught or systems developed.</li>
-<li>Summary of reach, adoption, or qualitative outcome.</li>
-</ul>
-<h2>PROJECTS</h2>
-<p><strong>Project Title One (Keywords / Domains):</strong> Concise description of project purpose, scope, and technologies used.</p>
-<p><strong>Project Title Two (Keywords / Domains):</strong> High-level explanation of problem solved and approach taken.</p>
-<p><strong>Project Title Three (Keywords / Domains):</strong> Description focusing on scale, collaboration, or performance.</p>
-<h2>HONORS AND AWARDS</h2>
-<ul>
-<li>Recognition or Award Title – Month, Year</li>
-<li>Competition or Honor Description – Month, Year</li>
-</ul>
-<h2>SKILLS</h2>
-<ul>
-<li>Communication: Skill A, Skill B, Skill C</li>
-<li>Programming / Data / Design: Skill A, Skill B, Skill C</li>
-<li>Languages or Interests: Skill A, Skill B, Skill C</li>
-</ul>
+    const [docContent, setDocContent] = React.useState(`
+<h1>Welcome to your note 🩵</h1>
+<p>You can start typing or ask AI to generate content for you.</p>
     `.trim())
-    interface ResumeSettings {
+    interface DocSettings {
         fontStyle: 'serif' | 'sans';
         fontSize: number; // Base font size
         h1Size: number;
@@ -3021,12 +2987,12 @@ export default function OmegleMentorshipUI(props: Props) {
         pSize: number;
     }
 
-    const [resumeSettings, setResumeSettings] = React.useState<ResumeSettings>({ 
+    const [docSettings, setDocSettings] = React.useState<DocSettings>({ 
         fontStyle: 'sans', 
         fontSize: 11,
         h1Size: 24, 
         h2Size: 14,
-        pSize: 11 
+        pSize: 12 
     })
     const [remoteCursor, setRemoteCursor] = React.useState<{ x: number, y: number, color: string } | null>(null)
     const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)
@@ -3401,24 +3367,43 @@ export default function OmegleMentorshipUI(props: Props) {
                 return
             }
 
-            const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiMessageContent}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
-
+            // Capture context if available
+            const visualContext = await captureCurrentContext()
+            
             try {
+                const systemInstruction = `You are a helpful AI assistant.
+Your goal is to suggest 3 short, relevant follow-up responses the USER might want to say next.
+Keep suggestions brief (under 10 words).
+Output ONLY a JSON array of strings: ["suggestion 1", "suggestion 2", "suggestion 3"].
+Do not include markdown formatting or explanations.`
+
+                const userContent: any[] = [
+                    { text: `The AI just said: "${lastAiMessageContent}". What are 3 relevant follow-up things I (the user) might say next?` }
+                ]
+
+                if (visualContext) {
+                    userContent.push({
+                        inlineData: {
+                            mimeType: "image/jpeg",
+                            data: visualContext
+                        }
+                    })
+                }
+
+                // If document is open, include it for context
+                if (isDocOpen) {
+                    userContent.push({ text: `Current document content: \n${docContent}` })
+                }
+
                 const response = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/${SUGGESTION_MODEL_ID}:generateContent?key=${geminiApiKey}`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: suggestionPrompt }] }],
-                            generationConfig: {
-                                temperature: 0.7,
-                                maxOutputTokens: 100,
-                                stopSequences: ["\n\n"],
-                                thinkingConfig: {
-                                    thinkingBudget: 0
-                                }
-                            },
+                            contents: [{ role: "user", parts: userContent }],
+                            systemInstruction: { parts: [{ text: systemInstruction }] },
+                            generationConfig: { responseMimeType: "application/json" }
                         }),
                     }
                 )
@@ -3426,20 +3411,19 @@ export default function OmegleMentorshipUI(props: Props) {
                 if (!response.ok) return
 
                 const data = await response.json()
-                const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
-
-                if (responseText) {
-                    try {
-                        const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
-                        if (jsonMatch && jsonMatch[0]) {
-                            const suggestionsArray = JSON.parse(jsonMatch[0])
-                            // Note: suggestions not yet used in UI
-                        }
-                    } catch (e) { }
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+                if (text) {
+                    const parsed = JSON.parse(text)
+                    if (Array.isArray(parsed)) {
+                        // setSuggestions(parsed.slice(0, 3)) 
+                        // Suggestion logic needs to be connected or removed if unused
+                    }
                 }
-            } catch (e) { }
+            } catch (error) {
+                console.error("Suggestion fetch error:", error)
+            }
         },
-        [geminiApiKey]
+        [geminiApiKey, captureCurrentContext, isDocOpen, docContent]
     )
 
     const stopLiveSession = React.useCallback(() => {
@@ -3496,6 +3480,9 @@ export default function OmegleMentorshipUI(props: Props) {
 
             ws.onopen = async () => {
                 const currentSystemPrompt = getSystemPromptWithContext()
+                // Append doc context if available
+                const docContext = isDocOpen ? `\n\n[Current Document Content]:\n${docContent}` : ""
+                
                 ws.send(
                     JSON.stringify({
                         setup: {
@@ -3514,7 +3501,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                 }
                             },
                             systemInstruction: {
-                                parts: [{ text: currentSystemPrompt }],
+                                parts: [{ text: currentSystemPrompt + docContext }],
                             },
                             inputAudioTranscription: {},
                             outputAudioTranscription: {},
@@ -4033,13 +4020,13 @@ export default function OmegleMentorshipUI(props: Props) {
         _isScreenSharing: boolean, 
         _remoteScreenStream: MediaStream | null, 
         _isWhiteboardOpen: boolean,
-        _isResumeOpen: boolean,
+        _isDocOpen: boolean,
         _sharedScreenSize: { width: number, height: number } | null
     ) => {
         // 1. Calculate Min Height (Max Video Height Constraint)
         let minHeight = 100
         
-        if (!_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isResumeOpen) {
+        if (!_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isDocOpen) {
             const targetRatio = 1.55
             let maxVideoHeightNeeded = 0
             
@@ -4064,7 +4051,7 @@ export default function OmegleMentorshipUI(props: Props) {
              if (_isWhiteboardOpen) {
                   if (_isMobileLayout) { activeWidth = 1080; activeHeight = 1350; }
                   else { activeWidth = 1920; activeHeight = 1080; }
-             } else if (_isResumeOpen) {
+             } else if (_isDocOpen) {
                   // A4 Dimensions
                   activeWidth = 1240
                   activeHeight = 1754
@@ -4090,12 +4077,12 @@ export default function OmegleMentorshipUI(props: Props) {
         // 2. Calculate Max Height (Min Video Height Constraint)
         let maxHeight = cHeight - 100 // Default
 
-        if (_isMobileLayout && !_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isResumeOpen) {
+        if (_isMobileLayout && !_isScreenSharing && !_remoteScreenStream && !_isWhiteboardOpen && !_isDocOpen) {
              const minVideoSectionHeight = 80
              maxHeight = Math.max(100, cHeight - 40 - minVideoSectionHeight)
         }
 
-        if (_isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen || _isResumeOpen) {
+        if (_isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen || _isDocOpen) {
             let topRowHeight = 140
             if (_isMobileLayout) {
                  const availableW = Math.max(0, cWidth - 32)
@@ -4172,20 +4159,20 @@ export default function OmegleMentorshipUI(props: Props) {
             isScreenSharing,
             remoteScreenStream,
             isWhiteboardOpen,
-            isResumeOpen,
+            isDocOpen,
             sharedScreenSize
         )
 
         setChatHeight(prev => Math.max(minHeight, Math.min(prev, maxHeight)))
 
-    }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isResumeOpen, sharedScreenSize, calculateHeightConstraints])
+    }, [containerSize, isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isDocOpen, sharedScreenSize, calculateHeightConstraints])
 
-    // --- EFFECT: MINIMIZE CHAT WHEN RESUME OPENS ---
+    // --- EFFECT: MINIMIZE CHAT WHEN DOC OPENS ---
     React.useEffect(() => {
-        if (isResumeOpen) {
+        if (isDocOpen) {
              setChatHeight(100) // Minimize chat to allow doc editor to be full height
         }
-    }, [isResumeOpen])
+    }, [isDocOpen])
 
     const handleRoleSelect = React.useCallback((selectedRole: "student" | "mentor") => {
         if (typeof window !== "undefined") {
@@ -4319,8 +4306,8 @@ export default function OmegleMentorshipUI(props: Props) {
         setIsScreenSharing(false)
     }, [])
 
-    const toggleResume = React.useCallback(() => {
-        setIsResumeOpen(v => {
+    const toggleDoc = React.useCallback(() => {
+        setIsDocOpen(v => {
             const willBeOpen = !v
             if (willBeOpen) {
                 if (isWhiteboardOpen) {
@@ -4345,7 +4332,7 @@ export default function OmegleMentorshipUI(props: Props) {
             }
         } else {
             log("Starting whiteboard...")
-            if (isResumeOpen) setIsResumeOpen(false)
+            if (isDocOpen) setIsDocOpen(false)
             if (isScreenSharing) stopLocalScreenShare()
             
             setIsWhiteboardOpen(true)
@@ -4367,10 +4354,10 @@ export default function OmegleMentorshipUI(props: Props) {
                 log("Warning: No data connection available to start whiteboard sync")
             }
         }
-    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isResumeOpen])
+    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isDocOpen])
 
     const handleDocChange = React.useCallback((content: string) => {
-        setResumeContent(content)
+        setDocContent(content)
         if (docTimeoutRef.current) clearTimeout(docTimeoutRef.current)
         docTimeoutRef.current = setTimeout(() => {
             if (dataConnectionRef.current) {
@@ -4425,7 +4412,7 @@ export default function OmegleMentorshipUI(props: Props) {
                     dataConnectionRef.current.send({ type: 'tldraw-stop' })
                 }
             }
-            if (isResumeOpen) setIsResumeOpen(false)
+            if (isDocOpen) setIsDocOpen(false)
             
             // START SHARING
             try {
@@ -4936,7 +4923,7 @@ export default function OmegleMentorshipUI(props: Props) {
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
             } else if (data.type === 'doc-update') {
-                setResumeContent(data.payload)
+                setDocContent(data.payload)
             } else if (data.type === 'tldraw-start') {
                 log("Received tldraw-start command")
                 if (isScreenSharingRef.current) stopLocalScreenShare()
@@ -5092,14 +5079,14 @@ export default function OmegleMentorshipUI(props: Props) {
                 {
                     functionDeclarations: [
                         {
-                            name: "update_resume",
-                            description: "Updates the user's resume content. Use this when the user asks to add, edit, or create resume sections. Provide the FULL content in HTML format suitable for a resume.",
+                            name: "update_doc",
+                            description: "Updates the shared document content. Use this to write notes, create summaries, draft emails, build resumes, or any other text content. You have full control over HTML formatting.",
                             parameters: {
                                 type: "OBJECT",
                                 properties: {
                                     content: {
                                         type: "STRING",
-                                        description: "The full HTML content of the resume. Use <h1> for name, <h2> for sections, <ul>/<li> for lists, <b>/<strong> for bold, etc."
+                                        description: "The full HTML content. Use <h1>/<h2> for headings, <p> for body text, <ul>/<li> for lists, <b>/<strong> for bold, <i>/<em> for italics, and <a href='...'> for links."
                                     }
                                 },
                                 required: ["content"]
@@ -5125,7 +5112,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             if (currentSystemPrompt.trim()) {
                 payload.systemInstruction = {
-                    parts: [{ text: currentSystemPrompt + " If the user asks to edit their resume, use the update_resume tool. Always maintain a professional, clean structure." }]
+                    parts: [{ text: currentSystemPrompt + " If the user asks to edit the document or take notes, use the update_doc tool." }]
                 }
             }
 
@@ -5177,12 +5164,13 @@ export default function OmegleMentorshipUI(props: Props) {
 
             // Handle Tool Call
             if (functionCall) {
-                if (functionCall.name === "update_resume") {
-                    const newContent = functionCall.args.content
-                    setResumeContent(newContent)
-                    if (!isResumeOpen) setIsResumeOpen(true) // Auto-open
+                if (functionCall.name === "update_doc") {
+                    const args = functionCall.args as any
+                    const newContent = args.content || ""
+                    setDocContent(newContent)
+                    if (!isDocOpen) setIsDocOpen(true) // Auto-open
                     
-                    if (!aiText) aiText = "I've updated your resume."
+                    if (!aiText) aiText = "I've updated the document."
                 }
             }
 
@@ -5198,7 +5186,7 @@ export default function OmegleMentorshipUI(props: Props) {
             setIsLoading(false)
             abortControllerRef.current = null
         }
-    }, [messages, systemPrompt, model, geminiApiKey, isResumeOpen, getSystemPromptWithContext])
+    }, [messages, systemPrompt, model, geminiApiKey, isDocOpen, getSystemPromptWithContext])
 
     const handleIncomingPeerMessage = React.useCallback((payload: any) => {
         const peerMsg: Message = {
@@ -5368,12 +5356,12 @@ export default function OmegleMentorshipUI(props: Props) {
                 isScreenSharing,
                 remoteScreenStream,
                 isWhiteboardOpen,
-                isResumeOpen,
+                isDocOpen,
                 sharedScreenSize
             )
 
-            // When overlay is active (resume, screen share, whiteboard), allow pulling down further
-            const isOverlayActive = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isResumeOpen
+            // When overlay is active (doc, screen share, whiteboard), allow pulling down further
+            const isOverlayActive = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
             const effectiveMinHeight = isOverlayActive ? 100 : minHeight
 
             let newHeight = dragStartHeight.current
@@ -5394,7 +5382,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 let ratio = 16/9
                 if (isWhiteboardOpen) {
                     ratio = isMobileLayout ? 1080/1350 : 1920/1080
-                } else if (isResumeOpen) {
+                } else if (isDocOpen) {
                     ratio = 1240/1754
                 } else if (sharedScreenSize) {
                     ratio = sharedScreenSize.width / sharedScreenSize.height
@@ -5425,7 +5413,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             setChatHeight(Math.max(effectiveMinHeight, Math.min(newHeight, maxHeight)))
         })
-    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isResumeOpen, sharedScreenSize, calculateHeightConstraints])
+    }, [isMobileLayout, isScreenSharing, remoteScreenStream, isWhiteboardOpen, isDocOpen, sharedScreenSize, calculateHeightConstraints])
 
     const handlePointerUp = React.useCallback(() => {
         isDragging.current = false
@@ -5456,7 +5444,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 activeWidth = 1920
                 activeHeight = 1080
             }
-        } else if (isResumeOpen) {
+        } else if (isDocOpen) {
              return {
                  width: "100%",
                  height: "100%",
@@ -5505,7 +5493,7 @@ export default function OmegleMentorshipUI(props: Props) {
             height: finalH,
             flex: "none" // Disable flex growing to enforce size
         }
-    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize, isWhiteboardOpen, isResumeOpen])
+    }, [containerSize, chatHeight, isMobileLayout, sharedScreenSize, isWhiteboardOpen, isDocOpen])
 
     // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
     const videoSectionHeight = containerSize.height - chatHeight - 40
@@ -5712,7 +5700,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isResumeOpen) ? (
+            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? (
                 // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
                 <div style={{
                     flex: "1 1 0",
@@ -5885,7 +5873,7 @@ export default function OmegleMentorshipUI(props: Props) {
                             marginBottom: 0
                         }}>
                             {/* Drag Handles (Left/Right) - Only for screensharing */}
-                            {!isResumeOpen && !isWhiteboardOpen && (
+                            {!isDocOpen && !isWhiteboardOpen && (
                                 <>
                                     <div 
                                         onPointerDown={(e) => handlePointerDown(e, 'left')}
@@ -5917,12 +5905,12 @@ export default function OmegleMentorshipUI(props: Props) {
                             )}
 
                             <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: 14, position: "relative" }}>
-                            {isResumeOpen ? (
+                            {isDocOpen ? (
                                 <DocEditor 
-                                    content={resumeContent} 
+                                    content={docContent} 
                                     onChange={handleDocChange}
-                                    settings={resumeSettings}
-                                    onSettingsChange={setResumeSettings}
+                                    settings={docSettings}
+                                    onSettingsChange={setDocSettings}
                                     themeColors={themeColors}
                                     isMobileLayout={isMobileLayout}
                                     remoteCursor={remoteCursor}
@@ -6136,7 +6124,7 @@ export default function OmegleMentorshipUI(props: Props) {
                         width: 32,
                         height: 4,
                         borderRadius: 2,
-                        background: isResumeOpen ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
+                        background: isDocOpen ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"
                     }}
                 />
             </div>
@@ -6193,7 +6181,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                     <g clipPath="url(#clipLoadAnimMentorship)">
                                         <path
                                             d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                            fill={isResumeOpen ? themeColors.text.primary : "white"}
+                                            fill={isDocOpen ? themeColors.text.primary : "white"}
                                         />
                                     </g>
                                     <defs>
@@ -6201,7 +6189,7 @@ export default function OmegleMentorshipUI(props: Props) {
                                             <rect
                                                 width="20"
                                                 height="20"
-                                                fill={isResumeOpen ? themeColors.text.primary : "white"}
+                                                fill={isDocOpen ? themeColors.text.primary : "white"}
                                             />
                                         </clipPath>
                                     </defs>
@@ -6246,8 +6234,8 @@ export default function OmegleMentorshipUI(props: Props) {
                         isScreenSharing={isScreenSharing}
                         isWhiteboardOpen={isWhiteboardOpen}
                         toggleWhiteboard={toggleWhiteboard}
-                        isResumeOpen={isResumeOpen}
-                        toggleResume={toggleResume}
+                        isDocOpen={isDocOpen}
+                        toggleDoc={toggleDoc}
                         isConnected={status === "connected" && !isLiveMode}
                         isMobileLayout={isMobileLayout}
                         isLiveMode={isLiveMode}
