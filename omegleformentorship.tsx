@@ -98,6 +98,36 @@ function float32ToBase64(float32: Float32Array): string {
     return btoa(binary)
 }
 
+// -----------------------------------------------------------------------------
+// Shared UI Components
+// -----------------------------------------------------------------------------
+
+interface TooltipProps {
+    children: React.ReactNode
+    style?: React.CSSProperties
+}
+
+const Tooltip = ({ children, style }: TooltipProps) => (
+    <div style={{
+        position: "absolute",
+        background: "#000000",
+        color: "white",
+        padding: "4px 12px",
+        borderRadius: "28px",
+        fontSize: "12px",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        pointerEvents: "none",
+        zIndex: 10,
+        boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        ...style
+    }}>
+        {children}
+    </div>
+)
+
 function downsampleBuffer(
     buffer: Float32Array,
     inputRate: number,
@@ -179,9 +209,9 @@ const darkColors = {
 
 const lightColors = {
     background: "#FFFFFF",
-    surface: "#F2F5F8",
+    surface: "#f6f6f6",
     surfaceHighlight: "#E2E8F0",
-    surfaceMenu: "#F1F5F9",
+    surfaceMenu: "#f6f6f6",
     surfaceModal: "#FFFFFF",
     card: "#FFFFFF",
     
@@ -913,6 +943,85 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         }
     }
 
+    // Handle markdown shortcuts (# for H1, ## for H2, - for bullet list)
+    const handleMarkdownShortcuts = (e: React.KeyboardEvent) => {
+        if (!editorRef.current || e.key !== ' ') return
+        
+        const selection = window.getSelection()
+        if (!selection || !selection.rangeCount) return
+        
+        const range = selection.getRangeAt(0)
+        let node = range.startContainer
+        
+        // Get the parent block element to find the full line text
+        let blockElement: Node | null = node
+        if (node.nodeType === Node.TEXT_NODE) {
+            blockElement = node.parentElement
+        }
+        
+        // Traverse up to find block element
+        while (blockElement && blockElement !== editorRef.current) {
+            const tag = (blockElement as HTMLElement).tagName
+            if (tag && ['P', 'DIV', 'H1', 'H2', 'LI'].includes(tag.toUpperCase())) {
+                break
+            }
+            blockElement = blockElement.parentElement
+        }
+        
+        if (!blockElement || blockElement === editorRef.current) {
+            blockElement = node
+        }
+        
+        // Get the full text of the current block/line
+        const fullText = (blockElement.textContent || '').trim()
+        
+        // Check for markdown patterns at the start of the line - check ## before # (longer pattern first)
+        if (fullText === '##') {
+            e.preventDefault()
+            
+            // Clear the content of the block
+            if (blockElement.nodeType === Node.ELEMENT_NODE) {
+                (blockElement as HTMLElement).textContent = ''
+            }
+            
+            // Convert to H2
+            document.execCommand('formatBlock', false, 'h2')
+            handleInput()
+            saveSelection()
+            return
+        }
+        
+        if (fullText === '#') {
+            e.preventDefault()
+            
+            // Clear the content of the block
+            if (blockElement.nodeType === Node.ELEMENT_NODE) {
+                (blockElement as HTMLElement).textContent = ''
+            }
+            
+            // Convert to H1
+            document.execCommand('formatBlock', false, 'h1')
+            handleInput()
+            saveSelection()
+            return
+        }
+        
+        if (fullText === '-') {
+            e.preventDefault()
+            
+            // Clear the content of the block
+            if (blockElement.nodeType === Node.ELEMENT_NODE) {
+                (blockElement as HTMLElement).textContent = ''
+            }
+            
+            // Convert to bullet list
+            document.execCommand('insertUnorderedList', false)
+            handleInput()
+            saveSelection()
+            return
+        }
+    }
+
     // Initialize content only once or when radically changed externally (avoid cursor jumps)
     React.useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== content) {
@@ -924,15 +1033,39 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         }
     }, [content])
 
+    // Store the last selection so we can restore it when toolbar buttons are clicked
+    const savedSelectionRef = React.useRef<Range | null>(null)
+
+    const saveSelection = () => {
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+            savedSelectionRef.current = selection.getRangeAt(0).cloneRange()
+        }
+    }
+
+    const restoreSelection = () => {
+        if (savedSelectionRef.current && editorRef.current) {
+            const selection = window.getSelection()
+            if (selection) {
+                selection.removeAllRanges()
+                selection.addRange(savedSelectionRef.current)
+            }
+            editorRef.current.focus()
+        }
+    }
+
     const handleFormat = (command: string, value?: string) => {
+        restoreSelection()
         document.execCommand(command, false, value)
         handleInput() // Sync immediately
+        saveSelection()
     }
 
     // Logic: If selection exists, it applies to selection. If collapsed (cursor), find the parent block element and apply class/style?
     // standard execCommand 'bold' works on selection or toggles style for future typing. 
     // To "bold the whole line" if no selection, we need custom logic.
     const handleSmartFormat = (command: string) => {
+        restoreSelection()
         const selection = window.getSelection()
         if (!selection || !editorRef.current) return
 
@@ -963,6 +1096,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                 // Collapse to end (optional, usually better UX)
                 selection.collapseToEnd()
                 handleInput()
+                saveSelection()
                 return
             }
         }
@@ -970,6 +1104,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
         // Default behavior (selected text or inline toggle)
         document.execCommand(command, false)
         handleInput()
+        saveSelection()
     }
 
     const downloadDoc = () => {
@@ -997,10 +1132,33 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                         font-family: ${settings.fontStyle === 'serif' ? '"Times New Roman", serif' : 'Inter, sans-serif'}; 
                         font-size: ${settings.pSize}pt; 
                         margin: 0.5in;
+                        text-align: left;
                     }
-                    h1 { font-size: ${settings.h1Size}pt; }
-                    h2 { font-size: ${settings.h2Size}pt; }
-                    p, li, div { font-size: ${settings.pSize}pt; }
+                    h1 { 
+                        font-size: ${settings.h1Size}pt; 
+                        font-weight: bold; 
+                        text-align: left;
+                        margin: 0.5em 0 0.25em 0;
+                    }
+                    h2 { 
+                        font-size: ${settings.h2Size}pt; 
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        border-bottom: 1px solid #000;
+                        padding-bottom: 2px;
+                        text-align: left;
+                        margin: 1em 0 0.5em 0;
+                    }
+                    p, li, div { 
+                        font-size: ${settings.pSize}pt; 
+                        text-align: left;
+                        margin: 0.25em 0;
+                    }
+                    ul, ol { 
+                        padding-left: 20px; 
+                        margin: 8px 0; 
+                    }
                 </style>
             </head><body>`
         const footer = "</body></html>"
@@ -1039,12 +1197,20 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
     const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const [toolbarWidth, setToolbarWidth] = React.useState(0)
+    const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
+    const linkDropdownRef = React.useRef<HTMLDivElement>(null)
     
-    // Watch for selection changes to update font size display
+    // Watch for selection changes to update font size display and save selection
     React.useEffect(() => {
         const handleSelectionChange = () => {
             const selection = window.getSelection()
             if (!selection || !selection.rangeCount) return
+            
+            // Check if the selection is inside our editor
+            const isInsideEditor = editorRef.current?.contains(selection.anchorNode || null)
+            if (isInsideEditor) {
+                saveSelection()
+            }
             
             // Try to detect font size of selection (for inline spans)
             // If no inline span, fall back to Category size
@@ -1091,6 +1257,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
     const updateFontSize = (newSize: number) => {
         const size = Math.max(8, Math.min(72, newSize))
         
+        restoreSelection()
         const selection = window.getSelection()
         if (selection && !selection.isCollapsed) {
             // 1. Text Selection -> Apply inline span override
@@ -1101,6 +1268,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
             span.appendChild(content)
             range.insertNode(span)
             handleInput()
+            saveSelection()
         } else {
             // 2. Cursor (Collapsed) -> Update Category Setting
             const info = getSelectionInfo()
@@ -1146,12 +1314,147 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
 
     const isCompact = toolbarWidth < 400 // Adjusted threshold
 
+    const [hoveredToolbarItem, setHoveredToolbarItem] = React.useState<string | null>(null)
+
+    const renderTooltip = (text: string) => (
+        <Tooltip style={{
+            top: "100%",
+            left: "50%",
+            transform: "translate(-50%, 8px)",
+            zIndex: 100
+        }}>
+            {text}
+        </Tooltip>
+    )
+
     const handleLink = () => {
-        const url = prompt("Enter URL:", "https://")
-        if (url) {
-            handleFormat('createLink', url)
+        restoreSelection()
+        const selection = window.getSelection()
+        if (!selection || !selection.rangeCount) return
+
+        let node = selection.anchorNode
+        let isLink = false
+        while (node && node !== editorRef.current) {
+            if (node.nodeName === 'A') {
+                isLink = true
+                break
+            }
+            node = node.parentNode
         }
+
+        if (isLink) {
+             document.execCommand('unlink')
+        } else {
+            const url = prompt("Enter URL:", "https://")
+            if (url) {
+                document.execCommand('createLink', false, url)
+            }
+        }
+        handleInput()
+        saveSelection()
     }
+
+    const handleInsertLink = (url: string) => {
+        if (!url || !url.trim()) return
+        
+        restoreSelection()
+        const selection = window.getSelection()
+        if (!selection || !editorRef.current) return
+
+        // If no selection (collapsed), select the whole line/block
+        if (selection.isCollapsed) {
+            const range = selection.getRangeAt(0)
+            let node = range.commonAncestorContainer as HTMLElement | null
+            
+            // Traverse up to find the block element
+            while (node && node !== editorRef.current) {
+                const tag = node.nodeName.toUpperCase()
+                if (['P', 'LI', 'H1', 'H2', 'DIV'].includes(tag)) {
+                    break
+                }
+                node = node.parentElement
+            }
+
+            if (node && node !== editorRef.current) {
+                // Select the whole node content
+                const newRange = document.createRange()
+                newRange.selectNodeContents(node)
+                selection.removeAllRanges()
+                selection.addRange(newRange)
+            }
+        }
+
+        document.execCommand('createLink', false, url)
+        handleInput()
+        saveSelection()
+        setShowLinkDropdown(false)
+    }
+
+    const handleRemoveLink = () => {
+        restoreSelection()
+        document.execCommand('unlink')
+        handleInput()
+        saveSelection()
+        setShowLinkDropdown(false)
+    }
+
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (document.activeElement !== editorRef.current) return
+            
+            const cmd = e.metaKey || e.ctrlKey // Support both Mac and Windows/Android
+            
+            if (cmd) {
+                if (e.key.toLowerCase() === 'k') {
+                    e.preventDefault()
+                    setShowLinkDropdown(true)
+                }
+                if (e.key.toLowerCase() === 'b') {
+                    e.preventDefault()
+                    handleSmartFormat('bold')
+                }
+                if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                    e.preventDefault()
+                    document.execCommand('undo')
+                    handleInput()
+                }
+                if (e.key.toLowerCase() === 'z' && e.shiftKey) {
+                    e.preventDefault()
+                    document.execCommand('redo')
+                    handleInput()
+                }
+                if (e.shiftKey) {
+                    if (e.key === '8') { // Bullet list
+                         e.preventDefault()
+                         handleFormat('insertUnorderedList')
+                    }
+                    if (e.key === ',' || e.key === '<') { // Decrease font
+                         e.preventDefault()
+                         updateFontSize(selectedFontSize - 1)
+                    }
+                    if (e.key === '.' || e.key === '>') { // Increase font
+                         e.preventDefault()
+                         updateFontSize(selectedFontSize + 1)
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [selectedFontSize])
+
+    // Handle clicking outside link dropdown to close it
+    React.useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (linkDropdownRef.current && !linkDropdownRef.current.contains(e.target as Node)) {
+                setShowLinkDropdown(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     return (
         <div data-layer="doc editor" className="DocEditor" style={{
@@ -1169,30 +1472,23 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
             position: 'relative'
         }}>
           {/* Toolbar */}
-          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 728, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flexShrink: 0}}>
-            {/* Download */}
-            <div data-layer="font family" className="FontFamily" onClick={downloadDoc} style={{height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: themeColors.state.accent, borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex', cursor: 'pointer'}}>
-              <div data-svg-wrapper data-layer="download icon" className="DownloadIcon">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0.648438 8.81412V9.52096C0.648438 10.0856 0.872746 10.6271 1.27202 11.0264C1.67129 11.4257 2.21282 11.65 2.77747 11.65H9.87424C10.4389 11.65 10.9804 11.4257 11.3797 11.0264C11.779 10.6271 12.0033 10.0856 12.0033 9.52096V8.81128M6.32586 0.649994V8.45645M6.32586 8.45645L8.80973 5.97257M6.32586 8.45645L3.84199 5.97257" stroke="white" strokeOpacity="0.95" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div data-layer="Download" className="Download" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Download</div>
-            </div>
-            
-            {/* Font Style */}
-            <div data-layer="font family" className="FontFamily" onClick={() => onSettingsChange({...settings, fontStyle: settings.fontStyle === 'serif' ? 'sans' : 'serif'})} style={{width: 72, height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 10, display: 'flex', cursor: 'pointer'}}>
-              <div data-layer="Modern" className="Modern" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: settings.fontStyle === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>
-                  {settings.fontStyle === 'serif' ? 'Classic' : 'Modern'}
-              </div>
-            </div>
-
+          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 540, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flexShrink: 0}}>
             {/* Font Size */}
-            <div data-layer="font size" className="FontSize" style={{width: 72, height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'flex'}}>
-              <div data-svg-wrapper data-layer="minus" className="Minus" onClick={() => updateFontSize(selectedFontSize - 1)} style={{cursor: 'pointer'}}>
+            <div data-layer="font size" className="FontSize" style={{width: 72, height: 32, paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, background: '#F5F5F5', borderRadius: 28, justifyContent: 'center', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
+              <div 
+                data-svg-wrapper 
+                data-layer="minus" 
+                className="Minus"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => updateFontSize(selectedFontSize - 1)}
+                onMouseEnter={() => setHoveredToolbarItem('minus')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{cursor: 'pointer', position: 'relative'}}
+              >
                 <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M0.601562 14H9.60156" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
+                {hoveredToolbarItem === 'minus' && renderTooltip("Decrease font size (⌘+Shift+,)")}
               </div>
               <input 
                   value={fontSizeInput} 
@@ -1201,39 +1497,163 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                   onBlur={handleBlur}
                   type="number"
                   className="FontSizeNumber"
-                  style={{width: 18, textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', background: 'transparent', border: 'none', outline: 'none', padding: 0, margin: 0}}
+                  style={{width: 20, textAlign: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', background: 'transparent', border: 'none', outline: 'none', padding: 0, margin: 0}}
               />
-              <div data-svg-wrapper data-layer="plus" className="Plus" onClick={() => updateFontSize(selectedFontSize + 1)} style={{cursor: 'pointer'}}>
+              <div 
+                data-svg-wrapper 
+                data-layer="plus" 
+                className="Plus"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => updateFontSize(selectedFontSize + 1)}
+                onMouseEnter={() => setHoveredToolbarItem('plus')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{cursor: 'pointer', position: 'relative'}}
+              >
                 <svg width="11" height="28" viewBox="0 0 11 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M9.60156 14H5.10156M5.10156 14H0.601562M5.10156 14V9.5M5.10156 14V18.5" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
+                {hoveredToolbarItem === 'plus' && renderTooltip("Increase font size (⌘+Shift+.)")}
               </div>
             </div>
 
             {/* Bold */}
-            <div data-layer="bold" className="Bold" onClick={() => handleSmartFormat('bold')} style={{width: 32, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: '#F2F5F8', borderRadius: 28, justifyContent: 'center', alignItems: 'center', display: 'flex', cursor: 'pointer'}}>
-              <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '700', lineHeight: "19.32px", wordWrap: 'break-word'}}>B</div>
-            </div>
-
-            {/* Italic */}
-            <div data-svg-wrapper data-layer="italic" className="Italic" onClick={() => handleSmartFormat('italic')} style={{cursor: 'pointer'}}>
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="32" height="32" rx="16" fill="#F2F5F8"/>
-              <path d="M19.8872 11H14.3316M17.6649 21H12.1094M17.3872 11L14.8872 21" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            <div 
+                data-layer="bold" 
+                className="Bold" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSmartFormat('bold')} 
+                onMouseEnter={() => setHoveredToolbarItem('bold')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{width: 32, height: 32, paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 4, background: '#F5F5F5', borderRadius: 28, justifyContent: 'center', alignItems: 'center', display: 'flex', cursor: 'pointer', position: 'relative'}}
+            >
+              <div data-layer="B" className="B" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(0, 0, 0, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '700', lineHeight: 1.38, wordWrap: 'break-word'}}>B</div>
+              {hoveredToolbarItem === 'bold' && renderTooltip("Bold (⌘+B)")}
             </div>
 
             {/* List */}
-            <div data-svg-wrapper data-layer="list" className="List" onClick={() => handleFormat('insertUnorderedList')} style={{cursor: 'pointer'}}>
+            <div 
+                data-svg-wrapper 
+                data-layer="list" 
+                className="List" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleFormat('insertUnorderedList')} 
+                onMouseEnter={() => setHoveredToolbarItem('list')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{cursor: 'pointer', position: 'relative'}}
+            >
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="32" height="32" rx="16" fill="#F2F5F8"/>
+              <rect width="32" height="32" rx="16" fill="#F5F5F5"/>
               <path d="M9 11.6C9 11.4409 9.06321 11.2883 9.17574 11.1757C9.28826 11.0632 9.44087 11 9.6 11H10.4C10.5591 11 10.7117 11.0632 10.8243 11.1757C10.9368 11.2883 11 11.4409 11 11.6C11 11.7591 10.9368 11.9117 10.8243 12.0243C10.7117 12.1368 10.5591 12.2 10.4 12.2H9.6C9.44087 12.2 9.28826 12.1368 9.17574 12.0243C9.06321 11.9117 9 11.7591 9 11.6ZM12.2 11.6C12.2 11.4409 12.2632 11.2883 12.3757 11.1757C12.4883 11.0632 12.6409 11 12.8 11H22.4C22.5591 11 22.7117 11.0632 22.8243 11.1757C22.9368 11.2883 23 11.4409 23 11.6C23 11.7591 22.9368 11.9117 22.8243 12.0243C22.7117 12.1368 22.5591 12.2 22.4 12.2H12.8C12.6409 12.2 12.4883 12.1368 12.3757 12.0243C12.2632 11.9117 12.2 11.7591 12.2 11.6ZM9 16C9 15.8409 9.06321 15.6883 9.17574 15.5757C9.28826 15.4632 9.44087 15.4 9.6 15.4H10.4C10.5591 15.4 10.7117 15.4632 10.8243 15.5757C10.9368 15.6883 11 15.8409 11 16C11 16.1591 10.9368 16.3117 10.8243 16.4243C10.7117 16.5368 10.5591 16.6 10.4 16.6H9.6C9.44087 16.6 9.28826 16.5368 9.17574 16.4243C9.06321 16.3117 9 16.1591 9 16ZM12.2 16C12.2 15.8409 12.2632 15.6883 12.3757 15.5757C12.4883 15.4632 12.6409 15.4 12.8 15.4H22.4C22.5591 15.4 22.7117 15.4632 22.8243 15.5757C22.9368 15.6883 23 15.8409 23 16C23 16.1591 22.9368 16.3117 22.8243 16.4243C22.7117 16.5368 22.5591 16.6 22.4 16.6H12.8C12.6409 16.6 12.4883 16.5368 12.3757 16.4243C12.2632 16.3117 12.2 16.1591 12.2 16ZM9 20.4C9 20.2409 9.06321 20.0883 9.17574 19.9757C9.28826 19.8632 9.44087 19.8 9.6 19.8H10.4C10.5591 19.8 10.7117 19.8632 10.8243 19.9757C10.9368 20.0883 11 20.2409 11 20.4C11 20.5591 10.9368 20.7117 10.8243 20.8243C10.7117 20.9368 10.5591 21 10.4 21H9.6C9.44087 21 9.28826 20.9368 9.17574 20.8243C9.06321 20.7117 9 20.5591 9 20.4ZM12.2 20.4C12.2 20.2409 12.2632 20.0883 12.3757 19.9757C12.4883 19.8632 12.6409 19.8 12.8 19.8H22.4C22.5591 19.8 22.7117 19.8632 22.8243 19.9757C22.9368 20.0883 23 20.2409 23 20.4C23 20.5591 22.9368 20.7117 22.8243 20.8243C22.7117 20.9368 22.5591 21 22.4 21H12.8C12.6409 21 12.4883 20.9368 12.3757 20.8243C12.2632 20.7117 12.2 20.5591 12.2 20.4Z" fill="black" fillOpacity="0.95"/>
               </svg>
+              {hoveredToolbarItem === 'list' && renderTooltip("Bullet List (⌘+Shift+8)")}
+            </div>
+
+            {/* Link with Dropdown */}
+            <div ref={linkDropdownRef} style={{position: 'relative'}}>
+              <div 
+                data-svg-wrapper 
+                data-layer="link" 
+                className="Link" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowLinkDropdown(!showLinkDropdown)} 
+                onMouseEnter={() => setHoveredToolbarItem('link')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{cursor: 'pointer', position: 'relative'}}
+              >
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="16" fill="#F5F5F5"/>
+                <path d="M18.9059 16.7733L20.6951 14.9841C21.7413 13.9379 21.7649 12.265 20.7477 11.2477C19.7305 10.2305 18.0576 10.2542 17.0114 11.3004L15.2222 13.0896M16.8009 18.8783L15.0096 20.6622C13.9623 21.7063 12.3399 21.831 11.2711 20.7149C10.2028 19.5992 10.2776 18.031 11.3248 16.9869L13.1161 15.203M13.7787 18.2168L18.2444 13.7511" stroke="black" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              {hoveredToolbarItem === 'link' && renderTooltip("Insert/Remove Link (⌘+K)")}
+              {showLinkDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  right: 0,
+                  padding: 10,
+                  background: themeColors.surfaceMenu,
+                  boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)',
+                  borderRadius: 28,
+                  outline: `0.33px ${themeColors.border.subtle} solid`,
+                  outlineOffset: '-0.33px',
+                  zIndex: 1000,
+                  minWidth: 200,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4
+                }}>
+                  <input
+                    type="text"
+                    placeholder="Enter URL..."
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleInsertLink((e.target as HTMLInputElement).value)
+                        ;(e.target as HTMLInputElement).value = ''
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: themeColors.surface,
+                      border: 'none',
+                      borderRadius: 20,
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                      fontWeight: '400',
+                      lineHeight: '19.32px',
+                      color: themeColors.text.primary,
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <div
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleRemoveLink}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                      fontWeight: '400',
+                      lineHeight: '19.32px',
+                      color: themeColors.text.primary,
+                      background: 'transparent',
+                      borderRadius: 8
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Remove Link
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Download */}
+            <div data-layer="Frame 1000007268" className="Frame1000007268" style={{justifyContent: 'flex-end', alignItems: 'center', gap: 10, display: 'flex'}}>
+              <div 
+                data-svg-wrapper 
+                data-layer="font family" 
+                className="FontFamily" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={downloadDoc} 
+                onMouseEnter={() => setHoveredToolbarItem('download')}
+                onMouseLeave={() => setHoveredToolbarItem(null)}
+                style={{cursor: 'pointer', position: 'relative'}}
+              >
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="31.3548" height="32" rx="15.6774" fill="#0099FF"/>
+                <path d="M10 18.6641V19.371C10 19.9356 10.2243 20.4771 10.6236 20.8764C11.0229 21.2757 11.5644 21.5 12.129 21.5H19.2258C19.7905 21.5 20.332 21.2757 20.7313 20.8764C21.1305 20.4771 21.3548 19.9356 21.3548 19.371V18.6613M15.6774 10.5V18.3065M15.6774 18.3065L18.1613 15.8226M15.6774 18.3065L13.1935 15.8226" stroke="white" strokeOpacity="0.95" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {hoveredToolbarItem === 'download' && renderTooltip("Download")}
+              </div>
             </div>
           </div>
           
           {/* Content Area */}
-          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 728, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flex: 1, overflow: 'hidden'}}>
+          <div data-layer="toolbar" className="Toolbar" style={{width: '100%', maxWidth: 540, justifyContent: 'center', alignItems: 'flex-start', gap: 4, display: 'inline-flex', flexWrap: 'wrap', alignContent: 'flex-start', flex: 1, overflow: 'hidden'}}>
             <div 
                 className="DocContentArea"
                 style={{
@@ -1255,6 +1675,7 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                     ref={editorRef}
                     contentEditable
                     onInput={handleInput}
+                    onKeyDown={handleMarkdownShortcuts}
                     suppressContentEditableWarning={true}
                     style={{ minHeight: "100%", outline: "none" }}
                 />
@@ -1264,9 +1685,24 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
           <style>{`
                 .DocContentArea ul { padding-left: 20px; margin: 8px 0; }
                 .DocContentArea ol { padding-left: 20px; margin: 8px 0; }
-                .DocContentArea h1 { font-size: ${settings.h1Size}px; font-weight: bold; margin: 0.5em 0; border-bottom: 1px solid #ddd; }
-                .DocContentArea h2 { font-size: ${settings.h2Size}px; font-weight: bold; margin: 0.5em 0; }
-                .DocContentArea p { margin: 0.5em 0; }
+                .DocContentArea h1 { 
+                    font-size: ${settings.h1Size}px; 
+                    font-weight: bold; 
+                    margin: 0.5em 0 0.25em 0; 
+                    text-align: left;
+                }
+                .DocContentArea h2 { 
+                    font-size: ${settings.h2Size}px; 
+                    font-weight: bold; 
+                    margin: 1em 0 0.5em 0; 
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    border-bottom: 1px solid #000;
+                    padding-bottom: 2px;
+                    text-align: left;
+                }
+                .DocContentArea p { margin: 0.25em 0; text-align: left; }
+                .DocContentArea li { text-align: left; }
                 /* Hide number input spinners */
                 input[type=number]::-webkit-inner-spin-button, 
                 input[type=number]::-webkit-outer-spin-button { 
@@ -1633,7 +2069,15 @@ const ChatInput = React.memo(function ChatInput({
                 </>
             )}
 
-          <div data-layer="overlay" className="Overlay" style={{width: "100%", padding: "24px 0 16px 0", background: isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`, justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}>
+          <motion.div 
+            key={isResumeOpen ? 'resume-open' : 'resume-closed'}
+            data-layer="overlay" 
+            className="Overlay" 
+            style={{width: "100%", padding: "24px 0 16px 0", background: isResumeOpen ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)` : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`, justifyContent: 'center', alignItems: 'flex-end', gap: 10, display: 'flex'}}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0, delay: 0.2 }}
+          >
             
             {/* INPUT BOX */}
             <div data-layer="input-box" className="InputBox" style={{
@@ -1765,24 +2209,13 @@ const ChatInput = React.memo(function ChatInput({
                     }}
                   >
                     {!showMenu && isAddFilesTooltipHovered && (
-                        <div style={{
-                            position: "absolute",
+                        <Tooltip style={{
                             bottom: "100%",
                             left: "50%",
                             transform: isMobileLayout ? "translate(-25%, -17px)" : "translate(-50%, -17px)",
-                            background: "#000000",
-                            color: "white",
-                            padding: "4px 12px",
-                            borderRadius: "28px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                            pointerEvents: "none",
-                            zIndex: 10,
-                            boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
                         }}>
                             Add files and more
-                        </div>
+                        </Tooltip>
                     )}
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 5V19M5 12H19" stroke={themeColors.text.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1918,24 +2351,13 @@ const ChatInput = React.memo(function ChatInput({
                         }}
                       >
                           {isAiTooltipHovered && (
-                              <div style={{
-                                  position: "absolute",
+                              <Tooltip style={{
                                   bottom: "100%",
                                   left: "50%",
                                   transform: isMobileLayout ? "translate(-70%, -17px)" : "translate(-50%, -17px)",
-                                  background: "#000000",
-                                  color: "white",
-                                  padding: "4px 12px",
-                                  borderRadius: "28px",
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  whiteSpace: "nowrap",
-                                  pointerEvents: "none",
-                                  zIndex: 10,
-                                  boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
                               }}>
                                   Connect with AI
-                              </div>
+                              </Tooltip>
                           )}
                           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z" fill={themeColors.text.primary} fillOpacity="0.95"/>
@@ -1963,24 +2385,13 @@ const ChatInput = React.memo(function ChatInput({
                   }}
               >
                 {isEndCallTooltipHovered && (
-                    <div style={{
-                        position: "absolute",
+                    <Tooltip style={{
                         bottom: "100%",
                         left: "50%",
                         transform: isMobileLayout ? "translate(-50%, -4px)" : "translate(-50%, -4px)",
-                        background: "#000000",
-                        color: "white",
-                        padding: "4px 12px",
-                        borderRadius: "28px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        pointerEvents: "none",
-                        zIndex: 10,
-                        boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
                     }}>
                         End call
-                    </div>
+                    </Tooltip>
                 )}
                 <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect width="56" height="56" rx="28" fill="#EC1313"/>
@@ -1991,7 +2402,7 @@ const ChatInput = React.memo(function ChatInput({
               </div>
             )}
 
-          </div>
+          </motion.div>
         </div>
     )
 })
@@ -2704,25 +3115,41 @@ export default function OmegleMentorshipUI(props: Props) {
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [resumeContent, setResumeContent] = React.useState(`
-<h1 style="text-align: center;">[Your Name]</h1>
-<p style="text-align: center;">[City, State, Zip] | [Phone] | [Email]</p>
-<hr />
-<h2>Professional Experience</h2>
-<p><strong>[Job Title]</strong>, [Company Name] | [Dates]</p>
+<h1>Full Name</h1>
+<p>email@example.com | your-portfolio.com | github.com/your-username</p>
+<h2>EDUCATION</h2>
+<p><strong>Degree Name in Field of Study</strong></p>
+<p>University or Institution Name; GPA: X.XX</p>
+<p><em>Start Month Year – End Month Year</em></p>
+<h2>EXPERIENCE</h2>
+<p><strong>Role or Title, Organization or Program Name</strong></p>
+<p><em>Start Month Year – End Month Year</em></p>
 <ul>
-<li>[Responsibility or Achievement]</li>
-<li>[Responsibility or Achievement]</li>
+<li>Brief description of responsibility, contribution, or outcome.</li>
+<li>Summary of technical or organizational work performed.</li>
+<li>Explanation of implementation, optimization, or delivery.</li>
 </ul>
-<p><strong>[Job Title]</strong>, [Company Name] | [Dates]</p>
+<p><strong>Role or Title, Company or Platform Name</strong></p>
+<p><em>Start Month Year – Present</em></p>
 <ul>
-<li>[Responsibility or Achievement]</li>
-<li>[Responsibility or Achievement]</li>
+<li>Description of content creation, delivery, or ownership.</li>
+<li>Overview of concepts taught or systems developed.</li>
+<li>Summary of reach, adoption, or qualitative outcome.</li>
 </ul>
-<h2>Education</h2>
-<p><strong>[Degree]</strong>, [University Name] | [Graduation Date]</p>
-<h2>Skills</h2>
+<h2>PROJECTS</h2>
+<p><strong>Project Title One (Keywords / Domains):</strong> Concise description of project purpose, scope, and technologies used.</p>
+<p><strong>Project Title Two (Keywords / Domains):</strong> High-level explanation of problem solved and approach taken.</p>
+<p><strong>Project Title Three (Keywords / Domains):</strong> Description focusing on scale, collaboration, or performance.</p>
+<h2>HONORS AND AWARDS</h2>
 <ul>
-<li>[Skill 1], [Skill 2], [Skill 3]</li>
+<li>Recognition or Award Title – Month, Year</li>
+<li>Competition or Honor Description – Month, Year</li>
+</ul>
+<h2>SKILLS</h2>
+<ul>
+<li>Communication: Skill A, Skill B, Skill C</li>
+<li>Programming / Data / Design: Skill A, Skill B, Skill C</li>
+<li>Languages or Interests: Skill A, Skill B, Skill C</li>
 </ul>
     `.trim())
     interface ResumeSettings {
@@ -2736,9 +3163,9 @@ export default function OmegleMentorshipUI(props: Props) {
     const [resumeSettings, setResumeSettings] = React.useState<ResumeSettings>({ 
         fontStyle: 'sans', 
         fontSize: 11,
-        h1Size: 22, // 2em approx
-        h2Size: 16.5, // 1.5em approx
-        pSize: 11 // 1em approx
+        h1Size: 24, 
+        h2Size: 14,
+        pSize: 11 
     })
     const [remoteCursor, setRemoteCursor] = React.useState<{ x: number, y: number, color: string } | null>(null)
     const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)

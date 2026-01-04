@@ -1,0 +1,189 @@
+%------------------------
+% Resume Template
+% Author : Logan Garcia
+% Github : https://github.com/loganngarcia
+% License : MIT
+%------------------------
+
+\documentclass[a4paper,20pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[pdftex]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.530in}
+\addtolength{\evensidemargin}{-0.375in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.45in}
+\addtolength{\textheight}{1in}
+
+\urlstyle{rm}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-10pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-6pt}]
+
+%-------------------------
+% Custom commands
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    #1 \vspace{-2pt}
+  }
+}
+
+\newcommand{\resumeItemWithoutTitle}[1]{
+  \item{
+    #1 \vspace{-2pt}
+  }
+}
+
+% Bulletless subheading block:
+% Left row 1 = bold title line
+% Right row 1 = date
+% Left row 2 = secondary line (can be empty)
+% Right row 2 = location in 80% gray, non-italic
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-1pt}
+  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+    \textbf{#1} & #4 \\
+    #3 & \textcolor[gray]{0.80}{#2} \\
+  \end{tabular*}\vspace{-5pt}
+}
+
+% Backwards-compatible helper (kept, but no bolding)
+\newcommand{\resumeSubItem}[2]{\resumeItemWithoutTitle{#1: #2}\vspace{-3pt}}
+
+\renewcommand{\labelitemii}{$\bullet$}
+
+% Keep list wrappers but make them bulletless and consistent
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0pt,label={},itemsep=0pt,topsep=0pt]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+
+% Description bullets only (using filled bullets)
+\newcommand{\resumeItemListStart}{\vspace{-12pt}\begin{itemize}[leftmargin=1.2em,itemsep=2pt,topsep=0pt,label=$\bullet$]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-----------------------------
+%%%%%%  CV STARTS HERE  %%%%%%
+
+\begin{document}
+
+%----------HEADING-----------------
+\begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+  \textbf{{\LARGE Full Name}}
+    & \href{mailto:email@example.com}{email@example.com} \\
+  & \href{https://your-portfolio.com}{your-portfolio.com} \\
+  & \href{https://github.com/your-username}{github.com/your-username} \\
+\end{tabular*}
+
+%-----------EDUCATION-----------------
+\section{Education}
+\resumeSubHeadingListStart
+  \item
+  \resumeSubheading
+    {Degree Name in Field of Study}{City, Country}
+    {University or Institution Name; GPA: X.XX}{Start Month Year – End Month Year}
+\resumeSubHeadingListEnd
+
+%-----------EXPERIENCE-----------------
+\vspace{4pt}
+\section{Experience}
+\resumeSubHeadingListStart
+
+  \item
+  \resumeSubheading
+    {Role or Title, Organization or Program Name}{City, Country}
+    {}{Start Month Year – End Month Year}
+    \vspace{4pt}
+  \resumeItemListStart
+    \resumeItemWithoutTitle{Brief description of responsibility, contribution, or outcome.}
+    \resumeItemWithoutTitle{Summary of technical or organizational work performed.}
+    \resumeItemWithoutTitle{Explanation of implementation, optimization, or delivery.}
+  \resumeItemListEnd
+
+  \vspace{12pt}
+  \item
+  \resumeSubheading
+    {Role or Title, Company or Platform Name}{City, Country}
+    {}{Start Month Year – Present}
+    \vspace{4pt}
+  \resumeItemListStart
+    \resumeItemWithoutTitle{Description of content creation, delivery, or ownership.}
+    \resumeItemWithoutTitle{Overview of concepts taught or systems developed.}
+    \resumeItemWithoutTitle{Summary of reach, adoption, or qualitative outcome.}
+  \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------------
+\vspace{8pt}
+\section{Projects}
+\begin{itemize}[leftmargin=0pt,label={},itemsep=-2pt,topsep=0pt]
+  \item \resumeItemWithoutTitle{Project Title One (Keywords / Domains): Concise description of project purpose, scope, and technologies used.}
+  \item \resumeItemWithoutTitle{Project Title Two (Keywords / Domains): High-level explanation of problem solved and approach taken.}
+  \item \resumeItemWithoutTitle{Project Title Three (Keywords / Domains): Description focusing on scale, collaboration, or performance.}
+  \item \resumeItemWithoutTitle{Project Title Four (Keywords / Domains): Summary of tooling, architecture, or learning outcomes.}
+\end{itemize}
+
+%-----------PUBLICATIONS-----------------
+\vspace{4pt}
+\section{Publications}
+\begin{itemize}[leftmargin=0pt,label={},itemsep=-2pt,topsep=0pt]
+  \item \resumeItemWithoutTitle{Publication or Book Title One: Description of scope, status, and tools involved.}
+  \item \resumeItemWithoutTitle{Publication or Book Title Two: Summary of platform, audience, and technical stack.}
+\end{itemize}
+
+%-----------AWARDS-----------------
+\vspace{4pt}
+\section{Honors and Awards}
+\vspace{4pt}
+\begin{description}[font=$\bullet$]
+  \item {Recognition or Award Title – Month, Year}
+  \item {Competition or Honor Description – Month, Year}
+  \item {Additional Award or Distinction – Month, Year}
+\end{description}
+
+%-----------VOLUNTEER-----------------
+\vspace{-5pt}
+\section{Volunteer Experience}
+\resumeSubHeadingListStart
+  \item
+  \resumeSubheading
+    {Role or Title, Organization Name}{City, Country}
+    {}{Start Month Year – Present}
+  \resumeItemListStart
+    \resumeItemWithoutTitle{Description of activities, programs, or audience impacted.}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------SKILLS-----------------
+\vspace{4pt}
+\section{Skills}
+\vspace{4pt}
+\begin{itemize}[leftmargin=1.2em, itemsep=2pt, topsep=2pt]
+  \item Communication: Skill A, Skill B, Skill C
+  \item Programming / Data / Design: Skill A, Skill B, Skill C
+  \item Languages or Interests: Skill A, Skill B, Skill C
+\end{itemize}
+\vspace{-6pt}
+
+\end{document}
