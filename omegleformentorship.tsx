@@ -1789,7 +1789,7 @@ const ChatInput = React.memo(function ChatInput({
 
         items.push({
             id: 'doc',
-            label: isDocOpen ? 'Close document' : 'Document',
+            label: isDocOpen ? 'Close notes' : 'Notes',
             icon: isDocOpen ? (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M14 2L2 14M2 2L14 14" stroke="#FB6A6A" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -2976,7 +2976,7 @@ export default function OmegleMentorshipUI(props: Props) {
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(`
-<h1>Welcome to your note 🩵</h1>
+<h1>Welcome to your notes 🩵</h1>
 <p>You can start typing or ask AI to generate content for you.</p>
     `.trim())
     interface DocSettings {
@@ -2989,7 +2989,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const [docSettings, setDocSettings] = React.useState<DocSettings>({ 
         fontStyle: 'sans', 
-        fontSize: 11,
+        fontSize: 12,
         h1Size: 24, 
         h2Size: 14,
         pSize: 12 
