@@ -1051,6 +1051,7 @@ function setCaretPosition(element: HTMLElement, offset: number) {
 
 const DocEditor = React.memo(function DocEditor({ content, onChange, settings, onSettingsChange, themeColors = lightColors, isMobileLayout = false, remoteCursor, onCursorMove }: DocEditorProps) {
     const editorRef = React.useRef<HTMLDivElement>(null)
+    const containerRef = React.useRef<HTMLDivElement>(null)
     const linkDropdownRef = React.useRef<HTMLDivElement>(null)
     const savedSelectionRef = React.useRef<Range | null>(null)
     
@@ -1384,11 +1385,10 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
 
 
     const handleEditorPointerMove = React.useCallback((e: React.PointerEvent) => {
-        if (!onCursorMove || !editorRef.current) return
+        if (!onCursorMove || !containerRef.current) return
         
-        const rect = editorRef.current.getBoundingClientRect()
-        // Calculate relative position (0-1) within the A4-like page
-        // We use the editorRef (the page itself) not the container
+        const rect = containerRef.current.getBoundingClientRect()
+        // Calculate relative position (0-1) within the full viewport container
         const x = (e.clientX - rect.left) / rect.width
         const y = (e.clientY - rect.top) / rect.height
         
@@ -1531,7 +1531,12 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
             </div>
 
             {/* Content Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '60px 20px 20px', display: 'flex', justifyContent: 'center' }}>
+            <div 
+                ref={containerRef}
+                onPointerMove={handleEditorPointerMove}
+                onPointerLeave={() => onCursorMove?.(-1, -1)}
+                style={{ flex: 1, overflowY: 'auto', padding: '60px 20px 20px', display: 'flex', justifyContent: 'center', position: 'relative' }}
+            >
                 <div style={{ width: '100%', maxWidth: 600, position: 'relative' }}>
                      <div 
                         ref={editorRef}
@@ -1548,8 +1553,6 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                              const text = e.clipboardData.getData('text/plain');
                              document.execCommand('insertText', false, text);
                         }}
-                        onPointerMove={handleEditorPointerMove}
-                        onPointerLeave={() => onCursorMove?.(-1, -1)}
                         style={{ 
                             outline: 'none', minHeight: '80vh', 
                             fontSize: 'var(--doc-p-size)', 
@@ -1559,10 +1562,10 @@ const DocEditor = React.memo(function DocEditor({ content, onChange, settings, o
                             zIndex: 1
                         }}
                     />
-                    {remoteCursor && remoteCursor.x >= 0 && remoteCursor.x <= 1 && remoteCursor.y >= 0 && (
-                        <LiveCursor x={remoteCursor.x} y={remoteCursor.y} color={remoteCursor.color} />
-                    )}
                 </div>
+                {remoteCursor && remoteCursor.x >= 0 && remoteCursor.x <= 1 && remoteCursor.y >= 0 && (
+                    <LiveCursor x={remoteCursor.x} y={remoteCursor.y} color={remoteCursor.color} />
+                )}
             </div>
             
             <style>{`
@@ -2730,12 +2733,8 @@ const MessageBubble = React.memo(({
             justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
             width: "100%",
             scrollMarginTop: 24,
-            // FIX: "Snap to Top" without permanent void.
-            // If this is the LAST message and it is from the AI, we give it a large min-height.
-            // This ensures there is enough space below the PREVIOUS user message to scroll it to the top.
-            // Once a new message arrives, this message is no longer last, so it collapses to normal height.
-            // result: User message snaps to top, AI responds in the large space, then history cleans up.
-            minHeight: (isLast && (msg.role === "model" || msg.role === "assistant")) ? "calc(100vh - 200px)" : "auto"
+            // FIX: Removed "Snap to Top" min-height logic as it caused excessive scrolling space.
+            minHeight: "auto"
         }}>
             <div style={{ 
                 maxWidth: (msg.role === "user" || msg.role === "peer") ? "80%" : "100%", 
@@ -2993,7 +2992,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(`
 <h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, make study guides, draft emails, and so much more. </p>
+<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
     `.trim())
     interface DocSettings {
         fontStyle: 'serif' | 'sans';
@@ -3089,7 +3088,8 @@ export default function OmegleMentorshipUI(props: Props) {
     }, [])
 
     const isWhiteboardOpenRef = React.useRef(false)
-    const docTimeoutRef = React.useRef<any>(null) // Debounce for doc editor
+    const docTimeoutRef = React.useRef<any>(null) // Debounce/Throttle for doc editor
+    const lastDocSendTimeRef = React.useRef<number>(0)
     React.useEffect(() => { isWhiteboardOpenRef.current = isWhiteboardOpen }, [isWhiteboardOpen])
 
     const hasWhiteboardStartedRef = React.useRef(false)
@@ -4384,12 +4384,28 @@ Do not include markdown formatting or explanations.`
 
     const handleDocChange = React.useCallback((content: string) => {
         setDocContent(content)
+        
+        const now = Date.now()
+        const interval = 50 // Match cursor update rate (20fps)
+        const timeSinceLastSend = now - lastDocSendTimeRef.current
+        
         if (docTimeoutRef.current) clearTimeout(docTimeoutRef.current)
-        docTimeoutRef.current = setTimeout(() => {
-            if (dataConnectionRef.current) {
+
+        if (timeSinceLastSend > interval) {
+            // Send immediately if enough time has passed
+            if (dataConnectionRef.current?.open) {
                 dataConnectionRef.current.send({ type: 'doc-update', payload: content })
+                lastDocSendTimeRef.current = now
             }
-        }, 500)
+        } else {
+            // Otherwise schedule for the end of the interval
+            docTimeoutRef.current = setTimeout(() => {
+                if (dataConnectionRef.current?.open) {
+                    dataConnectionRef.current.send({ type: 'doc-update', payload: content })
+                    lastDocSendTimeRef.current = Date.now()
+                }
+            }, interval - timeSinceLastSend)
+        }
     }, [])
 
     const handleDocPointerMove = React.useCallback((x: number, y: number) => {
@@ -4951,6 +4967,9 @@ Do not include markdown formatting or explanations.`
 
             if (data.type === 'chat') {
                 handleIncomingPeerMessage(data.payload)
+            } else if (data.type === 'ai-response') {
+                // Handle incoming AI response broadcasted from peer
+                setMessages(prev => [...prev, { role: "model", text: data.payload.text }])
             } else if (data.type === 'doc-start') {
                 if (isScreenSharingRef.current) stopLocalScreenShare()
                 if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
@@ -5116,7 +5135,7 @@ Do not include markdown formatting or explanations.`
                     functionDeclarations: [
                         {
                             name: "update_doc",
-                            description: "Updates the document and email content. Use this to write notes, create summaries, draft emails, build resumes, or any other text content. You have full control over HTML formatting.",
+                            description: "Updates the document editor. Use this to write documents, create guides, draft messages, build resumes, or any other text content. You have full control over HTML formatting.",
                             parameters: {
                                 type: "OBJECT",
                                 properties: {
@@ -5247,6 +5266,13 @@ Do not include markdown formatting or explanations.`
                     setDocContent(newContent)
                     if (!isDocOpen) setIsDocOpen(true) // Auto-open
                     
+                    // BROADCAST DOC UPDATE
+                    if (dataConnectionRef.current?.open) {
+                        dataConnectionRef.current.send({ type: 'doc-update', payload: newContent })
+                        // Ensure peer opens doc if not already open
+                        dataConnectionRef.current.send({ type: 'doc-start' })
+                    }
+
                     if (!accumulatedText) {
                         accumulatedText = "I've updated the document."
                         setMessages(prev => {
@@ -5271,6 +5297,12 @@ Do not include markdown formatting or explanations.`
                         return newArr.slice(0, -1)
                     }
                     return newArr
+                })
+            } else if (accumulatedText && dataConnectionRef.current?.open) {
+                // BROADCAST FINAL AI RESPONSE
+                dataConnectionRef.current.send({
+                    type: 'ai-response',
+                    payload: { text: accumulatedText }
                 })
             }
             
@@ -5302,9 +5334,9 @@ Do not include markdown formatting or explanations.`
         
         setMessages(prev => [...prev, peerMsg])
         
-        // Trigger AI response for the peer's message (as user context)
-        generateAIResponse(peerMsg.text, [], "peer")
-    }, [generateAIResponse])
+        // AI response is now handled via 'ai-response' broadcast from the sender
+        // generateAIResponse(peerMsg.text, [], "peer")
+    }, [])
 
     /**
      * Handles message delivery to the Google Gemini API.
@@ -6283,8 +6315,7 @@ Do not include markdown formatting or explanations.`
                         <div style={{ 
                             paddingLeft: 8, 
                             paddingBottom: 8,
-                            // FIX: Ensure loader takes up space to push user message to top
-                            minHeight: "calc(100vh - 200px)"
+                            minHeight: "auto"
                         }}>
                             <div style={{ animation: "pulseStar 1.5s infinite ease-in-out", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                 <svg
