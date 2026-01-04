@@ -5864,8 +5864,7 @@ Do not include markdown formatting or explanations.`
                     fontSize: 14,
                     fontWeight: 500,
                     zIndex: 2000,
-                    flexShrink: 0,
-                    borderBottom: "1px solid rgba(255,255,255,0.1)"
+                    flexShrink: 0
                 }}>
                     You are temporarily banned. Please review the{" "}
                     <a 
@@ -5894,7 +5893,7 @@ Do not include markdown formatting or explanations.`
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {!isBanned && ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? (
+            {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? (
                 // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
                 <div style={{
                     flex: "1 1 0",
@@ -5912,6 +5911,7 @@ Do not include markdown formatting or explanations.`
                     justifyContent: "flex-start" // Anchor cameras to top
                 }}>
                     {/* TOP ROW: CAMERAS (Horizontal) */}
+                    {!isBanned && (
                     <div style={{
                         display: "flex",
                         gap: 8, // Reduced gap
@@ -6040,6 +6040,7 @@ Do not include markdown formatting or explanations.`
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* MAIN AREA: SCREEN SHARE */}
                     <div 
@@ -6161,6 +6162,7 @@ Do not include markdown formatting or explanations.`
                     </div>
                 </div>
             ) : (
+                !isBanned && (
                 // --- STANDARD LAYOUT (SPLIT VIEW) ---
                 <div
                     style={{
@@ -6302,7 +6304,7 @@ Do not include markdown formatting or explanations.`
             ))}
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
-            {!isBanned && <div
+            {(!isBanned || (isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen)) && <div
                 onPointerDown={handlePointerDown}
                 style={{
                     height: 24,
@@ -6326,11 +6328,11 @@ Do not include markdown formatting or explanations.`
             </div>}
 
             {/* 3. AI CHAT HISTORY LAYER */}
-            <div style={{ width: "100%", height: isBanned ? "100%" : "auto", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
+            <div style={{ width: "100%", height: (isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen)) ? "100%" : "auto", background: (isDocOpen || isWhiteboardOpen) ? "white" : "transparent", display: "flex", justifyContent: "center" }}>
             <div 
                 style={{
-                    height: isBanned ? "100%" : chatHeight,
-                    paddingTop: isBanned ? 24 : 0,
+                    height: (isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen)) ? "100%" : chatHeight,
+                    paddingTop: (isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen)) ? 24 : 0,
                     width: "100%",
                     maxWidth: 728,
                     position: "relative",
@@ -6399,7 +6401,7 @@ Do not include markdown formatting or explanations.`
                 {/* 4. CHAT INPUT INTERFACE */}
                 <div
                     style={{
-                        position: isBanned ? "fixed" : "absolute",
+                        position: (isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen)) ? "fixed" : "absolute",
                         bottom: 0,
                         left: 0,
                         right: 0,
