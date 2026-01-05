@@ -5992,7 +5992,7 @@ Do not include markdown formatting or explanations.`
     }, [])
 
     // --- EFFECT: CALCULATE MAXIMUM CHAT HEIGHT ---
-    // For new users (no localStorage history), maximize chat height so videos/cards are at the top.
+    // For new users (no localStorage history), maximize chat height so videos/tile cards are at the top.
     React.useEffect(() => {
         if (containerSize.width === 0 || containerSize.height === 0) return
 
@@ -8051,676 +8051,598 @@ Do not include markdown formatting or explanations.`
             {/* DEBUG CONSOLE OVERLAY */}
             {debugMode && <DebugConsole logs={logs} />}
 
-            {/* 1. CONTENT RENDERING LAYER (Unified for Cards & Videos) */}
+            {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
             <style>{markdownStyles}</style>
-            {isScreenSharing ||
+            {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
+            <style>{markdownStyles}</style>
+            {(isScreenSharing ||
             !!remoteScreenStream ||
             isWhiteboardOpen ||
-            isDocOpen ? (
-                // --- SCREEN SHARE LAYOUT (FOCUS ON CONTENT) ---
+            isDocOpen ||
+            !isBanned) && (
                 <div
                     style={{
                         flex: "1 1 0",
                         width: "100%",
                         display: "flex",
-                        flexDirection: "column",
-                        gap: 8, // Reduced gap
+                        flexDirection:
+                            isScreenSharing ||
+                            !!remoteScreenStream ||
+                            isWhiteboardOpen ||
+                            isDocOpen
+                                ? "column"
+                                : shouldUseHorizontalLayout
+                                  ? "row"
+                                  : "column",
+                        gap: 8,
                         paddingTop: 16,
-                        paddingLeft: isDocOpen || isWhiteboardOpen ? 0 : 16,
-                        paddingRight: isDocOpen || isWhiteboardOpen ? 0 : 16,
+                        paddingLeft:
+                            isScreenSharing ||
+                            !!remoteScreenStream ||
+                            isWhiteboardOpen ||
+                            isDocOpen
+                                ? isDocOpen || isWhiteboardOpen
+                                    ? 0
+                                    : 16
+                                : 16,
+                        paddingRight:
+                            isScreenSharing ||
+                            !!remoteScreenStream ||
+                            isWhiteboardOpen ||
+                            isDocOpen
+                                ? isDocOpen || isWhiteboardOpen
+                                    ? 0
+                                    : 16
+                                : 16,
                         paddingBottom: 0,
+                        alignItems:
+                            isScreenSharing ||
+                            !!remoteScreenStream ||
+                            isWhiteboardOpen ||
+                            isDocOpen
+                                ? "center"
+                                : !isMobileLayout
+                                  ? "flex-end"
+                                  : "center",
+                        justifyContent:
+                            isScreenSharing ||
+                            !!remoteScreenStream ||
+                            isWhiteboardOpen ||
+                            isDocOpen
+                                ? "flex-start"
+                                : "center",
                         boxSizing: "border-box",
                         minHeight: 0,
-                        alignItems: "center",
-                        justifyContent: "flex-start", // Anchor cameras to top
+                        position: "relative",
+                        overflow: "hidden",
                     }}
                 >
-                    {/* TOP ROW: CAMERAS (Horizontal) */}
+                    {/* TILES (Row/Column) */}
                     {!isBanned && (
                         <div
                             style={{
                                 display: "flex",
-                                gap: 8, // Reduced gap
-                                height: isMobileLayout ? "auto" : 140,
+                                gap: 8,
                                 width: "100%",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                                paddingLeft:
-                                    isDocOpen || isWhiteboardOpen ? 16 : 0,
-                                paddingRight:
-                                    isDocOpen || isWhiteboardOpen ? 16 : 0,
                                 boxSizing: "border-box",
+                                justifyContent: "center",
+                                ...(isScreenSharing ||
+                                !!remoteScreenStream ||
+                                isWhiteboardOpen ||
+                                isDocOpen
+                                    ? {
+                                          height: isMobileLayout
+                                              ? "auto"
+                                              : 140,
+                                          flexShrink: 0,
+                                          paddingLeft:
+                                              isDocOpen || isWhiteboardOpen
+                                                  ? 16
+                                                  : 0,
+                                          paddingRight:
+                                              isDocOpen || isWhiteboardOpen
+                                                  ? 16
+                                                  : 0,
+                                          flexDirection: "row",
+                                          alignItems: "flex-start",
+                                      }
+                                    : {
+                                          flex: 1,
+                                          flexDirection: shouldUseHorizontalLayout
+                                              ? "row"
+                                              : "column",
+                                          alignItems: !isMobileLayout
+                                              ? "flex-end"
+                                              : "center",
+                                      }),
                             }}
                         >
-                            {/* CAMERA 1: Left (Student Position) */}
+                            {/* TILE 1: Student */}
                             <div
                                 style={{
-                                    height: isMobileLayout ? "auto" : "100%",
-                                    width: isMobileLayout ? "50%" : "auto",
-                                    aspectRatio: "4/3",
-                                    borderRadius: 16,
                                     overflow: "hidden",
-                                    background:
-                                        role === "mentor" && !remoteStream
-                                            ? themeColors.surface
-                                            : themeColors.card,
                                     position: "relative",
+                                    background:
+                                        !role &&
+                                        status === "idle" &&
+                                        !isLiveMode
+                                            ? themeColors.state.accent
+                                            : role === "mentor" && !remoteStream
+                                              ? themeColors.surface
+                                              : themeColors.card,
+                                    cursor:
+                                        !role &&
+                                        status === "idle" &&
+                                        !isLiveMode
+                                            ? "pointer"
+                                            : "default",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    ...(isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                        ? {
+                                              flex: isMobileLayout
+                                                  ? 1
+                                                  : "0 0 auto",
+                                              width: "auto",
+                                              height: isMobileLayout
+                                                  ? "auto"
+                                                  : "100%",
+                                              aspectRatio: "4/3",
+                                              borderRadius: 24,
+                                              minWidth: 0,
+                                          }
+                                        : {
+                                              width: finalWidth,
+                                              height: finalHeight,
+                                              borderRadius:
+                                                  finalHeight <
+                                                  (isMobileLayout ? 164 : 224)
+                                                      ? 28
+                                                      : 36,
+                                              flexShrink: 0,
+                                          }),
                                 }}
+                                onClick={() =>
+                                    !role &&
+                                    status === "idle" &&
+                                    !isLiveMode &&
+                                    handleRoleSelect("student")
+                                }
                             >
                                 {!role && status === "idle" && !isLiveMode ? (
+                                    <RoleSelectionButton
+                                        colors={themeColors}
+                                        type="student"
+                                        isCompact={
+                                            isScreenSharing ||
+                                            !!remoteScreenStream ||
+                                            isWhiteboardOpen ||
+                                            isDocOpen ||
+                                            finalHeight <
+                                                (isMobileLayout ? 164 : 224)
+                                        }
+                                        isMobileLayout={isMobileLayout}
+                                    />
+                                ) : role === "student" || isLiveMode ? (
+                                    <VideoPlayer
+                                        stream={localStream}
+                                        isMirrored={true}
+                                        muted={true}
+                                        themeColors={themeColors}
+                                    />
+                                ) : status === "connected" ? (
+                                    <VideoPlayer
+                                        stream={remoteStream}
+                                        isMirrored={false}
+                                        themeColors={themeColors}
+                                    />
+                                ) : isScreenSharing ||
+                                  !!remoteScreenStream ||
+                                  isWhiteboardOpen ||
+                                  isDocOpen ? (
+                                    <VideoPlayer
+                                        stream={null}
+                                        placeholder="Waiting for student..."
+                                        themeColors={themeColors}
+                                        style={transparentStyle}
+                                    />
+                                ) : (
                                     <div
                                         style={{
                                             width: "100%",
                                             height: "100%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: themeColors.text.secondary,
+                                            fontSize: 15,
                                         }}
-                                        onClick={() =>
-                                            handleRoleSelect("student")
-                                        }
                                     >
-                                        <RoleSelectionButton
-                                            colors={themeColors}
-                                            type="student"
-                                            isCompact={true}
-                                            isMobileLayout={isMobileLayout}
-                                        />
+                                        Searching for student
                                     </div>
-                                ) : (
-                                    <VideoPlayer
-                                        // If I am Student -> Local. If Mentor -> Remote.
-                                        stream={
-                                            role === "student" || isLiveMode
-                                                ? localStream
-                                                : role === "mentor"
-                                                  ? remoteStream
-                                                  : null
-                                        }
-                                        isMirrored={
-                                            role === "student" || isLiveMode
-                                        }
-                                        muted={role === "student" || isLiveMode} // Mute my own camera
-                                        placeholder={
-                                            role === "mentor" && !remoteStream
-                                                ? "Waiting for student..."
-                                                : undefined
-                                        }
-                                        style={transparentStyle}
-                                        themeColors={themeColors}
-                                    />
                                 )}
                             </div>
 
-                            {/* CAMERA 2: Right (Mentor Position) */}
+                            {/* TILE 2: Mentor */}
                             <div
                                 style={{
-                                    height: isMobileLayout ? "auto" : "100%",
-                                    width: isMobileLayout ? "50%" : "auto",
-                                    aspectRatio: "4/3",
-                                    borderRadius: 16,
                                     overflow: "hidden",
+                                    position: "relative",
                                     background:
                                         role === "student" && !remoteStream
                                             ? themeColors.surface
                                             : themeColors.card,
-                                    position: "relative",
+                                    cursor:
+                                        !role && status === "idle"
+                                            ? "pointer"
+                                            : "default",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    ...(isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                        ? {
+                                              flex: isMobileLayout
+                                                  ? 1
+                                                  : "0 0 auto",
+                                              width: "auto",
+                                              height: isMobileLayout
+                                                  ? "auto"
+                                                  : "100%",
+                                              aspectRatio: "4/3",
+                                              borderRadius: 24,
+                                              minWidth: 0,
+                                          }
+                                        : {
+                                              width: finalWidth,
+                                              height: finalHeight,
+                                              borderRadius:
+                                                  finalHeight <
+                                                  (isMobileLayout ? 164 : 224)
+                                                      ? 28
+                                                      : 36,
+                                              flexShrink: 0,
+                                          }),
                                 }}
+                                onClick={() =>
+                                    !role &&
+                                    status === "idle" &&
+                                    handleRoleSelect("volunteer")
+                                }
                             >
-                                {isLiveMode ? (
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            background: "#000",
-                                        }}
-                                    >
-                                        <svg
-                                            width="48"
-                                            height="48"
-                                            viewBox="0 0 20 20"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            style={{
-                                                animation:
-                                                    userIsSpeaking ||
-                                                    isLiveGenerating
-                                                        ? "pulseStar 1.5s infinite ease-in-out"
-                                                        : "none",
-                                                transition: "all 0.3s ease",
-                                                transform: "scale(0.8)",
-                                            }}
-                                        >
-                                            <path
-                                                d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                                fill="#FFFFFF"
-                                            />
-                                        </svg>
-                                        <style>{`
-                                        @keyframes pulseStar {
-                                            0% { transform: scale(0.95); opacity: 0.7; }
-                                            50% { transform: scale(1.1); opacity: 1; }
-                                            100% { transform: scale(0.95); opacity: 0.7; }
+                                {!role && status === "idle" ? (
+                                    <RoleSelectionButton
+                                        colors={themeColors}
+                                        type="volunteer"
+                                        isCompact={
+                                            isScreenSharing ||
+                                            !!remoteScreenStream ||
+                                            isWhiteboardOpen ||
+                                            isDocOpen ||
+                                            finalHeight <
+                                                (isMobileLayout ? 164 : 224)
                                         }
-                                    `}</style>
-                                    </div>
-                                ) : !role && status === "idle" ? (
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                        }}
-                                        onClick={() =>
-                                            handleRoleSelect("volunteer")
-                                        }
-                                    >
-                                        <RoleSelectionButton
-                                            colors={themeColors}
-                                            type="volunteer"
-                                            isCompact={true}
-                                            isMobileLayout={isMobileLayout}
-                                        />
-                                    </div>
-                                ) : role === "student" && isLiveMode ? (
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            background: "#000",
-                                        }}
-                                    >
-                                        <svg
-                                            width="32"
-                                            height="32"
-                                            viewBox="0 0 20 20"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            style={{
-                                                animation:
-                                                    userIsSpeaking ||
-                                                    isLiveGenerating
-                                                        ? "pulseStar 1.5s infinite ease-in-out"
-                                                        : "none",
-                                                transition: "all 0.3s ease",
-                                            }}
-                                        >
-                                            <path
-                                                d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                                fill="#FFFFFF"
-                                            />
-                                        </svg>
-                                        <style>{`
-                                            @keyframes pulseStar {
-                                                0% { transform: scale(0.95); opacity: 0.7; }
-                                                50% { transform: scale(1.1); opacity: 1; }
-                                                100% { transform: scale(0.95); opacity: 0.7; }
-                                            }
-                                        `}</style>
-                                    </div>
-                                ) : (
-                                    <VideoPlayer
-                                        // If I am Student -> Remote. If Mentor -> Local.
-                                        stream={
-                                            role === "volunteer"
-                                                ? localStream
-                                                : role === "student"
-                                                  ? remoteStream
-                                                  : null
-                                        }
-                                        isMirrored={role === "volunteer"}
-                                        muted={role === "volunteer"} // Mute my own camera
-                                        placeholder={
-                                            role === "student" && !remoteStream
-                                                ? "Waiting for mentor..."
-                                                : undefined
-                                        }
-                                        style={transparentStyle}
-                                        themeColors={themeColors}
-                                    />
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MAIN AREA: SCREEN SHARE */}
-                    <div
-                        onPointerDown={handlePointerDown}
-                        style={{
-                            flex: 1, // Take up all remaining space
-                            width: "100%",
-                            overflow: "hidden",
-                            background: "transparent",
-                            position: "relative",
-                            display: "flex",
-                            alignItems: "center", // Center video vertically in available space
-                            justifyContent: "center",
-                        }}
-                    >
-                        {/* Wrapper to enforce aspect ratio */}
-                        <div
-                            onPointerDown={(e) => e.stopPropagation()}
-                            style={{
-                                position: "relative",
-                                // Use calculated dimensions if available, otherwise 100%
-                                ...screenShareContainerStyle,
-                                // Ensure it never exceeds the parent flex container
-                                maxWidth: "100%",
-                                maxHeight: "100%",
-                                // borderRadius: 14, // Removed from here to allow handles to bleed
-                                // overflow: "hidden", // Removed from here
-                                marginTop: 0,
-                                marginBottom: 0,
-                            }}
-                        >
-                            {/* Drag Handles (Left/Right) - Only for screensharing */}
-                            {!isDocOpen && !isWhiteboardOpen && (
-                                <>
-                                    <div
-                                        onPointerDown={(e) =>
-                                            handlePointerDown(e, "left")
-                                        }
-                                        style={{
-                                            position: "absolute",
-                                            top: 0,
-                                            bottom: 0,
-                                            left: -12, // Extend outside
-                                            width: 24,
-                                            cursor: "ew-resize", // Changed to ew-resize
-                                            zIndex: 100,
-                                            touchAction: "none",
-                                        }}
-                                    />
-                                    <div
-                                        onPointerDown={(e) =>
-                                            handlePointerDown(e, "right")
-                                        }
-                                        style={{
-                                            position: "absolute",
-                                            top: 0,
-                                            bottom: 0,
-                                            right: -12, // Extend outside
-                                            width: 24,
-                                            cursor: "ew-resize", // Changed to ew-resize
-                                            zIndex: 100,
-                                            touchAction: "none",
-                                        }}
-                                    />
-                                </>
-                            )}
-
-                            <div
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    overflow: "hidden",
-                                    borderRadius:
-                                        isDocOpen || isWhiteboardOpen
-                                            ? "28px 28px 0 0"
-                                            : 14,
-                                    position: "relative",
-                                    background:
-                                        isDocOpen || isWhiteboardOpen
-                                            ? "white"
-                                            : "transparent",
-                                }}
-                            >
-                                {isDocOpen ? (
-                                    <DocEditor
-                                        content={docContent}
-                                        onChange={handleDocChange}
-                                        settings={docSettings}
-                                        onSettingsChange={setDocSettings}
-                                        themeColors={themeColors}
                                         isMobileLayout={isMobileLayout}
-                                        remoteCursor={remoteCursor}
-                                        onCursorMove={handleDocPointerMove}
                                     />
-                                ) : isWhiteboardOpen ? (
-                                    <div
-                                        ref={whiteboardContainerRef}
-                                        onPointerMove={
-                                            handleWhiteboardPointerMove
-                                        }
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            background: "#FFF",
-                                            position: "relative",
-                                            zIndex: 0,
-                                        }}
-                                        onPointerDown={(e) =>
-                                            e.stopPropagation()
-                                        }
-                                    >
-                                        <Tldraw
-                                            onMount={(e) => {
-                                                log("Tldraw editor mounted")
-                                                setEditor(e)
-                                            }}
-                                        />
-                                        {remoteCursor && (
-                                            <LiveCursor
-                                                x={remoteCursor.x}
-                                                y={remoteCursor.y}
-                                                color={remoteCursor.color}
-                                            />
-                                        )}
-                                    </div>
-                                ) : (
-                                    <>
-                                        {hasWhiteboardStarted && (
-                                            <div
-                                                style={{
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    background: "#FFF",
-                                                    position: "absolute",
-                                                    top: 0,
-                                                    left: 0,
-                                                    zIndex: -1,
-                                                    visibility: "hidden",
-                                                    pointerEvents: "none",
-                                                }}
-                                                onPointerDown={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                            >
-                                                <Tldraw
-                                                    onMount={(e) => {
-                                                        log(
-                                                            "Hidden Tldraw editor mounted"
-                                                        )
-                                                        setEditor(e)
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-                                        <VideoPlayer
-                                            stream={
-                                                remoteScreenStream ||
-                                                screenStreamRef.current
-                                            }
-                                            isMirrored={false}
-                                            muted={!remoteScreenStream} // Unmute only if it's a remote screen share
+                                ) : role === "volunteer" ? (
+                                    <VideoPlayer
+                                        stream={localStream}
+                                        isMirrored={true}
+                                        muted={true}
+                                        themeColors={themeColors}
+                                    />
+                                ) : status === "connected" ? (
+                                    isLiveMode ? (
+                                        <div
                                             style={{
                                                 width: "100%",
                                                 height: "100%",
-                                                objectFit: "contain",
-                                            }}
-                                            onVideoSize={(w, h) =>
-                                                setSharedScreenSize({
-                                                    width: w,
-                                                    height: h,
-                                                })
-                                            }
-                                            themeColors={themeColors}
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                !isBanned && (
-                    // --- STANDARD LAYOUT (SPLIT VIEW) ---
-                    <div
-                        style={{
-                            flex: "1 1 0",
-                            width: "100%",
-                            display: "flex",
-                            flexDirection: shouldUseHorizontalLayout
-                                ? "row"
-                                : "column",
-                            gap: 8,
-                            paddingTop: 16,
-                            paddingLeft: 16,
-                            paddingRight: 16,
-                            paddingBottom: 0,
-                            alignItems: !isMobileLayout ? "flex-end" : "center",
-                            justifyContent: "center",
-                            position: "relative",
-                            minHeight: 0,
-                            flexWrap: "nowrap",
-                            overflow: "hidden",
-                            boxSizing: "border-box",
-                        }}
-                    >
-                        {/* ITEM 1: Student Card OR Left Video */}
-                        <div
-                            style={{
-                                width: finalWidth,
-                                height: finalHeight,
-                                borderRadius:
-                                    finalHeight < (isMobileLayout ? 164 : 224)
-                                        ? 28
-                                        : 36, // Smaller radius when compact
-                                background:
-                                    !role && status === "idle" && !isLiveMode
-                                        ? themeColors.state.accent
-                                        : role === "mentor" && !remoteStream
-                                          ? themeColors.surface
-                                          : themeColors.card,
-                                overflow: "hidden",
-                                position: "relative",
-                                flexShrink: 0,
-                                cursor:
-                                    !role && status === "idle" && !isLiveMode
-                                        ? "pointer"
-                                        : "default",
-                                display: "flex",
-                                flexDirection: "column",
-                            }}
-                            onClick={() =>
-                                !role &&
-                                status === "idle" &&
-                                !isLiveMode &&
-                                handleRoleSelect("student")
-                            }
-                        >
-                            {!role && status === "idle" && !isLiveMode ? (
-                                <RoleSelectionButton
-                                    colors={themeColors}
-                                    type="student"
-                                    isCompact={
-                                        finalHeight <
-                                        (isMobileLayout ? 164 : 224)
-                                    }
-                                    isMobileLayout={isMobileLayout}
-                                />
-                            ) : role === "student" || isLiveMode ? (
-                                // --- LOCAL USER (STUDENT) ---
-                                <VideoPlayer
-                                    stream={localStream}
-                                    isMirrored={true}
-                                    muted={true}
-                                    themeColors={themeColors}
-                                />
-                            ) : // --- REMOTE USER (STUDENT) ---
-                            status === "connected" ? (
-                                <VideoPlayer
-                                    stream={remoteStream}
-                                    isMirrored={false}
-                                    themeColors={themeColors}
-                                />
-                            ) : (
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        color: themeColors.text.secondary,
-                                        fontSize: 15,
-                                    }}
-                                >
-                                    Searching for student
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ITEM 2: Mentor Card OR Right Video */}
-                        <div
-                            style={{
-                                width: finalWidth,
-                                height: finalHeight,
-                                borderRadius:
-                                    finalHeight < (isMobileLayout ? 164 : 224)
-                                        ? 28
-                                        : 36, // Smaller radius when compact
-                                background:
-                                    role === "student" && !remoteStream
-                                        ? themeColors.surface
-                                        : themeColors.card,
-                                overflow: "hidden",
-                                position: "relative",
-                                flexShrink: 0,
-                                cursor:
-                                    !role && status === "idle"
-                                        ? "pointer"
-                                        : "default",
-                                display: "flex",
-                                flexDirection: "column",
-                            }}
-                            onClick={() =>
-                                !role &&
-                                status === "idle" &&
-                                handleRoleSelect("volunteer")
-                            }
-                        >
-                            {!role && status === "idle" ? (
-                                <RoleSelectionButton
-                                    colors={themeColors}
-                                    type="volunteer"
-                                    isCompact={
-                                        finalHeight <
-                                        (isMobileLayout ? 164 : 224)
-                                    }
-                                    isMobileLayout={isMobileLayout}
-                                />
-                            ) : role === "volunteer" ? (
-                                // --- LOCAL USER (VOLUNTEER) ---
-                                <VideoPlayer
-                                    stream={localStream}
-                                    isMirrored={true}
-                                    muted={true}
-                                    themeColors={themeColors}
-                                />
-                            ) : // --- REMOTE USER (MENTOR) ---
-                            status === "connected" ? (
-                                isLiveMode ? (
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            background: "#000",
-                                        }}
-                                    >
-                                        <svg
-                                            width="64"
-                                            height="64"
-                                            viewBox="0 0 20 20"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            style={{
-                                                animation:
-                                                    userIsSpeaking ||
-                                                    isLiveGenerating
-                                                        ? "pulseStar 1.5s infinite ease-in-out"
-                                                        : "none",
-                                                transition: "all 0.3s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background: "#000",
                                             }}
                                         >
-                                            <path
-                                                d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                                fill="#FFFFFF"
-                                            />
-                                        </svg>
-                                        <style>{`
+                                            <svg
+                                                width="64"
+                                                height="64"
+                                                viewBox="0 0 20 20"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                style={{
+                                                    animation:
+                                                        userIsSpeaking ||
+                                                        isLiveGenerating
+                                                            ? "pulseStar 1.5s infinite ease-in-out"
+                                                            : "none",
+                                                    transition:
+                                                        "all 0.3s ease",
+                                                    transform:
+                                                        isScreenSharing ||
+                                                        !!remoteScreenStream ||
+                                                        isWhiteboardOpen ||
+                                                        isDocOpen
+                                                            ? "scale(0.8)"
+                                                            : "none",
+                                                }}
+                                            >
+                                                <path
+                                                    d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                                    fill="#FFFFFF"
+                                                />
+                                            </svg>
+                                            <style>{`
                                                 @keyframes pulseStar {
                                                     0% { transform: scale(0.95); opacity: 0.7; }
                                                     50% { transform: scale(1.1); opacity: 1; }
                                                     100% { transform: scale(0.95); opacity: 0.7; }
                                                 }
                                             `}</style>
-                                    </div>
-                                ) : (
+                                        </div>
+                                    ) : (
+                                        <VideoPlayer
+                                            stream={remoteStream}
+                                            isMirrored={false}
+                                            themeColors={themeColors}
+                                        />
+                                    )
+                                ) : isScreenSharing ||
+                                  !!remoteScreenStream ||
+                                  isWhiteboardOpen ||
+                                  isDocOpen ? (
                                     <VideoPlayer
-                                        stream={remoteStream}
-                                        isMirrored={false}
+                                        stream={null}
+                                        placeholder="Waiting for mentor..."
                                         themeColors={themeColors}
+                                        style={transparentStyle}
                                     />
-                                )
-                            ) : (
+                                ) : (
+                                    <div
+                                        data-layer="tile"
+                                        className="Tile"
+                                        style={{
+                                            alignSelf: "stretch",
+                                            height: "100%",
+                                            padding: 16,
+                                            background: "transparent",
+                                            overflow: "hidden",
+                                            borderRadius: 28,
+                                            flexDirection: "column",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            display: "flex",
+                                        }}
+                                    >
+                                        <div
+                                            data-layer="Searching for mentor"
+                                            className="SearchingForMentor"
+                                            style={{
+                                                textAlign: "center",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: themeColors.text.primary,
+                                                fontSize: 15,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: 1.4,
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            Searching for mentor
+                                        </div>
+                                        <div
+                                            onClick={handleConnectWithAI}
+                                            data-layer="Or connect with AI"
+                                            className="OrConnectWithAi"
+                                            style={{
+                                                height: 44,
+                                                textAlign: "center",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: themeColors.text.secondary,
+                                                fontSize: 15,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: 1.4,
+                                                wordWrap: "break-word",
+                                                cursor: "pointer",
+                                                width: "100%",
+                                                marginTop: -4,
+                                            }}
+                                        >
+                                            Or connect with AI
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MAIN CONTENT AREA */}
+                    {(isScreenSharing ||
+                        !!remoteScreenStream ||
+                        isWhiteboardOpen ||
+                        isDocOpen) && (
+                        <div
+                            onPointerDown={handlePointerDown}
+                            style={{
+                                flex: 1,
+                                width: "100%",
+                                overflow: "hidden",
+                                background: "transparent",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <div
+                                onPointerDown={(e) => e.stopPropagation()}
+                                style={{
+                                    position: "relative",
+                                    ...screenShareContainerStyle,
+                                    maxWidth: "100%",
+                                    maxHeight: "100%",
+                                    marginTop: 0,
+                                    marginBottom: 0,
+                                }}
+                            >
+                                {/* Drag Handles */}
+                                {!isDocOpen && !isWhiteboardOpen && (
+                                    <>
+                                        <div
+                                            onPointerDown={(e) =>
+                                                handlePointerDown(e, "left")
+                                            }
+                                            style={{
+                                                position: "absolute",
+                                                top: 0,
+                                                bottom: 0,
+                                                left: -12,
+                                                width: 24,
+                                                cursor: "ew-resize",
+                                                zIndex: 100,
+                                                touchAction: "none",
+                                            }}
+                                        />
+                                        <div
+                                            onPointerDown={(e) =>
+                                                handlePointerDown(e, "right")
+                                            }
+                                            style={{
+                                                position: "absolute",
+                                                top: 0,
+                                                bottom: 0,
+                                                right: -12,
+                                                width: 24,
+                                                cursor: "ew-resize",
+                                                zIndex: 100,
+                                                touchAction: "none",
+                                            }}
+                                        />
+                                    </>
+                                )}
+
                                 <div
-                                    data-layer="tile"
-                                    className="Tile"
                                     style={{
-                                        alignSelf: "stretch",
+                                        width: "100%",
                                         height: "100%",
-                                        padding: 16,
-                                        background: "transparent",
                                         overflow: "hidden",
-                                        borderRadius: 28,
-                                        flexDirection: "column",
-                                        justifyContent: "center",
-                                        alignItems: "center",
-                                        display: "flex",
+                                        borderRadius:
+                                            isDocOpen || isWhiteboardOpen
+                                                ? "28px 28px 0 0"
+                                                : 14,
+                                        position: "relative",
+                                        background:
+                                            isDocOpen || isWhiteboardOpen
+                                                ? "white"
+                                                : "transparent",
                                     }}
                                 >
-                                    <div
-                                        data-layer="Searching for mentor"
-                                        className="SearchingForMentor"
-                                        style={{
-                                            textAlign: "center",
-                                            justifyContent: "center",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            color: themeColors.text.primary,
-                                            fontSize: 15,
-                                            fontFamily: "Inter",
-                                            fontWeight: "400",
-                                            lineHeight: 1.4,
-                                            wordWrap: "break-word",
-                                        }}
-                                    >
-                                        Searching for mentor
-                                    </div>
-                                    <div
-                                        onClick={handleConnectWithAI}
-                                        data-layer="Or connect with AI"
-                                        className="OrConnectWithAi"
-                                        style={{
-                                            height: 44,
-                                            textAlign: "center",
-                                            justifyContent: "center",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            color: colors.text.secondary,
-                                            fontSize: 15,
-                                            fontFamily: "Inter",
-                                            fontWeight: "400",
-                                            lineHeight: 1.4,
-                                            wordWrap: "break-word",
-                                            cursor: "pointer",
-                                            width: "100%",
-                                            marginTop: -4, // Negative gap to pull closer as requested
-                                        }}
-                                    >
-                                        Or connect with AI
-                                    </div>
+                                    {isDocOpen ? (
+                                        <DocEditor
+                                            content={docContent}
+                                            onChange={handleDocChange}
+                                            settings={docSettings}
+                                            onSettingsChange={setDocSettings}
+                                            themeColors={themeColors}
+                                            isMobileLayout={isMobileLayout}
+                                            remoteCursor={remoteCursor}
+                                            onCursorMove={handleDocPointerMove}
+                                        />
+                                    ) : isWhiteboardOpen ? (
+                                        <div
+                                            ref={whiteboardContainerRef}
+                                            onPointerMove={
+                                                handleWhiteboardPointerMove
+                                            }
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                background: "#FFF",
+                                                position: "relative",
+                                                zIndex: 0,
+                                            }}
+                                            onPointerDown={(e) =>
+                                                e.stopPropagation()
+                                            }
+                                        >
+                                            <Tldraw
+                                                onMount={(e) => {
+                                                    log("Tldraw editor mounted")
+                                                    setEditor(e)
+                                                }}
+                                            />
+                                            {remoteCursor && (
+                                                <LiveCursor
+                                                    x={remoteCursor.x}
+                                                    y={remoteCursor.y}
+                                                    color={remoteCursor.color}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {hasWhiteboardStarted && (
+                                                <div
+                                                    style={{
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        background: "#FFF",
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
+                                                        zIndex: -1,
+                                                        visibility: "hidden",
+                                                        pointerEvents: "none",
+                                                    }}
+                                                    onPointerDown={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
+                                                    <Tldraw
+                                                        onMount={(e) => {
+                                                            log(
+                                                                "Hidden Tldraw editor mounted"
+                                                            )
+                                                            setEditor(e)
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <VideoPlayer
+                                                stream={
+                                                    remoteScreenStream ||
+                                                    screenStreamRef.current
+                                                }
+                                                isMirrored={false}
+                                                muted={!remoteScreenStream}
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "contain",
+                                                }}
+                                                onVideoSize={(w, h) =>
+                                                    setSharedScreenSize({
+                                                        width: w,
+                                                        height: h,
+                                                    })
+                                                }
+                                                themeColors={themeColors}
+                                            />
+                                        </>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
-                    </div>
-                )
+                    )}
+                </div>
             )}
 
             {/* 2. DRAG HANDLE (Chat Drawer Control) */}
