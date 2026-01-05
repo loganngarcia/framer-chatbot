@@ -724,6 +724,14 @@ interface Message {
         name?: string
         mimeType?: string
     }[]
+    functionCall?: {
+        name: string
+        args: Record<string, any>
+    }
+    functionResponse?: {
+        name: string
+        response: any
+    }
 }
 
 interface FileAttachmentProps {
@@ -2937,27 +2945,53 @@ const captureVideoFrame = async (streamOrTrack: MediaStream | MediaStreamTrack |
         
         // Use ImageCapture if available
         if ('ImageCapture' in window) {
-            const imageCapture = new (window as any).ImageCapture(track)
-            const bitmap = await imageCapture.grabFrame()
-            
-            // Resize to max 800px width/height to save bandwidth/processing
-            const canvas = document.createElement('canvas')
-            const scale = Math.min(1, 800 / Math.max(bitmap.width, bitmap.height))
-            canvas.width = bitmap.width * scale
-            canvas.height = bitmap.height * scale
-            
-            const ctx = canvas.getContext('2d')
-            if (!ctx) {
-                bitmap.close()
-                return null
+            try {
+                const imageCapture = new (window as any).ImageCapture(track)
+                const bitmap = await imageCapture.grabFrame()
+                
+                // Resize to max 383px width to save bandwidth/processing
+                const canvas = document.createElement('canvas')
+                const scale = Math.min(1, 383 / bitmap.width)
+                canvas.width = bitmap.width * scale
+                canvas.height = bitmap.height * scale
+                
+                const ctx = canvas.getContext('2d')
+                if (!ctx) {
+                    bitmap.close()
+                    return null
+                }
+                
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+                bitmap.close() // Important: Release memory
+                
+                return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7))
+            } catch (err) {
+                console.warn("ImageCapture failed, trying fallback", err)
             }
-            
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-            bitmap.close() // Important: Release memory
-            
-            return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7))
         }
-        return null
+
+        // Fallback: Create video element
+        const video = document.createElement('video')
+        video.muted = true
+        (video as any).playsInline = true
+        video.srcObject = new MediaStream([track])
+        await video.play()
+        
+        const canvas = document.createElement('canvas')
+        const scale = Math.min(1, 383 / video.videoWidth)
+        canvas.width = video.videoWidth * scale
+        canvas.height = video.videoHeight * scale
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return null
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        
+        // Cleanup
+        video.pause()
+        video.srcObject = null
+        
+        return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7))
     } catch (e) { 
         return null 
     }
@@ -3990,6 +4024,96 @@ Do not include markdown formatting or explanations.`
     // Unique session ID for the user
     const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
 
+    const enforceBan = () => {
+        log("Enforcing ban locally due to violation.")
+        // Determine ban duration
+        const violationCount = parseInt(localStorage.getItem("curastem_violation_count") || "0")
+        let banDuration = 10 * 60 * 1000 // 10 mins
+        if (violationCount > 0) {
+            banDuration = 60 * 60 * 1000 // 1 hour
+        }
+        
+        // Set ban state
+        localStorage.setItem("curastem_violation_count", (violationCount + 1).toString())
+        localStorage.setItem("curastem_ban_expiry", (Date.now() + banDuration).toString())
+        
+        // Enforce ban
+        checkBanStatus()
+        cleanup()
+    }
+
+    const performModerationCheck = async (
+        evidenceParts: { inlineData: { mimeType: string, data: string } }[],
+        prompt: string = `Analyze these images for code of conduct violations. 
+                          Strictly check for: Nudity, sexually explicit content, gore, violence, impersonation, profanity, blatant advertising, scams, or illegal activity.
+                          Respond with ONLY "VIOLATION" if found, or "SAFE" if not.`
+    ): Promise<string> => {
+        if (!geminiApiKey || evidenceParts.length === 0) return "UNKNOWN"
+        
+        try {
+            console.log("Sending moderation request to Gemini...")
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            ...evidenceParts
+                        ]
+                    }],
+                    generationConfig: {
+                        thinkingConfig: {
+                            thinkingBudget: 0
+                        }
+                    }
+                })
+            })
+            
+            const data = await response.json()
+            const verdict = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.toUpperCase()
+            console.log(`AI Verdict: ${verdict}`)
+            return verdict || "UNKNOWN"
+        } catch (e) {
+            console.error(`Moderation check failed: ${e}`)
+            return "UNKNOWN"
+        }
+    }
+
+    // --- EFFECT: MODERATION SCREENSHOTS ---
+    React.useEffect(() => {
+        if (status === "connected") {
+            const timer = setTimeout(async () => {
+                // Double check status to avoid race conditions
+                if (statusRef.current !== "connected") return
+
+                console.log("Capturing moderation screenshot (5s check)...")
+                try {
+                    // Only capture and check REMOTE stream (check your partner)
+                    const remoteBlob = await captureVideoFrame(remoteStreamRef.current)
+                    
+                    if (remoteBlob) {
+                         const remoteEvidence = [{ inlineData: { mimeType: "image/jpeg", data: await blobToBase64(remoteBlob) } }]
+                         const verdict = await performModerationCheck(remoteEvidence) // Uses default prompt
+
+                         if (verdict === "VIOLATION") {
+                             console.warn("VIOLATION DETECTED (REMOTE). Reporting peer.")
+                             if (dataConnectionRef.current && dataConnectionRef.current.open) {
+                                dataConnectionRef.current.send({
+                                    type: 'REPORT_VIOLATION',
+                                    reason: 'Automated AI Moderation'
+                                })
+                            }
+                         }
+                    }
+                } catch (e) {
+                    console.error("Failed to capture moderation screenshots", e)
+                }
+            }, 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [status, geminiApiKey, model])
+
     // --- STATE: AI CHAT (GEMINI) ---
     const [messages, setMessages] = React.useState<Message[]>([])
     const [inputText, setInputText] = React.useState("")
@@ -4590,7 +4714,7 @@ Do not include markdown formatting or explanations.`
         log(`Evidence captured in ${Date.now() - evidenceStart}ms`)
 
         // --- GEMINI API REVIEW ---
-        const evidenceParts: any[] = []
+        const evidenceParts: { inlineData: { mimeType: string, data: string } }[] = []
         try {
             if (whiteboardBlob) evidenceParts.push({ inlineData: { mimeType: "image/png", data: await blobToBase64(whiteboardBlob) } })
             if (peerVideoBlob) evidenceParts.push({ inlineData: { mimeType: "image/jpeg", data: await blobToBase64(peerVideoBlob) } })
@@ -4599,40 +4723,13 @@ Do not include markdown formatting or explanations.`
 
         let confirmedViolation = true
 
-        if (evidenceParts.length > 0 && geminiApiKey) {
-            log("Sending evidence to Gemini...")
-            try {
-                // Non-blocking fetch (fire and forget disconnect logic after response)
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: `Analyze these images for code of conduct violations. 
-                                  Strictly check for: Nudity, sexually explicit content, gore, violence, impersonation, blatant advertising, scam, or illegal activity.
-                                  Respond with ONLY "VIOLATION" if found, or "SAFE" if not.` },
-                                ...evidenceParts
-                            ]
-                        }],
-                        generationConfig: {
-                            thinkingConfig: {
-                                thinkingBudget: 0
-                            }
-                        }
-                    })
-                })
-                
-                const data = await response.json()
-                const verdict = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.toUpperCase()
-                
-                log(`AI Verdict: ${verdict}`)
-                if (verdict === "SAFE") {
-                    confirmedViolation = false
-                    log("AI found no violation. Report logged but no immediate ban enforced.")
-                }
-            } catch (e) {
-                log(`AI Review Failed: ${e}. Defaulting to user report.`)
+        if (evidenceParts.length > 0) {
+            const verdict = await performModerationCheck(evidenceParts)
+            if (verdict === "SAFE") {
+                confirmedViolation = false
+                log("AI found no violation. Report logged but no immediate ban enforced.")
+            } else if (verdict === "UNKNOWN") {
+                log("AI Review failed or uncertain. Defaulting to user report.")
             }
         }
 
@@ -5037,20 +5134,7 @@ Do not include markdown formatting or explanations.`
         conn.on('data', (data: any) => {
             if (data.type === 'REPORT_VIOLATION') {
                 log("Received violation report")
-                // Determine ban duration
-                const violationCount = parseInt(localStorage.getItem("curastem_violation_count") || "0")
-                let banDuration = 10 * 60 * 1000 // 10 mins
-                if (violationCount > 0) {
-                    banDuration = 60 * 60 * 1000 // 1 hour
-                }
-                
-                // Set ban state
-                localStorage.setItem("curastem_violation_count", (violationCount + 1).toString())
-                localStorage.setItem("curastem_ban_expiry", (Date.now() + banDuration).toString())
-                
-                // Enforce ban
-                checkBanStatus()
-                cleanup()
+                enforceBan()
                 return
             }
 
@@ -5239,10 +5323,25 @@ Do not include markdown formatting or explanations.`
             // Map peer messages to 'user' for Gemini context
             const history = messages
                 .slice(-MAX_HISTORY_MESSAGES)
-                .map(m => ({
-                    role: m.role === "model" ? "model" : "user",
-                    parts: [{ text: m.text }]
-                }))
+                .map(m => {
+                    const parts: any[] = []
+                    if (m.text) {
+                        parts.push({ text: m.text })
+                    }
+                    if (m.functionCall) {
+                        parts.push({ functionCall: m.functionCall })
+                    }
+                    if (m.functionResponse) {
+                        parts.push({ functionResponse: m.functionResponse })
+                    }
+                    // Fallback for empty parts if needed (though text usually exists or function call)
+                    if (parts.length === 0) parts.push({ text: "" })
+                    
+                    return {
+                        role: m.role === "model" ? "model" : "user",
+                        parts: parts
+                    }
+                })
 
             // Define Tools
             const tools = [
@@ -5407,7 +5506,12 @@ Do not include markdown formatting or explanations.`
                             if (newArr.length > 0 && newArr[newArr.length - 1].role === "model") {
                                 newArr[newArr.length - 1] = { 
                                     ...newArr[newArr.length - 1], 
-                                    text: accumulatedText 
+                                    text: accumulatedText,
+                                    functionCall: accumulatedFunctionCall,
+                                    functionResponse: {
+                                        name: "update_doc",
+                                        response: { content: "Document updated successfully." }
+                                    }
                                 }
                             }
                             return newArr
