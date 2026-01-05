@@ -8118,7 +8118,12 @@ Do not include markdown formatting or explanations.`
                     }}
                 >
                     {/* TILES (Row/Column) */}
-                    {!isBanned && (
+                    {!isBanned &&
+                        !(
+                            isMobileLayout &&
+                            (status !== "connected" || isLiveMode) && // Hide tiles in mobile if not connected or in live mode
+                            (isWhiteboardOpen || isDocOpen)
+                        ) && (
                         <div
                             style={{
                                 display: "flex",
