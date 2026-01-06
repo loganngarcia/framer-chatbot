@@ -6811,13 +6811,17 @@ Do not include markdown formatting or explanations.`
     }, [chatHeight])
 
     // --- CONSTANTS ---
-    const MIN_CHAT_HEIGHT = 172
+    const MIN_CHAT_HEIGHT = 180
 
     // --- STATE: LAYOUT & DIMENSIONS ---
     const [containerSize, setContainerSize] = React.useState({
         width: 0,
         height: 0,
     })
+    // Track previous container size to handle virtual keyboard resizing logic
+    const prevContainerSize = React.useRef({ width: 0, height: 0 })
+    const hasSnappedForMessages = React.useRef(false)
+    const chatHeightBeforeOverlay = React.useRef<number | null>(null)
     const isMobileLayout = containerSize.width < 768
     const [sharedScreenSize, setSharedScreenSize] = React.useState<{
         width: number
@@ -7045,10 +7049,17 @@ Do not include markdown formatting or explanations.`
     }, [containerSize])
 
     // --- EFFECT: ENFORCE CHAT HEIGHT CONSTRAINTS ON RESIZE ---
-    // Ensures the chat height adjusts when the viewport/container changes size,
-    // keeping the drag bar in a valid position relative to video constraints.
+    // Ensures the chat height adjusts when the viewport/container changes size.
+    // On mobile with messages, completely ignore resize events to prevent keyboard from affecting tiles.
     React.useEffect(() => {
         if (containerSize.width === 0 || containerSize.height === 0) return
+
+        // On mobile with active messages, completely skip resize handling
+        // to prevent virtual keyboard from affecting layout
+        if (isMobileLayout && hasMessages && !isWhiteboardOpen && !isDocOpen) {
+            prevContainerSize.current = containerSize
+            return
+        }
 
         const { minHeight, maxHeight } = calculateHeightConstraints(
             containerSize.width,
@@ -7062,6 +7073,8 @@ Do not include markdown formatting or explanations.`
         )
 
         setChatHeight((prev) => Math.max(minHeight, Math.min(prev, maxHeight)))
+        
+        prevContainerSize.current = containerSize
     }, [
         containerSize,
         isMobileLayout,
@@ -7071,13 +7084,12 @@ Do not include markdown formatting or explanations.`
         isDocOpen,
         sharedScreenSize,
         calculateHeightConstraints,
+        hasMessages,
     ])
 
     // --- EFFECT: SNAP CHAT HEIGHT WHEN MESSAGING STARTS ---
     // When the first message is sent, we snap the chat to a larger height.
-    // We want the TILES to be roughly 140px.
-    // Total Height = ChatHeight + DragBar(24) + Gap(8) + TileHeight(140) + TopPadding(16)
-    // ChatHeight = TotalHeight - 24 - 8 - 140 - 16 = TotalHeight - 188
+    // On mobile, we wait for keyboard to close before marking as "snapped".
     React.useEffect(() => {
         if (
             !hasMessages ||
@@ -7087,6 +7099,16 @@ Do not include markdown formatting or explanations.`
             isDocOpen
         )
             return
+
+        // If already snapped on a large viewport, skip
+        if (hasSnappedForMessages.current && containerSize.height > 500) {
+            return
+        }
+
+        // On mobile, only proceed if viewport is reasonably tall (keyboard likely closed)
+        if (isMobileLayout && containerSize.height < 500) {
+            return
+        }
 
         const { maxHeight } = calculateHeightConstraints(
             containerSize.width,
@@ -7099,22 +7121,71 @@ Do not include markdown formatting or explanations.`
             sharedScreenSize
         )
 
-        // Calculate height that leaves ~140px for video tiles
-        const targetTileHeight = 140
+        // Calculate height that leaves appropriate space for tiles based on layout
+        let targetTileHeight: number
         const topUIHeight = 16 + 8 + 24 // PaddingTop + Gap + DragBar
+        
+        if (isMobileLayout) {
+            // Mobile: tiles arranged horizontally side-by-side
+            // Each tile width = (availableWidth - gap) / 2
+            // Height = tileWidth / aspectRatio(4/3)
+            const availableWidth = Math.max(0, containerSize.width - 32)
+            const tileW = (availableWidth - 8) / 2
+            targetTileHeight = tileW / (4 / 3)
+        } else {
+            // Desktop: tiles side-by-side, target 140px height
+            targetTileHeight = 140
+        }
+        
         const targetChatHeight = containerSize.height - targetTileHeight - topUIHeight
         
-        // Ensure we don't exceed the absolute max allowed height (which prevents video from disappearing entirely)
-        // But also snap to this target if possible.
+        // Ensure we don't exceed the absolute max allowed height
         const snapHeight = Math.min(targetChatHeight, maxHeight)
         
         setChatHeight(Math.max(MIN_CHAT_HEIGHT, snapHeight))
-    }, [hasMessages, isWhiteboardOpen, isDocOpen])
+        
+        // Only mark as snapped when we've done it with a full-size viewport
+        if (containerSize.height > 500) {
+            hasSnappedForMessages.current = true
+        }
+    }, [
+        hasMessages,
+        isWhiteboardOpen,
+        isDocOpen,
+        isMobileLayout,
+        containerSize,
+        isScreenSharing,
+        remoteScreenStream,
+        sharedScreenSize,
+        calculateHeightConstraints,
+    ])
+
+    // Reset snap flag when messages are cleared
+    React.useEffect(() => {
+        if (!hasMessages) {
+            hasSnappedForMessages.current = false
+        }
+    }, [hasMessages])
 
     // --- EFFECT: MINIMIZE CHAT WHEN DOC OR WHITEBOARD OPENS ---
+    // Save previous height and restore when closing
     React.useEffect(() => {
         if (isDocOpen || isWhiteboardOpen) {
-            setChatHeight(MIN_CHAT_HEIGHT) // Minimize chat to allow doc/whiteboard to be full height
+            // Store current height before minimizing
+            if (chatHeightBeforeOverlay.current === null) {
+                setChatHeight((prev) => {
+                    chatHeightBeforeOverlay.current = prev
+                    return MIN_CHAT_HEIGHT
+                })
+            } else {
+                setChatHeight(MIN_CHAT_HEIGHT)
+            }
+        } else {
+            // Restore previous height when closing
+            if (chatHeightBeforeOverlay.current !== null) {
+                setChatHeight(chatHeightBeforeOverlay.current)
+                chatHeightBeforeOverlay.current = null
+            }
         }
     }, [isDocOpen, isWhiteboardOpen])
 
