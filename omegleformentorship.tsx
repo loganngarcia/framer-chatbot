@@ -71,7 +71,7 @@ function detectVoiceActivity(
 
         if (i > 0 && audioData[i] * audioData[i - 1] < 0) {
             zeroCrossings++
-        }
+    }
     }
 
     const rms = Math.sqrt(sumSquares / audioData.length)
@@ -855,9 +855,9 @@ const FileAttachment = React.memo(function FileAttachment({
                         height: 18,
                         borderRadius: 9,
                         background: "#F6F6F6",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                         cursor: "pointer",
                         border: "none",
                         zIndex: 10,
@@ -878,10 +878,10 @@ const FileAttachment = React.memo(function FileAttachment({
                             strokeLinejoin="round"
                         />
                     </svg>
-                </div>
+            </div>
             )}
-            <div
-                style={{
+                <div
+                    style={{
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
@@ -999,19 +999,19 @@ const VideoPlayer = React.memo(function VideoPlayer({
                 ...style,
             }}
         >
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={muted}
-                style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    transform: isMirrored ? "scaleX(-1)" : "none",
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted={muted}
+                    style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transform: isMirrored ? "scaleX(-1)" : "none",
                     display: stream ? "block" : "none",
-                }}
-            />
+                    }}
+                />
             {!stream && placeholder && (
                 <div
                     style={{
@@ -2877,9 +2877,9 @@ const ChatInput = React.memo(function ChatInput({
                                 paddingBottom: 6,
                             }}
                         >
-                            <textarea
-                                ref={textareaRef}
-                                value={value}
+            <textarea
+                ref={textareaRef}
+                value={value}
                                 onChange={(e) => {
                                     onChange(e)
                                     // Auto-open menu on trigger
@@ -2943,20 +2943,20 @@ const ChatInput = React.memo(function ChatInput({
                                         if (hasContent && !isLoading) onSend()
                                     }
                                 }}
-                                placeholder={placeholder}
+                placeholder={placeholder}
                                 disabled={false}
                                 className="ChatTextInput"
-                                style={{
+                style={{
                                     flex: "1 1 0",
                                     color: themeColors.text.primary,
                                     fontSize: 16,
                                     fontFamily: "Inter",
                                     fontWeight: "400",
                                     lineHeight: "24px",
-                                    background: "transparent",
-                                    border: "none",
-                                    outline: "none",
-                                    resize: "none",
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    resize: "none",
                                     height: 24,
                                     padding: 0,
                                     margin: 0,
@@ -2974,9 +2974,9 @@ const ChatInput = React.memo(function ChatInput({
                                 if (isLoading && onStop) {
                                     onStop()
                                 } else if (hasContent) {
-                                    onSend()
-                                }
-                            }}
+                        onSend()
+                    }
+                }}
                             style={{
                                 cursor: "pointer",
                                 display: hasContent ? "block" : "none",
@@ -3218,7 +3218,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
     }
 
     if (!isOpen) return null
-
+    
     return (
         <div
             style={{
@@ -3266,7 +3266,7 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                         }}
                     >
                         Report user
-                    </div>
+            </div>
                     <button
                         onClick={onClose}
                         style={{
@@ -3293,9 +3293,9 @@ function ReportModal({ isOpen, onClose, onSubmit }: ReportModalProps) {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
-                        </svg>
+                </svg>
                     </button>
-                </div>
+            </div>
 
                 <div
                     style={{
@@ -3997,6 +3997,31 @@ function LiveCursor({ x, y, color }: { x: number; y: number; color: string }) {
     )
 }
 
+function stripMarkdown(text: string): string {
+    if (!text) return ""
+    return text
+        .replace(/```[\s\S]*?```/g, (match) => {
+             return match.replace(/^```.*\n?/, "").replace(/```$/, "")
+        })
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/(\*\*|__)(.*?)\1/g, "$2")
+        .replace(/(\*|_)(.*?)\1/g, "$2")
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/^>\s+/gm, "")
+        .replace(/^[-*+]\s+/gm, "")
+        .trim()
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
+}
+
 // --- HELPER COMPONENT: MESSAGE BUBBLE (MEMOIZED) ---
 const MessageBubble = React.memo(
     ({
@@ -4005,12 +4030,20 @@ const MessageBubble = React.memo(
         id,
         isLast,
         themeColors = darkColors,
+        isStreaming = false,
+        previousMsg,
+        copiedMessageId,
+        onCopy,
     }: {
         msg: Message
         isMobileLayout: boolean
         id?: string
         isLast?: boolean
         themeColors?: typeof darkColors
+        isStreaming?: boolean
+        previousMsg?: Message
+        copiedMessageId?: string | null
+        onCopy?: (msgId: string) => void
     }) => {
         // Memoize base styles to avoid recreation
         const baseTextStyle = React.useMemo(
@@ -4029,6 +4062,349 @@ const MessageBubble = React.memo(
             }),
             [themeColors]
         )
+
+        const [isShareHovered, setIsShareHovered] = React.useState(false)
+        const [isCopyHovered, setIsCopyHovered] = React.useState(false)
+        const [isDislikeHovered, setIsDislikeHovered] = React.useState(false)
+        const [isDislikeActive, setIsDislikeActive] = React.useState(false)
+
+        const actionButtonBaseStyle: React.CSSProperties = {
+            width: 28,
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            borderRadius: 10,
+            padding: 4
+        }
+
+        const hoverBackground = themeColors.background === "#FFFFFF" 
+            ? "rgba(0, 0, 0, 0.04)" 
+            : "rgba(255, 255, 255, 0.04)"
+
+        const handleShare = React.useCallback(async () => {
+            if (typeof window === "undefined" || typeof document === "undefined") return
+
+            // 1. Setup Canvas (2x Resolution for Retina/High DPI)
+            const SCALE = 2
+            const WIDTH = 320 * SCALE
+            const HEIGHT = 400 * SCALE
+            
+            const canvas = document.createElement("canvas")
+            canvas.width = WIDTH
+            canvas.height = HEIGHT
+            const ctx = canvas.getContext("2d")
+            
+            if (!ctx) return
+
+            // Scale all context operations
+            ctx.scale(SCALE, SCALE)
+
+            // 2. Constants & Helpers
+            const PADDING = 24
+            const BUBBLE_PADDING_X = 12
+            const BUBBLE_PADDING_Y = 8
+            const MAX_BUBBLE_WIDTH = 224
+            
+            // Draw Background
+            ctx.fillStyle = "white"
+            ctx.fillRect(0, 0, 320, 400) // Logical coords
+
+            // Helper: Rounded Rect
+            const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+                if (w < 2 * r) r = w / 2
+                if (h < 2 * r) r = h / 2
+                ctx.beginPath()
+                ctx.moveTo(x + r, y)
+                ctx.arcTo(x + w, y, x + w, y + h, r)
+                ctx.arcTo(x + w, y + h, x, y + h, r)
+                ctx.arcTo(x, y + h, x, y, r)
+                ctx.arcTo(x, y, x + w, y, r)
+                ctx.closePath()
+                ctx.fillStyle = "rgba(0, 0, 0, 0.08)"
+                ctx.fill()
+            }
+
+            // Helper: Text Wrapping with return metrics
+            const measureTextWrapped = (text: string, maxWidth: number, font: string) => {
+                ctx.font = font
+                const words = text.split(" ")
+                let line = ""
+                const lines: string[] = []
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + " "
+                    const metrics = ctx.measureText(testLine)
+                    if (metrics.width > maxWidth && n > 0) {
+                        lines.push(line)
+                        line = words[n] + " "
+                    } else {
+                        line = testLine
+                    }
+                }
+                lines.push(line)
+                return { 
+                    lines,
+                    width: Math.min(maxWidth, Math.max(...lines.map(l => ctx.measureText(l).width)))
+                }
+            }
+
+            // 3. Prepare Content
+            const rawUserText = (previousMsg?.role === "user" ? previousMsg.text : "User Query") || "User Query"
+            const rawAiText = stripMarkdown(msg.text)
+
+            // 4. Render User Bubble (Truncate to 3 lines max)
+            ctx.font = "400 15px Inter, sans-serif"
+            const userMetrics = measureTextWrapped(rawUserText, MAX_BUBBLE_WIDTH - (BUBBLE_PADDING_X * 2), "400 15px Inter, sans-serif")
+            
+            const maxLines = 3
+            const displayLines = userMetrics.lines.slice(0, maxLines)
+            const isTruncated = userMetrics.lines.length > maxLines
+            
+            // Add ellipsis to last line if truncated
+            if (isTruncated && displayLines.length === maxLines) {
+                displayLines[maxLines - 1] = displayLines[maxLines - 1].trim() + "..."
+            }
+            
+            const lineHeight = 22.5
+            const bubbleW = userMetrics.width + (BUBBLE_PADDING_X * 2)
+            
+            // Use consistent padding for top and bottom
+            const topPadding = BUBBLE_PADDING_Y
+            const bottomPadding = BUBBLE_PADDING_Y
+            
+            // Calculate bubble height: number of lines * line height + top padding + bottom padding
+            const bubbleH = (displayLines.length * lineHeight) + topPadding + bottomPadding
+            const bubbleX = 320 - PADDING - bubbleW
+            const bubbleY = PADDING
+
+            roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 24)
+            
+            // Draw text with proper top-left alignment
+            ctx.fillStyle = "rgba(0, 0, 0, 0.95)"
+            ctx.textAlign = "left"
+            ctx.textBaseline = "top"
+            
+            // Position first line exactly at bubbleY + top padding
+            // Ensure text is properly aligned at the top
+            const fontSize = 15
+            const verticalOffset = (lineHeight - fontSize) / 2 // Center text within line height
+            const textStartY = bubbleY + topPadding + verticalOffset
+            
+            displayLines.forEach((line, i) => {
+                const textY = textStartY + (i * lineHeight)
+                ctx.fillText(line.trim(), bubbleX + BUBBLE_PADDING_X, textY)
+            })
+
+            const renderMarkdownToCanvas = (text: string, startX: number, startY: number, maxWidth: number) => {
+                let currentY = startY
+                const baseFont = "400 16px Inter, sans-serif"
+                const baseColor = "rgba(0, 0, 0, 0.95)"
+                ctx.font = baseFont
+                ctx.fillStyle = baseColor
+                ctx.textAlign = "left"
+                ctx.textBaseline = "top"
+                
+                const codeBlockRegex = /(```[\s\S]*?```)/g
+                const segments = text.split(codeBlockRegex)
+                
+                segments.forEach((segment) => {
+                    if (segment.startsWith("```")) {
+                        const content = segment.replace(/^```\w*\n?/, "").replace(/```$/, "")
+                        const lines = content.split("\n")
+                        const blockHeight = lines.length * 20 + 8
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
+                        ctx.fillRect(startX, currentY, maxWidth, blockHeight)
+                        ctx.font = "400 14px 'Courier New', monospace"
+                        ctx.fillStyle = baseColor
+                        lines.forEach((line) => {
+                            ctx.fillText(line, startX + 8, currentY + 4)
+                            currentY += 20
+                        })
+                        currentY += 8
+                        ctx.font = baseFont
+                    } else {
+                        const blocks = segment.split(/\n{2,}/)
+                        blocks.forEach((block) => {
+                            const trimmed = block.trim()
+                            if (!trimmed) return
+                            
+                            const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
+                            if (headingMatch) {
+                                const level = headingMatch[1].length
+                                const content = headingMatch[2]
+                                const sizes = [24, 20, 18, 16, 14, 12]
+                                ctx.font = `600 ${Math.max(sizes[level - 1], 14)}px Inter, sans-serif`
+                                
+                                // Measure and wrap heading
+                                const hMetrics = measureTextWrapped(content, maxWidth, ctx.font)
+                                hMetrics.lines.forEach((l, i) => {
+                                    ctx.fillText(l.trim(), startX, currentY + (i * sizes[level - 1] * 1.5))
+                                })
+                                currentY += (hMetrics.lines.length * sizes[level - 1] * 1.5) + 8
+                                ctx.font = baseFont
+                                return
+                            }
+                            
+                            // Inline Formatting Parser
+                            const processInlineFormatting = (text: string, x: number, y: number, maxW: number) => {
+                                const parts: Array<{text: string, bold?: boolean, italic?: boolean, code?: boolean, link?: string}> = []
+                                let i = 0
+                                while (i < text.length) {
+                                    if (text.substring(i).startsWith("**")) {
+                                        const end = text.indexOf("**", i + 2)
+                                        if (end !== -1) {
+                                            parts.push({text: text.substring(i + 2, end), bold: true}); i = end + 2; continue
+                                        }
+                                    }
+                                    if (text.substring(i).startsWith("__")) {
+                                        const end = text.indexOf("__", i + 2)
+                                        if (end !== -1) {
+                                            parts.push({text: text.substring(i + 2, end), bold: true}); i = end + 2; continue
+                                        }
+                                    }
+                                    if (text[i] === "`") {
+                                        const end = text.indexOf("`", i + 1)
+                                        if (end !== -1) {
+                                            parts.push({text: text.substring(i + 1, end), code: true}); i = end + 1; continue
+                                        }
+                                    }
+                                    if (text[i] === "*" && (i === 0 || text[i - 1] !== "*")) {
+                                        const end = text.indexOf("*", i + 1)
+                                        if (end !== -1 && text[end + 1] !== "*") {
+                                            parts.push({text: text.substring(i + 1, end), italic: true}); i = end + 1; continue
+                                        }
+                                    }
+                                    if (text[i] === "_" && (i === 0 || text[i - 1] !== "_")) {
+                                        const end = text.indexOf("_", i + 1)
+                                        if (end !== -1 && text[end + 1] !== "_") {
+                                            parts.push({text: text.substring(i + 1, end), italic: true}); i = end + 1; continue
+                                        }
+                                    }
+                                    if (text[i] === "[") {
+                                        const linkEnd = text.indexOf("]", i)
+                                        if (linkEnd !== -1) {
+                                            const urlStart = text.indexOf("(", linkEnd); const urlEnd = text.indexOf(")", urlStart)
+                                            if (urlStart !== -1 && urlEnd !== -1) {
+                                                parts.push({text: text.substring(i + 1, linkEnd), link: text.substring(urlStart + 1, urlEnd)}); i = urlEnd + 1; continue
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Plain text accumulation
+                                    let nextPos = text.length
+                                    const markers = [text.indexOf("**", i), text.indexOf("__", i), text.indexOf("`", i), text.indexOf("*", i), text.indexOf("_", i), text.indexOf("[", i)].filter(p => p !== -1 && p >= i)
+                                    if (markers.length > 0) nextPos = Math.min(...markers)
+                                    
+                                    if (nextPos > i) { parts.push({text: text.substring(i, nextPos)}); i = nextPos } 
+                                    else { parts.push({text: text.substring(i)}); break }
+                                }
+                                
+                                let currentX = x
+                                let currentLineY = y
+                                const lineHeight = 24
+                                
+                                parts.forEach((part) => {
+                                    if (part.bold) ctx.font = "600 16px Inter, sans-serif"
+                                    else if (part.italic) ctx.font = "400 italic 16px Inter, sans-serif"
+                                    else if (part.code) { ctx.font = "400 14px 'Courier New', monospace"; ctx.fillStyle = "rgba(0,0,0,0.7)" }
+                                    else if (part.link) { ctx.font = baseFont; ctx.fillStyle = "#0066cc" }
+                                    else { ctx.font = baseFont; ctx.fillStyle = baseColor }
+                                    
+                                    const words = part.text.split(" ")
+                                    words.forEach((word, idx) => {
+                                        // Preserve space if it's not start of line
+                                        const testText = (idx === 0 && currentX === x ? "" : " ") + word
+                                        // Don't add space at very start of a part if it's start of line
+                                        const renderText = (idx === 0 ? "" : " ") + word
+                                        const metrics = ctx.measureText(renderText)
+                                        
+                                        if (currentX + metrics.width > x + maxW) {
+                                            currentLineY += lineHeight
+                                            currentX = x
+                                            ctx.fillText(word, currentX, currentLineY) // No space at start of new line
+                                            currentX += ctx.measureText(word).width
+                                        } else {
+                                            ctx.fillText(renderText, currentX, currentLineY)
+                                            currentX += metrics.width
+                                        }
+                                    })
+                                    ctx.fillStyle = baseColor // Reset
+                                })
+                                return currentLineY + lineHeight
+                            }
+                            
+                            currentY = processInlineFormatting(trimmed, startX, currentY, maxWidth)
+                            currentY += 8
+                        })
+                    }
+                })
+                return currentY
+            }
+            
+            renderMarkdownToCanvas(msg.text, PADDING, bubbleY + bubbleH + 24, 320 - (PADDING * 2))
+
+            // 6. Draw Gradient
+            const grad = ctx.createLinearGradient(0, 400, 0, 250) // Bottom up to 250
+            grad.addColorStop(0, "white")
+            grad.addColorStop(0.5, "white")
+            grad.addColorStop(1, "rgba(255, 255, 255, 0)")
+            ctx.fillStyle = grad
+            ctx.fillRect(0, 250, 320, 150)
+
+            // 7. Process & Finish
+            const finishShare = () => {
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return
+                    const randomNum = Math.floor(10000 + Math.random() * 90000)
+                    const filename = `curastem.org${randomNum}.png`
+                    const file = new File([blob], filename, { type: "image/png" })
+                    const downloadFallback = () => {
+                        const link = document.createElement("a")
+                        link.href = URL.createObjectURL(blob)
+                        link.download = filename
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                    }
+
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({ files: [file] })
+                        } catch (e: any) {
+                            if (e.name !== "AbortError") downloadFallback()
+                        }
+                    } else {
+                        downloadFallback()
+                    }
+                }, "image/png")
+            }
+
+            // 8. Load Logo
+            const logoUrl = "https://framerusercontent.com/images/SIRCCFiD1J4uhNqtJAol7AEXQ4.png?width=764&height=128"
+            const img = new Image()
+            img.crossOrigin = "Anonymous"
+            let logoDrawn = false
+            
+            const onLogoReady = () => {
+                if (logoDrawn) return
+                logoDrawn = true
+                finishShare()
+            }
+
+            img.onload = () => {
+                const targetW = 216
+                const scale = targetW / img.naturalWidth
+                const targetH = img.naturalHeight * scale
+                ctx.drawImage(img, PADDING, 400 - 32 - targetH, targetW, targetH)
+                onLogoReady()
+            }
+            img.onerror = () => onLogoReady() // Proceed without logo
+            setTimeout(onLogoReady, 2000) // Timeout fallback
+            
+            img.src = logoUrl
+
+        }, [msg, previousMsg])
 
         return (
             <div
@@ -4228,6 +4604,87 @@ const MessageBubble = React.memo(
                                       baseTextStyle,
                                       linkStyle
                                   )}
+                        </div>
+                    )}
+
+                    {/* AI Message Actions */}
+                    {(msg.role !== "user" && msg.role !== "peer" && !isStreaming) && (
+                        <div data-layer="ai message actions" className="AiMessageActions" style={{justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', marginLeft: -10, gap: 2}}>
+                          <div 
+                            data-svg-wrapper 
+                            data-layer="share button" 
+                            style={{
+                                ...actionButtonBaseStyle,
+                                background: isShareHovered ? hoverBackground : "transparent",
+                            }}
+                            onMouseEnter={() => isHoverCapable() && setIsShareHovered(true)}
+                            onMouseLeave={() => setIsShareHovered(false)}
+                            onClick={handleShare}
+                          >
+                            <div data-svg-wrapper data-layer="share icon" className="ShareIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M6.60402e-07 9.54587V9.38738C6.60402e-07 9.03678 0.284305 8.75245 0.634966 8.75245C0.985626 8.75245 1.26993 9.03678 1.26993 9.38738V9.54587C1.26993 10.2246 1.2708 10.6958 1.3007 11.062C1.33 11.4206 1.38426 11.6225 1.46108 11.7734L1.52821 11.8946C1.69654 12.169 1.93812 12.3928 2.22657 12.5399L2.35058 12.5929C2.48785 12.6421 2.66879 12.6782 2.93799 12.7002C3.30417 12.7301 3.77519 12.7301 4.45407 12.7301H9.54595C10.2246 12.7301 10.6959 12.7301 11.062 12.7002C11.4204 12.6709 11.6226 12.6166 11.7734 12.5399L11.8946 12.4718C12.169 12.3035 12.3929 12.0618 12.5398 11.7734L12.593 11.6494C12.6421 11.5121 12.6782 11.331 12.7002 11.062C12.7301 10.6958 12.73 10.2246 12.73 9.54587V9.38738C12.73 9.03688 13.0145 8.75264 13.3651 8.75245C13.7156 8.75245 14 9.03678 14 9.38738V9.54587C14 10.2037 14.0006 10.7356 13.9655 11.1655C13.9342 11.5483 13.8721 11.8931 13.7343 12.2145L13.6709 12.3505C13.4174 12.848 13.0317 13.264 12.5585 13.5543L12.3506 13.6708C11.9908 13.8541 11.6028 13.9297 11.1654 13.9654C10.7356 14.0006 10.2038 14 9.54595 14H4.45407C3.79615 14 3.26437 14.0006 2.83449 13.9654C2.45207 13.9342 2.10749 13.8728 1.78648 13.7351L1.65035 13.6708C1.1528 13.4173 0.736038 13.0319 0.445691 12.5585L0.329141 12.3505C0.145852 11.9909 0.070234 11.6027 0.0345063 11.1655C-0.000600886 10.7356 6.60402e-07 10.2037 6.60402e-07 9.54587ZM6.3655 9.38738V2.16783L4.26666 4.26666C4.01876 4.51456 3.61673 4.51445 3.36876 4.26666C3.12081 4.0187 3.12081 3.61671 3.36876 3.36876L6.55104 0.185551L6.64801 0.106295C6.7515 0.0373605 6.87428 0 7.00042 0C7.16855 8.59299e-05 7.33 0.0667389 7.44897 0.185551L10.6322 3.36876C10.8798 3.61669 10.8799 4.0188 10.6322 4.26666C10.3842 4.51461 9.98123 4.51461 9.73327 4.26666L7.63544 2.16876V9.38738C7.63525 9.73778 7.35091 10.0222 7.00042 10.0224C6.6499 10.0224 6.36566 9.73788 6.3655 9.38738Z" fill={themeColors.text.tertiary}/>
+                              </svg>
+                            </div>
+                          </div>
+                          <div 
+                            data-svg-wrapper 
+                            data-layer="copy button (copy without markdown)" 
+                            style={{
+                                ...actionButtonBaseStyle,
+                                background: isCopyHovered ? hoverBackground : "transparent",
+                            }}
+                            onMouseEnter={() => isHoverCapable() && setIsCopyHovered(true)}
+                            onMouseLeave={() => setIsCopyHovered(false)}
+                            onClick={() => {
+                                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                                    navigator.clipboard.writeText(stripMarkdown(msg.text))
+                                    if (onCopy && id) {
+                                        onCopy(id)
+                                    }
+                                }
+                            }}
+                          >
+                            {copiedMessageId === id ? (
+                              <div data-svg-wrapper data-layer="copy checkmark icon (show on successful copy to clipboard for 2 seconds)" className="CopyCheckmarkIconShowOnSuccessfulCopyToClipboardFor2Seconds" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" clipRule="evenodd" d="M11.6256 0.149029C12.0167 0.415701 12.1177 0.948951 11.8509 1.34007L5.42242 10.7686C5.27868 10.9795 5.04836 11.1153 4.79431 11.1391C4.54015 11.1629 4.28864 11.0723 4.10816 10.8918L0.251047 7.03469C-0.0836823 6.69998 -0.0836823 6.15724 0.251047 5.82253C0.585785 5.48782 1.12849 5.48782 1.46323 5.82253L4.58884 8.94816L10.4346 0.374361C10.7013 -0.016759 11.2345 -0.117644 11.6256 0.149029Z" fill={themeColors.text.tertiary}/>
+                                </svg>
+                              </div>
+                            ) : (
+                              <div data-svg-wrapper data-layer="copy icon" className="CopyIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z" fill={themeColors.text.tertiary}/>
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div 
+                            data-svg-wrapper 
+                            data-layer="thumbs down button" 
+                            style={{
+                                ...actionButtonBaseStyle,
+                                background: isDislikeHovered ? hoverBackground : "transparent",
+                            }}
+                            onMouseEnter={() => isHoverCapable() && setIsDislikeHovered(true)}
+                            onMouseLeave={() => setIsDislikeHovered(false)}
+                            onClick={() => setIsDislikeActive(!isDislikeActive)}
+                          >
+                            {isDislikeActive ? (
+                              <div data-svg-wrapper data-layer="thumbs down icon (filled)" className="ThumbsDownIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                <svg width="13" height="15" viewBox="0 0 13 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11.91 8.00001L9.66002 10.57C9.00973 11.3222 8.50148 12.1862 8.16002 13.12L8.00002 13.63C7.85169 14.0388 7.57898 14.3908 7.22024 14.6365C6.86149 14.8822 6.43476 15.0094 6.00002 15C5.45184 14.9947 4.92791 14.7733 4.54215 14.3838C4.15639 13.9943 3.93999 13.4682 3.94002 12.92V11.75C3.93809 11.1072 4.04284 10.4685 4.25002 9.86001L4.53002 9.00001H1.38002C1.00596 8.97706 0.654781 8.81212 0.398279 8.53889C0.141776 8.26565 -0.000684511 7.90477 1.85001e-05 7.53001C-0.00118764 7.29121 0.0566006 7.05582 0.16825 6.84473C0.279899 6.63365 0.441954 6.4534 0.640018 6.32001C0.317791 6.09589 0.0977869 5.75295 0.0283991 5.36663C-0.0409886 4.98031 0.0459239 4.58225 0.270018 4.26001C0.42796 4.03818 0.641896 3.8622 0.890018 3.75001H0.940019C0.822449 3.53129 0.757399 3.28821 0.750018 3.04001C0.748445 2.68714 0.87386 2.34547 1.10336 2.07742C1.33285 1.80937 1.65112 1.63281 2.00002 1.58001V1.48001C1.99449 1.09952 2.13772 0.731909 2.39922 0.455468C2.66072 0.179028 3.01981 0.0156045 3.40002 6.67572e-06H8.23002C9.09022 0.000649631 9.93875 0.199097 10.71 0.580007L11.71 1.00001H13V8.00001H11.91ZM11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z" fill={themeColors.text.tertiary}/>
+                                <path d="M11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z" fill={themeColors.text.tertiary}/>
+                                </svg>
+                              </div>
+                            ) : (
+                              <div data-svg-wrapper data-layer="thumbs down icon (outline)" className="ThumbsDownIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                                <svg width="13" height="15" viewBox="0 0 13 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2.1748 1.73096L2.02637 1.75342C1.71909 1.79993 1.43849 1.95489 1.23633 2.19092C1.03514 2.4259 0.924514 2.72542 0.924805 3.03467C0.931378 3.25572 0.989039 3.47269 1.09375 3.66748L1.23242 3.92529H0.932617C0.726232 4.02478 0.547444 4.17317 0.414062 4.35986C0.216527 4.64391 0.139116 4.99491 0.200195 5.33545C0.261378 5.67609 0.456109 5.97865 0.740234 6.17627L0.950195 6.32275L0.737305 6.46533C0.563436 6.58253 0.421335 6.74095 0.323242 6.92627C0.225117 7.11179 0.173797 7.31894 0.174805 7.52881V7.53076C0.174294 7.86073 0.29956 8.17884 0.525391 8.41943C0.749322 8.65797 1.05564 8.80245 1.38184 8.82471H4.77148L4.69629 9.0542L4.41602 9.91455V9.9165L4.34473 10.1392C4.19073 10.6616 4.11359 11.2041 4.11523 11.7495V12.9204C4.11532 13.4222 4.31306 13.9037 4.66602 14.2603C5.01932 14.617 5.4999 14.8199 6.00195 14.8247H6.00391C6.40203 14.8333 6.79256 14.7167 7.12109 14.4917C7.40849 14.2948 7.63599 14.024 7.7793 13.7085L7.83594 13.5698L7.99316 13.0679L7.99609 13.0601C8.34481 12.1064 8.86326 11.2237 9.52734 10.4556L9.52832 10.4546L11.7783 7.88428L11.8311 7.82471H12.8252V1.17529H11.6748L11.6426 1.16162L10.6426 0.741699L10.6328 0.736816C9.8856 0.367789 9.06286 0.175916 8.22949 0.175293H3.40723C3.07261 0.189021 2.75652 0.332397 2.52637 0.575684C2.29631 0.818889 2.17005 1.14232 2.1748 1.47705V1.73096ZM11.1748 6.31982L11.127 6.37061L8.29199 9.36572C7.57642 10.1828 7.00166 11.1117 6.59082 12.1147L6.4248 12.5483L6.24512 13.0581L6.21875 13.1343L6.14355 13.1626L6.09277 13.1772C6.04262 13.1867 5.99085 13.1823 5.94238 13.1646V13.1655C5.91756 13.1568 5.89402 13.1438 5.87305 13.1284L5.81836 13.0737C5.78692 13.0318 5.76848 12.9815 5.76562 12.9292H5.76465V11.7495C5.76603 11.3037 5.83689 10.8604 5.97363 10.436V10.4351L7.05762 7.17529H2.26758L2.23828 7.16357C2.17835 7.14092 2.12357 7.10619 2.07812 7.06104C2.03278 7.01595 1.99763 6.96151 1.97461 6.90186C1.9516 6.84202 1.94088 6.7774 1.94434 6.71338C1.94781 6.64941 1.96484 6.58675 1.99414 6.52979L2.00391 6.51416L2.34375 5.99365L2.02832 5.43701C1.94672 5.29643 1.91422 5.13236 1.93555 4.97119C1.95698 4.81011 2.03111 4.66081 2.14648 4.54639L2.50293 4.18994L2.42676 3.71826V3.71533C2.40274 3.55333 2.43396 3.38812 2.51465 3.24561C2.59508 3.10367 2.7206 2.99301 2.87109 2.93018V2.9292L3.28418 2.75244L3.40137 2.35303V2.35205C3.44446 2.20015 3.53611 2.06634 3.66211 1.97119C3.78804 1.87615 3.94185 1.82559 4.09961 1.82568V1.82471H8.23047C8.80223 1.82589 9.36555 1.95886 9.87891 2.21045L9.87988 2.20947L11.0703 2.72998L11.1748 2.77588V6.31982Z" fill={themeColors.text.tertiary} stroke={themeColors.background} strokeWidth="0.35"/>
+                                </svg>
+                              </div>
+                            )}
+                          </div>
                         </div>
                     )}
                 </div>
@@ -5726,6 +6183,24 @@ Do not include markdown formatting or explanations.`
 
     // --- STATE: AI CHAT (GEMINI) ---
     const [messages, setMessages] = React.useState<Message[]>([])
+    const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null)
+    const copyTimeoutRef = React.useRef<number | null>(null)
+
+    const handleCopyMessage = React.useCallback((msgId: string) => {
+        // Clear any existing timeout
+        if (copyTimeoutRef.current !== null) {
+            clearTimeout(copyTimeoutRef.current)
+        }
+        
+        // Set the copied message ID
+        setCopiedMessageId(msgId)
+        
+        // Reset after 2 seconds
+        copyTimeoutRef.current = window.setTimeout(() => {
+            setCopiedMessageId(null)
+            copyTimeoutRef.current = null
+        }, 2000)
+    }, [])
     const [inputText, setInputText] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(false)
     const abortControllerRef = React.useRef<AbortController | null>(null)
@@ -7183,7 +7658,7 @@ Do not include markdown formatting or explanations.`
                             {
                                 name: "update_doc",
                                 description:
-                                    "Updates the document editor. Use this to write documents, create guides, draft messages, build resumes, or any other text content. You have full control over HTML formatting.",
+                                    "Updates the document editor. Use this to write documents, resumes, guides, emails, and all other long text content. You have full control over HTML formatting.",
                                 parameters: {
                                     type: "OBJECT",
                                     properties: {
@@ -8759,9 +9234,13 @@ Do not include markdown formatting or explanations.`
                                 key={idx}
                                 id={`msg-${idx}`}
                                 msg={msg}
+                                previousMsg={idx > 0 ? messages[idx - 1] : undefined}
                                 isMobileLayout={isMobileLayout}
                                 isLast={idx === messages.length - 1}
                                 themeColors={chatThemeColors}
+                                isStreaming={idx === messages.length - 1 && isLoading}
+                                copiedMessageId={copiedMessageId}
+                                onCopy={handleCopyMessage}
                             />
                         ))}
                         {isLoading &&
