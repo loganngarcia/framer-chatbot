@@ -714,13 +714,14 @@ const TOPIC_LOBBY = "framer-hybrid-lobby-v1"
 // Upload limits
 const MAX_UPLOAD_SIZE_MB = 10
 const INLINE_MAX_BYTES = 2 * 1024 * 1024 // 2MB inline limit
+const MAX_P2P_FILE_SIZE_BYTES = 3 * 1024 * 1024 // 3MB limit for P2P transfer
 
 // User abuse guardrails
 // These are designed to prevent abuse and ensure the API is used responsibly
 const MAX_INPUT_LENGTH = 1000 // Limit input characters
 const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
 const API_TIMEOUT_MS = 30000 // 30 seconds timeout
-const MAX_HISTORY_MESSAGES = 20 // Limit history context
+const MAX_HISTORY_MESSAGES = 50 // Limit history context
 const DAILY_MESSAGE_LIMIT = 250 // Limit messages per day
 
 // --- INTERFACES ---
@@ -764,12 +765,14 @@ interface FileAttachmentProps {
     name: string
     type: string
     onRemove?: () => void
+    themeColors: typeof darkColors
 }
 
 const FileAttachment = React.memo(function FileAttachment({
     name,
     type,
     onRemove,
+    themeColors,
 }: FileAttachmentProps) {
     const getIconColor = (fileName: string, fileType: string) => {
         const n = (fileName || "").toLowerCase()
@@ -791,6 +794,13 @@ const FileAttachment = React.memo(function FileAttachment({
             t.includes("powerpoint")
         )
             return "#FBBC04"
+        if (
+            n.endsWith(".doc") ||
+            n.endsWith(".docx") ||
+            t.includes("word") ||
+            t.includes("document")
+        )
+            return "#4285F4"
         return "#4285F4"
     }
 
@@ -801,7 +811,7 @@ const FileAttachment = React.memo(function FileAttachment({
                 height: 56,
                 padding: 0,
                 position: "relative",
-                background: "#3D3D3D",
+                background: themeColors.surfaceHighlight,
                 borderRadius: 14,
                 justifyContent: "flex-start",
                 alignItems: "center",
@@ -815,31 +825,19 @@ const FileAttachment = React.memo(function FileAttachment({
                     width: 56,
                     height: 56,
                     flexShrink: 0,
+                    // background: getIconColor(name, type), // Replaced by SVG fill
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                 }}
             >
-                <svg
-                    width="100%"
-                    height="100%"
-                    viewBox="0 0 49 49"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="M0.8125 14.6777C0.8125 6.94575 7.08051 0.677734 14.8125 0.677734H48.8125V48.6777H14.8125C7.08051 48.6777 0.8125 42.4097 0.8125 34.6777V14.6777Z"
-                        fill={getIconColor(name, type)}
-                    />
-                    <path
-                        d="M15.8125 17.6777C15.8125 17.1254 16.2602 16.6777 16.8125 16.6777H32.8125C33.3648 16.6777 33.8125 17.1254 33.8125 17.6777C33.8125 18.23 33.3648 18.6777 32.8125 18.6777H16.8125C16.2602 18.6777 15.8125 18.23 15.8125 17.6777ZM15.8125 24.6777C15.8125 24.1254 16.2602 23.6777 16.8125 23.6777H32.8125C33.3648 23.6777 33.8125 24.1254 33.8125 24.6777C33.8125 25.23 33.3648 25.6777 32.8125 25.6777H16.8125C16.2602 25.6777 15.8125 25.23 15.8125 24.6777ZM15.8125 31.6777C15.8125 31.1255 16.2602 30.6777 16.8125 30.6777H23.8125C24.3648 30.6777 24.8125 31.1255 24.8125 31.6777C24.8125 32.23 24.3648 32.6777 23.8125 32.6777H16.8125C16.2602 32.6777 15.8125 32.23 15.8125 31.6777Z"
-                        fill="white"
-                        fillOpacity="0.95"
-                    />
-                    <path
-                        d="M23.8125 30.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 23.5127C33.4559 23.5127 33.9775 24.0343 33.9775 24.6777C33.9775 25.3211 33.4559 25.8428 32.8125 25.8428H16.8125C16.1691 25.8428 15.6475 25.3211 15.6475 24.6777C15.6475 24.0343 16.1691 23.5127 16.8125 23.5127H32.8125ZM32.8125 16.5127C33.4559 16.5127 33.9775 17.0343 33.9775 17.6777C33.9775 18.3211 33.4559 18.8428 32.8125 18.8428H16.8125C16.1691 18.8428 15.6475 18.3211 15.6475 17.6777C15.6475 17.0343 16.1691 16.5127 16.8125 16.5127H32.8125Z"
-                        stroke="white"
-                        strokeOpacity="0.95"
-                        strokeWidth="0.33"
-                    />
-                </svg>
+                <div data-svg-wrapper data-layer="file-icon" className="FileIcon" style={{position: 'relative', width: "100%", height: "100%"}}>
+                  <svg width="100%" height="100%" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 14C0 6.26801 6.26801 0 14 0H48V48H14C6.26801 48 0 41.732 0 34V14Z" fill={getIconColor(name, type)}/>
+                  <path d="M15 17C15 16.4477 15.4477 16 16 16H32C32.5523 16 33 16.4477 33 17C33 17.5523 32.5523 18 32 18H16C15.4477 18 15 17.5523 15 17ZM15 24C15 23.4477 15.4477 23 16 23H32C32.5523 23 33 23.4477 33 24C33 24.5523 32.5523 25 32 25H16C15.4477 25 15 24.5523 15 24ZM15 31C15 30.4477 15.4477 30 16 30H23C23.5523 30 24 30.4477 24 31C24 31.5523 23.5523 32 23 32H16C15.4477 32 15 31.5523 15 31Z" fill="white" fillOpacity="0.95"/>
+                  <path d="M23 29.835C23.6434 29.835 24.165 30.3566 24.165 31C24.165 31.6434 23.6434 32.165 23 32.165H16C15.3566 32.165 14.835 31.6434 14.835 31C14.835 30.3566 15.3566 29.835 16 29.835H23ZM32 22.835C32.6434 22.835 33.165 23.3566 33.165 24C33.165 24.6434 32.6434 25.165 32 25.165H16C15.3566 25.165 14.835 24.6434 14.835 24C14.835 23.3566 15.3566 22.835 16 22.835H32ZM32 15.835C32.6434 15.835 33.165 16.3566 33.165 17C33.165 17.6434 32.6434 18.165 32 18.165H16C15.3566 18.165 14.835 17.6434 14.835 17C14.835 16.3566 15.3566 15.835 16 15.835H32Z" stroke="white" strokeOpacity="0.95" strokeWidth="0.33"/>
+                  </svg>
+                </div>
             </div>
             {onRemove && (
                 <div
@@ -854,10 +852,10 @@ const FileAttachment = React.memo(function FileAttachment({
                         width: 18,
                         height: 18,
                         borderRadius: 9,
-                        background: "#F6F6F6",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                        background: themeColors.background,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         cursor: "pointer",
                         border: "none",
                         zIndex: 10,
@@ -872,16 +870,16 @@ const FileAttachment = React.memo(function FileAttachment({
                     >
                         <path
                             d="M1 1L9 9M9 1L1 9"
-                            stroke="black"
+                            stroke={themeColors.text.primary}
                             strokeWidth="1.5"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                         />
                     </svg>
-            </div>
+                </div>
             )}
-                <div
-                    style={{
+            <div
+                style={{
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
@@ -895,7 +893,7 @@ const FileAttachment = React.memo(function FileAttachment({
             >
                 <div
                     style={{
-                        color: "rgba(255, 255, 255, 0.95)",
+                        color: themeColors.text.primary,
                         fontSize: 13,
                         fontFamily: "Inter",
                         fontWeight: 500,
@@ -911,18 +909,14 @@ const FileAttachment = React.memo(function FileAttachment({
                 </div>
                 <div
                     style={{
-                        color: "rgba(255, 255, 255, 0.65)",
+                        color: themeColors.text.secondary,
                         fontSize: 11,
                         fontFamily: "Inter",
                         fontWeight: 400,
                         lineHeight: "14px",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        width: "100%",
                     }}
                 >
-                    {name.split(".").pop()?.toUpperCase() || "FILE"}
+                    {type.split("/")[1]?.toUpperCase() || "FILE"}
                 </div>
             </div>
         </div>
@@ -2778,6 +2772,7 @@ const ChatInput = React.memo(function ChatInput({
                                         <FileAttachment
                                             name={att.name}
                                             type={att.mimeType}
+                                            themeColors={themeColors}
                                             onRemove={() =>
                                                 onRemoveAttachment &&
                                                 onRemoveAttachment(att.id)
@@ -4630,6 +4625,7 @@ const MessageBubble = React.memo(
                                                     key={i}
                                                     name={att.name || "File"}
                                                     type={att.mimeType || ""}
+                                                    themeColors={themeColors}
                                                 />
                                             ))}
                                         </div>
@@ -7697,13 +7693,57 @@ Do not include markdown formatting or explanations.`
                 }
 
                 // Map peer messages to 'user' for Gemini context
-                const history = messages
+                const history = await Promise.all(messages
                     .slice(-MAX_HISTORY_MESSAGES)
-                    .map((m) => {
+                    .map(async (m) => {
                         const parts: any[] = []
-                        if (m.text) {
-                            parts.push({ text: m.text })
+                        
+                        let textContent = m.text || ""
+                        if (m.role === "peer") {
+                            textContent = `[Partner]: ${textContent}`
                         }
+
+                        if (textContent) {
+                            parts.push({ text: textContent })
+                        }
+
+                        // Include attachments from history
+                        if (m.attachments && m.attachments.length > 0) {
+                            for (const att of m.attachments) {
+                                let base64 = ""
+                                let mimeType = att.mimeType || "application/octet-stream"
+
+                                if (att.file) {
+                                    try {
+                                        base64 = await new Promise<string>((resolve, reject) => {
+                                            const reader = new FileReader()
+                                            reader.onload = () => {
+                                                const result = reader.result as string
+                                                resolve(result.substring(result.indexOf(",") + 1))
+                                            }
+                                            reader.onerror = reject
+                                            reader.readAsDataURL(att.file!)
+                                        })
+                                        mimeType = att.file.type || mimeType
+                                    } catch (e) {
+                                        console.warn("Failed to read history attachment", e)
+                                    }
+                                } else if (att.url && att.url.startsWith("data:")) {
+                                    // Handle pre-converted data URLs (e.g. screenshots)
+                                    base64 = att.url.split(",")[1]
+                                }
+
+                                if (base64) {
+                                    parts.push({
+                                        inlineData: {
+                                            mimeType: mimeType,
+                                            data: base64,
+                                        },
+                                    })
+                                }
+                            }
+                        }
+
                         if (m.functionCall) {
                             parts.push({ functionCall: m.functionCall })
                         }
@@ -7717,7 +7757,7 @@ Do not include markdown formatting or explanations.`
                             role: m.role === "model" ? "model" : "user",
                             parts: parts,
                         }
-                    })
+                    }))
 
                 // Define Tools
                 const tools = [
@@ -8119,17 +8159,49 @@ Do not include markdown formatting or explanations.`
 
         // Send to Peer
         if (dataConnectionRef.current && dataConnectionRef.current.open) {
-            dataConnectionRef.current.send({
-                type: "chat",
-                payload: {
-                    text: textToSend,
-                    // Attachments are not currently supported over P2P data channel to avoid bandwidth/blob issues
-                    attachments: [],
-                },
-            })
+            // Filter attachments for P2P limit (3MB)
+            const p2pAttachmentsPromise = Promise.all(attachments.map(async (att) => {
+                if (!att.file || att.file.size > MAX_P2P_FILE_SIZE_BYTES) {
+                     return null
+                }
+                
+                // Convert to Base64 for transfer
+                 try {
+                    const base64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader()
+                        reader.onload = () => resolve(reader.result as string)
+                        reader.onerror = reject
+                        reader.readAsDataURL(att.file!)
+                    })
+                    
+                    return {
+                        id: att.id,
+                        type: att.type,
+                        name: att.name,
+                        mimeType: att.mimeType,
+                        url: base64, // Send full data URL
+                        previewUrl: base64 // Use same for preview
+                    }
+                } catch (e) {
+                    console.warn("Failed to process attachment for P2P", e)
+                    return null
+                }
+            }))
 
-            // Clear peer's input bar as well
-            dataConnectionRef.current.send({ type: "input-sync", payload: "" })
+            p2pAttachmentsPromise.then((p2pAttachments) => {
+                 const validAttachments = p2pAttachments.filter(Boolean)
+                 
+                 dataConnectionRef.current?.send({
+                    type: "chat",
+                    payload: {
+                        text: textToSend,
+                        attachments: validAttachments,
+                    },
+                })
+                
+                // Clear peer's input bar as well
+                dataConnectionRef.current?.send({ type: "input-sync", payload: "" })
+            })
         }
 
         await generateAIResponse(textToSend, attachmentsToSend, "user")
