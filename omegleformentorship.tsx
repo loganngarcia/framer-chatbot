@@ -4067,6 +4067,7 @@ const MessageBubble = React.memo(
         const [isCopyHovered, setIsCopyHovered] = React.useState(false)
         const [isDislikeHovered, setIsDislikeHovered] = React.useState(false)
         const [isDislikeActive, setIsDislikeActive] = React.useState(false)
+        const isSharing = React.useRef(false)
 
         const actionButtonBaseStyle: React.CSSProperties = {
             width: 28,
@@ -4085,6 +4086,8 @@ const MessageBubble = React.memo(
 
         const handleShare = React.useCallback(async () => {
             if (typeof window === "undefined" || typeof document === "undefined") return
+            if (isSharing.current) return
+            isSharing.current = true
 
             // 1. Setup Canvas (2x Resolution for Retina/High DPI)
             const SCALE = 2
@@ -4200,16 +4203,98 @@ const MessageBubble = React.memo(
                 let currentY = startY
                 const baseFont = "400 16px Inter, sans-serif"
                 const baseColor = "rgba(0, 0, 0, 0.95)"
-                ctx.font = baseFont
-                ctx.fillStyle = baseColor
+                const lineHeight = 24
                 ctx.textAlign = "left"
                 ctx.textBaseline = "top"
                 
+                // Inline formatting parser with comprehensive regex matching the React component
+                const processInlineFormatting = (textSegment: string, x: number, maxW: number, isBullet = false) => {
+                    const combinedRegex = /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\))/gi
+                    
+                    let currentX = isBullet ? x + 12 : x  // Indent for bullet items
+                    const lineStartX = isBullet ? x + 12 : x
+                    let lastIndex = 0
+                    let match
+                    
+                    const renderWords = (txt: string, xPos: number) => {
+                        if (!txt) return xPos
+                        const words = txt.split(/(\s+)/)
+                        let cx = xPos
+                        
+                        words.forEach((word) => {
+                            if (!word) return
+                            const metrics = ctx.measureText(word)
+                            
+                            if (cx + metrics.width > lineStartX + maxW - (isBullet ? 12 : 0) && cx !== lineStartX) {
+                                currentY += lineHeight
+                                cx = lineStartX
+                            }
+                            
+                            ctx.fillText(word, cx, currentY)
+                            cx += metrics.width
+                        })
+                        
+                        return cx
+                    }
+                    
+                    while ((match = combinedRegex.exec(textSegment)) !== null) {
+                        // Render plain text before match
+                        if (match.index > lastIndex) {
+                            const plainText = textSegment.substring(lastIndex, match.index)
+                            ctx.font = baseFont
+                            ctx.fillStyle = baseColor
+                            currentX = renderWords(plainText, currentX)
+                        }
+                        
+                        const [fullMatch, , boldInner, boldInner2, strongInner, bInner, codeInner, strikeInner, , italicInner, emInner, iInner, linkText, linkUrl] = match
+                        
+                        // Determine content and style
+                        let content = ""
+                        let font = baseFont
+                        let color = baseColor
+                        
+                        if (boldInner !== undefined || boldInner2 !== undefined || strongInner !== undefined || bInner !== undefined) {
+                            content = boldInner || boldInner2 || strongInner || bInner
+                            font = "600 16px Inter, sans-serif"
+                        } else if (codeInner !== undefined) {
+                            content = codeInner
+                            font = "400 14px 'Courier New', monospace"
+                            color = "rgba(0,0,0,0.7)"
+                        } else if (strikeInner !== undefined) {
+                            content = strikeInner
+                            // Strikethrough not easily rendered on canvas, render as normal
+                        } else if (italicInner !== undefined || emInner !== undefined || iInner !== undefined) {
+                            content = italicInner || emInner || iInner
+                            font = "italic 16px Inter, sans-serif"
+                        } else if (linkText !== undefined && linkUrl !== undefined) {
+                            content = linkText
+                            color = "#0066cc"
+                        }
+                        
+                        ctx.font = font
+                        ctx.fillStyle = color
+                        currentX = renderWords(content, currentX)
+                        
+                        lastIndex = match.index + fullMatch.length
+                    }
+                    
+                    // Render remaining text
+                    if (lastIndex < textSegment.length) {
+                        ctx.font = baseFont
+                        ctx.fillStyle = baseColor
+                        currentX = renderWords(textSegment.substring(lastIndex), currentX)
+                    }
+                    
+                    currentY += lineHeight
+                }
+                
+                // Process code blocks first
                 const codeBlockRegex = /(```[\s\S]*?```)/g
                 const segments = text.split(codeBlockRegex)
                 
                 segments.forEach((segment) => {
                     if (segment.startsWith("```")) {
+                        // Code block
                         const content = segment.replace(/^```\w*\n?/, "").replace(/```$/, "")
                         const lines = content.split("\n")
                         const blockHeight = lines.length * 20 + 8
@@ -4222,123 +4307,97 @@ const MessageBubble = React.memo(
                             currentY += 20
                         })
                         currentY += 8
-                        ctx.font = baseFont
                     } else {
+                        // Process blocks (paragraphs, lists, etc.)
                         const blocks = segment.split(/\n{2,}/)
+                        
                         blocks.forEach((block) => {
                             const trimmed = block.trim()
                             if (!trimmed) return
                             
+                            // Heading
                             const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
                             if (headingMatch) {
                                 const level = headingMatch[1].length
                                 const content = headingMatch[2]
                                 const sizes = [24, 20, 18, 16, 14, 12]
-                                ctx.font = `600 ${Math.max(sizes[level - 1], 14)}px Inter, sans-serif`
-                                
-                                // Measure and wrap heading
-                                const hMetrics = measureTextWrapped(content, maxWidth, ctx.font)
-                                hMetrics.lines.forEach((l, i) => {
-                                    ctx.fillText(l.trim(), startX, currentY + (i * sizes[level - 1] * 1.5))
+                                const fontSize = Math.max(sizes[level - 1], 14)
+                                const headingFont = `600 ${fontSize}px Inter, sans-serif`
+                                ctx.font = headingFont
+                                ctx.fillStyle = baseColor
+                                const headingMetrics = measureTextWrapped(content, maxWidth, headingFont)
+                                headingMetrics.lines.forEach((line) => {
+                                    ctx.fillText(line.trim(), startX, currentY)
+                                    currentY += fontSize * 1.5
                                 })
-                                currentY += (hMetrics.lines.length * sizes[level - 1] * 1.5) + 8
-                                ctx.font = baseFont
+                                currentY += 8
                                 return
                             }
                             
-                            // Inline Formatting Parser
-                            const processInlineFormatting = (text: string, x: number, y: number, maxW: number) => {
-                                const parts: Array<{text: string, bold?: boolean, italic?: boolean, code?: boolean, link?: string}> = []
-                                let i = 0
-                                while (i < text.length) {
-                                    if (text.substring(i).startsWith("**")) {
-                                        const end = text.indexOf("**", i + 2)
-                                        if (end !== -1) {
-                                            parts.push({text: text.substring(i + 2, end), bold: true}); i = end + 2; continue
-                                        }
-                                    }
-                                    if (text.substring(i).startsWith("__")) {
-                                        const end = text.indexOf("__", i + 2)
-                                        if (end !== -1) {
-                                            parts.push({text: text.substring(i + 2, end), bold: true}); i = end + 2; continue
-                                        }
-                                    }
-                                    if (text[i] === "`") {
-                                        const end = text.indexOf("`", i + 1)
-                                        if (end !== -1) {
-                                            parts.push({text: text.substring(i + 1, end), code: true}); i = end + 1; continue
-                                        }
-                                    }
-                                    if (text[i] === "*" && (i === 0 || text[i - 1] !== "*")) {
-                                        const end = text.indexOf("*", i + 1)
-                                        if (end !== -1 && text[end + 1] !== "*") {
-                                            parts.push({text: text.substring(i + 1, end), italic: true}); i = end + 1; continue
-                                        }
-                                    }
-                                    if (text[i] === "_" && (i === 0 || text[i - 1] !== "_")) {
-                                        const end = text.indexOf("_", i + 1)
-                                        if (end !== -1 && text[end + 1] !== "_") {
-                                            parts.push({text: text.substring(i + 1, end), italic: true}); i = end + 1; continue
-                                        }
-                                    }
-                                    if (text[i] === "[") {
-                                        const linkEnd = text.indexOf("]", i)
-                                        if (linkEnd !== -1) {
-                                            const urlStart = text.indexOf("(", linkEnd); const urlEnd = text.indexOf(")", urlStart)
-                                            if (urlStart !== -1 && urlEnd !== -1) {
-                                                parts.push({text: text.substring(i + 1, linkEnd), link: text.substring(urlStart + 1, urlEnd)}); i = urlEnd + 1; continue
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Plain text accumulation
-                                    let nextPos = text.length
-                                    const markers = [text.indexOf("**", i), text.indexOf("__", i), text.indexOf("`", i), text.indexOf("*", i), text.indexOf("_", i), text.indexOf("[", i)].filter(p => p !== -1 && p >= i)
-                                    if (markers.length > 0) nextPos = Math.min(...markers)
-                                    
-                                    if (nextPos > i) { parts.push({text: text.substring(i, nextPos)}); i = nextPos } 
-                                    else { parts.push({text: text.substring(i)}); break }
-                                }
-                                
-                                let currentX = x
-                                let currentLineY = y
-                                const lineHeight = 24
-                                
-                                parts.forEach((part) => {
-                                    if (part.bold) ctx.font = "600 16px Inter, sans-serif"
-                                    else if (part.italic) ctx.font = "400 italic 16px Inter, sans-serif"
-                                    else if (part.code) { ctx.font = "400 14px 'Courier New', monospace"; ctx.fillStyle = "rgba(0,0,0,0.7)" }
-                                    else if (part.link) { ctx.font = baseFont; ctx.fillStyle = "#0066cc" }
-                                    else { ctx.font = baseFont; ctx.fillStyle = baseColor }
-                                    
-                                    const words = part.text.split(" ")
-                                    words.forEach((word, idx) => {
-                                        // Preserve space if it's not start of line
-                                        const testText = (idx === 0 && currentX === x ? "" : " ") + word
-                                        // Don't add space at very start of a part if it's start of line
-                                        const renderText = (idx === 0 ? "" : " ") + word
-                                        const metrics = ctx.measureText(renderText)
-                                        
-                                        if (currentX + metrics.width > x + maxW) {
-                                            currentLineY += lineHeight
-                                            currentX = x
-                                            ctx.fillText(word, currentX, currentLineY) // No space at start of new line
-                                            currentX += ctx.measureText(word).width
-                                        } else {
-                                            ctx.fillText(renderText, currentX, currentLineY)
-                                            currentX += metrics.width
-                                        }
-                                    })
-                                    ctx.fillStyle = baseColor // Reset
-                                })
-                                return currentLineY + lineHeight
+                            // Horizontal rule
+                            if (/^---+$|^\*\*\*+$/.test(trimmed)) {
+                                ctx.strokeStyle = "rgba(0, 0, 0, 0.15)"
+                                ctx.lineWidth = 1
+                                ctx.beginPath()
+                                ctx.moveTo(startX, currentY + 8)
+                                ctx.lineTo(startX + maxWidth, currentY + 8)
+                                ctx.stroke()
+                                currentY += 24
+                                return
                             }
                             
-                            currentY = processInlineFormatting(trimmed, startX, currentY, maxWidth)
+                            // Blockquote
+                            if (trimmed.startsWith(">")) {
+                                const content = trimmed.replace(/^>\s?/gm, "").trim()
+                                ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
+                                ctx.fillRect(startX, currentY, 4, 24)
+                                ctx.font = baseFont
+                                ctx.fillStyle = "rgba(0, 0, 0, 0.65)"
+                                processInlineFormatting(content, startX + 12, maxWidth - 12)
+                                currentY += 8
+                                return
+                            }
+                            
+                            // Bullet list
+                            if (/^[-*]\s/.test(trimmed)) {
+                                const items = trimmed.split("\n").map((l) => l.replace(/^[-*]\s+/, ""))
+                                items.forEach((item) => {
+                                    if (!item.trim()) return
+                                    // Draw bullet
+                                    ctx.fillStyle = baseColor
+                                    ctx.beginPath()
+                                    ctx.arc(startX + 4, currentY + 8, 2, 0, Math.PI * 2)
+                                    ctx.fill()
+                                    // Draw item text with formatting
+                                    processInlineFormatting(item, startX, maxWidth, true)
+                                    currentY += 4
+                                })
+                                currentY += 4
+                                return
+                            }
+                            
+                            // Numbered list
+                            if (/^\d+\.\s/.test(trimmed)) {
+                                const items = trimmed.split("\n").map((l) => ({ num: l.match(/^(\d+)\./)?.[1] || "1", text: l.replace(/^\d+\.\s+/, "") }))
+                                items.forEach((item) => {
+                                    if (!item.text.trim()) return
+                                    ctx.font = baseFont
+                                    ctx.fillStyle = baseColor
+                                    ctx.fillText(`${item.num}.`, startX, currentY)
+                                    processInlineFormatting(item.text, startX + 20, maxWidth - 20)
+                                    currentY += 4
+                                })
+                                currentY += 4
+                                return
+                            }
+                            
+                            // Regular paragraph with inline formatting
+                            processInlineFormatting(trimmed, startX, maxWidth)
                             currentY += 8
                         })
                     }
                 })
+                
                 return currentY
             }
             
@@ -4355,7 +4414,10 @@ const MessageBubble = React.memo(
             // 7. Process & Finish
             const finishShare = () => {
                 canvas.toBlob(async (blob) => {
-                    if (!blob) return
+                    if (!blob) {
+                        isSharing.current = false
+                        return
+                    }
                     const randomNum = Math.floor(10000 + Math.random() * 90000)
                     const filename = `curastem.org${randomNum}.png`
                     const file = new File([blob], filename, { type: "image/png" })
@@ -4366,13 +4428,19 @@ const MessageBubble = React.memo(
                         document.body.appendChild(link)
                         link.click()
                         document.body.removeChild(link)
+                        isSharing.current = false
                     }
 
                     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                         try {
                             await navigator.share({ files: [file] })
+                            isSharing.current = false
                         } catch (e: any) {
-                            if (e.name !== "AbortError") downloadFallback()
+                            if (e.name !== "AbortError") {
+                                downloadFallback()
+                            } else {
+                                isSharing.current = false
+                            }
                         }
                     } else {
                         downloadFallback()
