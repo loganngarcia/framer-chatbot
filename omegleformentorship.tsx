@@ -113,33 +113,127 @@ function float32ToBase64(float32: Float32Array): string {
 // Shared UI Components
 // -----------------------------------------------------------------------------
 
+// Device detection utility
+const getDeviceInfo = () => {
+    if (typeof navigator === "undefined") {
+        return { isMobile: false, isMac: false, isIOS: false, isAndroid: false }
+    }
+    
+    const ua = navigator.userAgent
+    const platform = navigator.platform
+    
+    const isIOS = /iPhone|iPad|iPod/.test(ua) || /iPhone|iPad|iPod/.test(platform)
+    const isAndroid = /Android/.test(ua)
+    const isMac = /Mac/.test(platform) || /Macintosh/.test(ua)
+    const isMobile = isIOS || isAndroid
+    
+    return { isMobile, isMac: isMac || isIOS, isIOS, isAndroid }
+}
+
+// Get the correct modifier key symbol for the platform
+const getModifierKey = () => {
+    return getDeviceInfo().isMac ? "⌘" : "Ctrl"
+}
+
 interface TooltipProps {
     children: React.ReactNode
     style?: React.CSSProperties
 }
 
-const Tooltip = ({ children, style }: TooltipProps) => (
-    <div
-        style={{
-            position: "absolute",
-            background: "#000000",
-            color: "white",
-            padding: "4px 12px",
-            borderRadius: "28px",
-            fontSize: "12px",
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            zIndex: 10,
-            boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
-            userSelect: "none",
-            WebkitUserSelect: "none",
+const Tooltip = ({ children, style }: TooltipProps) => {
+    // Initial render with hidden opacity to avoid flash of wrong position
+    const [position, setPosition] = React.useState<React.CSSProperties>({ 
+        ...style, 
+        visibility: "hidden" 
+    })
+    const tooltipRef = React.useRef<HTMLDivElement>(null)
+
+    React.useLayoutEffect(() => {
+        if (!tooltipRef.current) return
+
+        const rect = tooltipRef.current.getBoundingClientRect()
+        const parentRect = tooltipRef.current.offsetParent?.getBoundingClientRect()
+        const EDGE_PADDING = 8
+        
+        const newStyle: React.CSSProperties = { 
             ...style,
-        }}
-    >
-        {children}
-    </div>
-)
+            visibility: "visible"
+        }
+
+        if (parentRect) {
+            // Predict where the tooltip WOULD be if it were centered (default style)
+            // Default center is parent center
+            const theoreticalCenter = parentRect.left + parentRect.width / 2
+            const halfWidth = rect.width / 2
+            const theoreticalLeft = theoreticalCenter - halfWidth
+            const theoreticalRight = theoreticalCenter + halfWidth
+            const theoreticalBottom = parentRect.bottom + 8 + rect.height // +8 for translateY
+
+            // Check right edge
+            if (theoreticalRight > window.innerWidth - EDGE_PADDING) {
+                const offset = parentRect.right - (window.innerWidth - EDGE_PADDING)
+                newStyle.right = `${offset}px`
+                newStyle.left = "auto"
+                newStyle.transform = "translateY(8px)"
+            }
+
+            // Check left edge
+            if (theoreticalLeft < EDGE_PADDING) {
+                const offset = EDGE_PADDING - parentRect.left
+                newStyle.left = `${offset}px`
+                newStyle.right = "auto"
+                newStyle.transform = "translateY(8px)"
+            }
+
+            // Check bottom edge
+            if (theoreticalBottom > window.innerHeight) {
+                newStyle.bottom = "100%"
+                newStyle.top = "auto"
+                
+                // If we adjusted horizontally, use simple vertical flip
+                if (newStyle.transform === "translateY(8px)") {
+                    newStyle.transform = "translateY(-8px)"
+                } else {
+                    // Otherwise keep centered
+                    newStyle.transform = "translate(-50%, -8px)"
+                }
+            }
+        }
+
+        // Only update if different to avoid loops (though layout effect runs synchronously)
+        setPosition(prev => {
+             // Simple shallow comparison for style props
+             const isSame = Object.keys(newStyle).every(
+                 key => newStyle[key as keyof React.CSSProperties] === prev[key as keyof React.CSSProperties]
+             )
+             return isSame ? prev : newStyle
+        })
+
+    }, [style, children])
+
+    return (
+        <div
+            ref={tooltipRef}
+            style={{
+                position: "absolute",
+                background: "#000000",
+                color: "white",
+                padding: "4px 12px",
+                borderRadius: "28px",
+                fontSize: "12px",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                zIndex: 10,
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                ...position,
+            }}
+        >
+            {children}
+        </div>
+    )
+}
 
 function downsampleBuffer(
     buffer: Float32Array,
@@ -1075,6 +1169,7 @@ const ToolbarButton = React.memo(
         <button
             className={id}
             onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
             onClick={onClick}
             onMouseEnter={() => onHoverChange(true)}
             onMouseLeave={() => onHoverChange(false)}
@@ -1082,7 +1177,7 @@ const ToolbarButton = React.memo(
                 width: 40,
                 height: 40,
                 background: isActive ? "#E5E5E5" : "#F6F6F6",
-                borderRadius: 35,
+                borderRadius: 28,
                 justifyContent: "center",
                 alignItems: "center",
                 display: "flex",
@@ -1188,7 +1283,11 @@ const DocEditor = React.memo(function DocEditor({
     const editorRef = React.useRef<HTMLDivElement>(null)
     const containerRef = React.useRef<HTMLDivElement>(null)
     const linkDropdownRef = React.useRef<HTMLDivElement>(null)
-    const savedSelectionRef = React.useRef<Range | null>(null)
+    const linkDropdownContentRef = React.useRef<HTMLDivElement>(null)
+    const linkInputRef = React.useRef<HTMLInputElement>(null)
+    
+    // Store the actual Range object, not just a cloned one
+    const [savedRange, setSavedRange] = React.useState<Range | null>(null)
 
     const [selectedFontSize, setSelectedFontSize] = React.useState(
         settings.pSize
@@ -1198,10 +1297,19 @@ const DocEditor = React.memo(function DocEditor({
     )
     const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
     const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
+    const [linkUrl, setLinkUrl] = React.useState("")
+    const [linkDropdownPosition, setLinkDropdownPosition] = React.useState<React.CSSProperties>({
+        position: "fixed", // Changed to fixed to avoid layout shift
+        top: 0,
+        left: 0,
+        visibility: "hidden", // Start hidden to calculate position
+    })
     const [isLinkActive, setIsLinkActive] = React.useState(false)
     const [hoveredToolbarItem, setHoveredToolbarItem] = React.useState<
         string | null
     >(null)
+    const [isFontDecreaseHovered, setIsFontDecreaseHovered] = React.useState(false)
+    const [isFontIncreaseHovered, setIsFontIncreaseHovered] = React.useState(false)
 
     // CSS Variables for performance
     const styleVariables = React.useMemo(
@@ -1256,20 +1364,20 @@ const DocEditor = React.memo(function DocEditor({
     const saveSelection = React.useCallback(() => {
         const selection = window.getSelection()
         if (selection && selection.rangeCount > 0) {
-            savedSelectionRef.current = selection.getRangeAt(0).cloneRange()
+            setSavedRange(selection.getRangeAt(0))
         }
     }, [])
 
     const restoreSelection = React.useCallback(() => {
-        if (savedSelectionRef.current && editorRef.current) {
+        if (savedRange && editorRef.current) {
             const selection = window.getSelection()
             if (selection) {
                 selection.removeAllRanges()
-                selection.addRange(savedSelectionRef.current)
+                selection.addRange(savedRange)
             }
             editorRef.current.focus()
         }
-    }, [])
+    }, [savedRange])
 
     // --- Formatting Logic ---
 
@@ -1295,38 +1403,21 @@ const DocEditor = React.memo(function DocEditor({
     const updateFontSize = React.useCallback(
         (newSize: number) => {
             const size = Math.max(8, Math.min(72, newSize))
-            restoreSelection()
-
-            const selection = window.getSelection()
-            if (selection && !selection.isCollapsed) {
-                document.execCommand("styleWithCSS", false, "true")
-                // Using execCommand fontSize is tricky as it uses 1-7 scale.
-                // Better to use span wrapping for precision.
-                const span = document.createElement("span")
-                span.style.fontSize = `${size}px`
-                const range = selection.getRangeAt(0)
-                const content = range.extractContents()
-                span.appendChild(content)
-                range.insertNode(span)
-            } else {
-                // Update Category Setting
+            
+            // Always update the global setting for the current text category
                 const info = getSelectionInfo()
-                if (info.tag === "H1")
+            if (info.tag === "H1") {
                     onSettingsChange({ ...settings, h1Size: size })
-                else if (info.tag === "H2")
+            } else if (info.tag === "H2") {
                     onSettingsChange({ ...settings, h2Size: size })
-                else onSettingsChange({ ...settings, pSize: size })
+            } else {
+                onSettingsChange({ ...settings, pSize: size })
             }
 
-            handleInput()
-            saveSelection()
             setSelectedFontSize(size)
             if (!isEditingFontSize) setFontSizeInput(size.toString())
         },
         [
-            handleInput,
-            saveSelection,
-            restoreSelection,
             getSelectionInfo,
             settings,
             onSettingsChange,
@@ -1456,7 +1547,13 @@ const DocEditor = React.memo(function DocEditor({
                 let linkFound = false
                 let size = 0
 
-                let node: Node | null = anchor
+                // Check both anchor and focus nodes for links
+                const nodesToCheck = [selection.anchorNode, selection.focusNode]
+                
+                for (const startNode of nodesToCheck) {
+                    if (!startNode) continue
+                    
+                    let node: Node | null = startNode
                 while (node && node !== editorRef.current) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         const el = node as HTMLElement
@@ -1477,6 +1574,9 @@ const DocEditor = React.memo(function DocEditor({
                         }
                     }
                     node = node.parentNode
+                    }
+                    
+                    if (linkFound) break // Found a link, no need to check further
                 }
 
                 setIsLinkActive(linkFound)
@@ -1496,6 +1596,56 @@ const DocEditor = React.memo(function DocEditor({
         }
     }, [isEditingFontSize, saveSelection, settings])
 
+    // Adjust link dropdown position to prevent cutoff
+    React.useLayoutEffect(() => {
+        if (!showLinkDropdown || !linkDropdownContentRef.current || !linkDropdownRef.current) return
+
+        const adjustPosition = () => {
+            const buttonRect = linkDropdownRef.current!.getBoundingClientRect()
+            const dropdownRect = linkDropdownContentRef.current!.getBoundingClientRect()
+            const EDGE_PADDING = 8
+            
+            // Default position: below button, aligned left
+            let top = buttonRect.bottom + 8
+            let left = buttonRect.left
+            
+            // Check right edge
+            if (left + dropdownRect.width > window.innerWidth - EDGE_PADDING) {
+                // If overflows right, try aligning to right of button
+                left = buttonRect.right - dropdownRect.width
+                
+                // If still overflows right (unlikely with this logic, but checking edge case)
+                // or if aligning right pushes it off left edge:
+                if (left + dropdownRect.width > window.innerWidth - EDGE_PADDING) {
+                     left = window.innerWidth - dropdownRect.width - EDGE_PADDING
+                }
+            }
+
+            // Check left edge
+            if (left < EDGE_PADDING) {
+                left = EDGE_PADDING
+            }
+
+            // Check bottom edge - flip to above
+            if (top + dropdownRect.height > window.innerHeight - EDGE_PADDING) {
+                top = buttonRect.top - dropdownRect.height - 8
+            }
+
+            setLinkDropdownPosition({
+                position: "fixed",
+                top: top,
+                left: left,
+                visibility: "visible",
+            })
+        }
+
+        adjustPosition()
+        
+        // Handle window resize
+        window.addEventListener("resize", adjustPosition)
+        return () => window.removeEventListener("resize", adjustPosition)
+    }, [showLinkDropdown])
+
     // Keyboard Shortcuts
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -1506,7 +1656,40 @@ const DocEditor = React.memo(function DocEditor({
                 switch (e.key.toLowerCase()) {
                     case "k":
                         e.preventDefault()
+                        // Save selection and open link dropdown
+                        const selection = window.getSelection()
+                        if (selection && selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0)
+                            setSavedRange(range)
+                            
+                            // Check if we're in a link and pre-populate the URL
+                            const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+                                while (node && editorRef.current?.contains(node)) {
+                                    if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                                        return node as HTMLAnchorElement
+                                    }
+                                    node = node.parentNode
+                                }
+                                return null
+                            }
+                            
+                            const existingLink = findLinkElement(range.startContainer) ||
+                                               findLinkElement(range.endContainer) ||
+                                               findLinkElement(range.commonAncestorContainer)
+                            
+                            if (existingLink) {
+                                setLinkUrl(existingLink.href)
+                            } else {
+                                setLinkUrl("")
+                            }
+                            
                         setShowLinkDropdown(true)
+                            // Focus the input after a short delay
+                            setTimeout(() => {
+                                linkInputRef.current?.focus()
+                                linkInputRef.current?.select()
+                            }, 50)
+                        }
                         break
                     case "b":
                         e.preventDefault()
@@ -1514,17 +1697,29 @@ const DocEditor = React.memo(function DocEditor({
                         break
                     case "i":
                         e.preventDefault()
-                        document.execCommand("italic")
-                        handleInput()
+                        handleSmartFormat("italic")
                         break
                     case "z":
                         e.preventDefault()
                         document.execCommand(e.shiftKey ? "redo" : "undo")
                         handleInput()
                         break
+                    case ",":
+                        if (e.shiftKey) {
+                            e.preventDefault()
+                            updateFontSize(selectedFontSize - 1)
+                        }
+                        break
+                    case ".":
+                        if (e.shiftKey) {
+                            e.preventDefault()
+                            updateFontSize(selectedFontSize + 1)
+                        }
+                        break
                 }
-            } else if (e.shiftKey) {
-                if (e.key === "8") {
+                
+                // Handle Cmd+Shift+8 for bullet list
+                if (e.shiftKey && e.key === "8") {
                     e.preventDefault()
                     handleFormat("insertUnorderedList")
                 }
@@ -1532,16 +1727,24 @@ const DocEditor = React.memo(function DocEditor({
         }
         document.addEventListener("keydown", handleKeyDown)
         return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [handleSmartFormat, handleFormat, handleInput])
+    }, [handleSmartFormat, handleFormat, handleInput, selectedFontSize, updateFontSize])
 
     // Outside Click for Link Dropdown
     React.useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (
                 linkDropdownRef.current &&
-                !linkDropdownRef.current.contains(e.target as Node)
+                !linkDropdownRef.current.contains(e.target as Node) &&
+                linkDropdownContentRef.current &&
+                !linkDropdownContentRef.current.contains(e.target as Node)
             ) {
                 setShowLinkDropdown(false)
+                setLinkDropdownPosition({
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    visibility: "hidden"
+                })
             }
         }
         document.addEventListener("mousedown", handleClickOutside)
@@ -1550,27 +1753,152 @@ const DocEditor = React.memo(function DocEditor({
     }, [])
 
     // --- Link Handling ---
-    const handleInsertLink = (url: string) => {
-        if (!url || !url.trim()) return
-        restoreSelection()
-        const selection = window.getSelection()
-        if (selection && selection.isCollapsed) {
-            document.execCommand("createLink", false, url)
-        } else {
-            document.execCommand("createLink", false, url)
-        }
-        handleInput()
-        saveSelection()
-        setShowLinkDropdown(false)
-    }
+    const handleInsertLink = React.useCallback(() => {
+        const url = linkUrl.trim()
+        if (!url || !savedRange) return
 
-    const handleRemoveLink = () => {
-        restoreSelection()
-        document.execCommand("unlink")
+        // Restore the selection first
+        const selection = window.getSelection()
+        if (!selection) return
+
+        selection.removeAllRanges()
+        selection.addRange(savedRange)
+
+        // Helper to find link element
+        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+            while (node && editorRef.current?.contains(node)) {
+                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                    return node as HTMLAnchorElement
+                }
+                node = node.parentNode
+            }
+            return null
+        }
+
+        // Check if we're updating an existing link
+        const existingLink = findLinkElement(savedRange.startContainer) ||
+                           findLinkElement(savedRange.endContainer) ||
+                           findLinkElement(savedRange.commonAncestorContainer)
+
+        const formattedUrl = url.startsWith("http") ? url : `https://${url}`
+
+        if (existingLink) {
+            // Update existing link and extend to selection
+            existingLink.href = formattedUrl
+            
+            // If selection extends beyond the link, expand the link to cover the selection
+            const selectedText = savedRange.toString()
+            if (selectedText && selectedText !== existingLink.textContent) {
+                // Create new link with extended content
+                const newLink = document.createElement("a")
+                newLink.href = formattedUrl
+                newLink.target = "_blank"
+                newLink.rel = "noopener noreferrer"
+                newLink.textContent = selectedText
+                
+                savedRange.deleteContents()
+                savedRange.insertNode(newLink)
+                
+                // Move cursor after the link
+                savedRange.setStartAfter(newLink)
+                savedRange.setEndAfter(newLink)
+                selection.removeAllRanges()
+                selection.addRange(savedRange)
+        } else {
+                // Just update the URL, keep existing text
+                existingLink.target = "_blank"
+                existingLink.rel = "noopener noreferrer"
+            }
+        } else {
+            // Create new link
+            const selectedText = savedRange.toString()
+            const link = document.createElement("a")
+            link.href = formattedUrl
+            link.target = "_blank"
+            link.rel = "noopener noreferrer"
+            link.textContent = selectedText || url
+
+            // Delete the current selection and insert the link
+            savedRange.deleteContents()
+            savedRange.insertNode(link)
+
+            // Move cursor after the link
+            savedRange.setStartAfter(link)
+            savedRange.setEndAfter(link)
+            selection.removeAllRanges()
+            selection.addRange(savedRange)
+        }
+
         handleInput()
-        saveSelection()
         setShowLinkDropdown(false)
-    }
+        setLinkUrl("")
+        setSavedRange(null)
+        setLinkDropdownPosition({
+            position: "fixed",
+            top: 0,
+            left: 0,
+            visibility: "hidden"
+        })
+        
+        if (editorRef.current) {
+            editorRef.current.focus()
+        }
+    }, [linkUrl, savedRange, handleInput])
+
+    const handleRemoveLink = React.useCallback(() => {
+        if (!savedRange) return
+
+        const selection = window.getSelection()
+        if (!selection) return
+
+        selection.removeAllRanges()
+        selection.addRange(savedRange)
+
+        // Find the link element by checking both start and end of selection
+        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+            while (node && node !== editorRef.current) {
+                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                    return node as HTMLAnchorElement
+                }
+                node = node.parentNode
+            }
+            return null
+        }
+
+        // Check start, end, and common ancestor
+        let linkElement = findLinkElement(savedRange.startContainer) ||
+                         findLinkElement(savedRange.endContainer) ||
+                         findLinkElement(savedRange.commonAncestorContainer)
+
+        if (linkElement) {
+            // Replace the entire link with its text content
+            const text = document.createTextNode(linkElement.textContent || "")
+            linkElement.parentNode?.replaceChild(text, linkElement)
+            
+            // Update cursor position to the end of the text
+            const newRange = document.createRange()
+            newRange.setStartAfter(text)
+            newRange.setEndAfter(text)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+            
+        handleInput()
+        }
+
+        setShowLinkDropdown(false)
+        setLinkUrl("")
+        setSavedRange(null)
+        setLinkDropdownPosition({
+            position: "fixed",
+            top: 0,
+            left: 0,
+            visibility: "hidden"
+        })
+
+        if (editorRef.current) {
+            editorRef.current.focus()
+        }
+    }, [savedRange, handleInput])
 
     // --- File Export ---
     const downloadDoc = () => {
@@ -1649,7 +1977,7 @@ const DocEditor = React.memo(function DocEditor({
                     style={{
                         maxWidth: 808.89,
                         background: "#F6F6F6",
-                        borderRadius: 31.11,
+                        borderRadius: 28,
                         justifyContent: "flex-start",
                         alignItems: "center",
                         gap: 4,
@@ -1665,7 +1993,7 @@ const DocEditor = React.memo(function DocEditor({
                             paddingLeft: 8,
                             paddingRight: 4,
                             background: "#F6F6F6",
-                            borderRadius: 35,
+                            borderRadius: 28,
                             justifyContent: "center",
                             alignItems: "center",
                             gap: 4,
@@ -1675,10 +2003,17 @@ const DocEditor = React.memo(function DocEditor({
                         <div
                             onClick={() => updateFontSize(selectedFontSize - 1)}
                             onMouseDown={(e) => e.preventDefault()}
+                            onPointerDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => setIsFontDecreaseHovered(true)}
+                            onMouseLeave={() => setIsFontDecreaseHovered(false)}
                             style={{
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
+                                justifyContent: "center",
+                                marginLeft: 4,
+                                userSelect: "none",
+                                position: "relative",
                             }}
                         >
                             <svg
@@ -1687,7 +2022,6 @@ const DocEditor = React.memo(function DocEditor({
                                 viewBox="0 0 16 40"
                                 fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
-                                style={{ pointerEvents: "none" }}
                             >
                                 <path
                                     d="M2 20H14"
@@ -1698,10 +2032,23 @@ const DocEditor = React.memo(function DocEditor({
                                     strokeLinejoin="round"
                                 />
                             </svg>
+                            {isFontDecreaseHovered && (
+                                <Tooltip
+                                    style={{
+                                        top: "100%",
+                                        left: "50%",
+                                        transform: "translate(-50%, 8px)",
+                                        zIndex: 100,
+                                    }}
+                                >
+                                    Decrease font size ({getModifierKey()}+Shift+,)
+                                </Tooltip>
+                            )}
                         </div>
                         <div
                             style={{
                                 width: 24,
+                                position: "relative", // Ensure absolute input is relative to this
                                 textAlign: "center",
                                 justifyContent: "center",
                                 display: "flex",
@@ -1742,10 +2089,16 @@ const DocEditor = React.memo(function DocEditor({
                         <div
                             onClick={() => updateFontSize(selectedFontSize + 1)}
                             onMouseDown={(e) => e.preventDefault()}
+                            onPointerDown={(e) => e.preventDefault()}
+                            onMouseEnter={() => setIsFontIncreaseHovered(true)}
+                            onMouseLeave={() => setIsFontIncreaseHovered(false)}
                             style={{
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
+                                justifyContent: "center",
+                                userSelect: "none",
+                                position: "relative",
                             }}
                         >
                             <svg
@@ -1754,7 +2107,6 @@ const DocEditor = React.memo(function DocEditor({
                                 viewBox="0 0 16 40"
                                 fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
-                                style={{ pointerEvents: "none" }}
                             >
                                 <path
                                     d="M14 20H8M8 20H2M8 20V14M8 20V26"
@@ -1765,6 +2117,18 @@ const DocEditor = React.memo(function DocEditor({
                                     strokeLinejoin="round"
                                 />
                             </svg>
+                            {isFontIncreaseHovered && (
+                                <Tooltip
+                                    style={{
+                                        top: "100%",
+                                        left: "50%",
+                                        transform: "translate(-50%, 8px)",
+                                        zIndex: 100,
+                                    }}
+                                >
+                                    Increase font size ({getModifierKey()}+Shift+.)
+                                </Tooltip>
+                            )}
                         </div>
                     </div>
 
@@ -1772,7 +2136,7 @@ const DocEditor = React.memo(function DocEditor({
                     <ToolbarButton
                         id="bold"
                         onClick={() => handleSmartFormat("bold")}
-                        tooltip="Bold (⌘+B)"
+                        tooltip={`Bold (${getModifierKey()}+B)`}
                         icon={
                             <div
                                 style={{
@@ -1793,8 +2157,8 @@ const DocEditor = React.memo(function DocEditor({
                     {/* Italic */}
                     <ToolbarButton
                         id="italic"
-                        onClick={() => handleFormat("italic")}
-                        tooltip="Italic (⌘+I)"
+                        onClick={() => handleSmartFormat("italic")}
+                        tooltip={`Italic (${getModifierKey()}+I)`}
                         icon={
                             <svg
                                 width="32"
@@ -1823,7 +2187,7 @@ const DocEditor = React.memo(function DocEditor({
                     <ToolbarButton
                         id="list"
                         onClick={() => handleFormat("insertUnorderedList")}
-                        tooltip="Bullet List"
+                        tooltip={`Bullet list (${getModifierKey()}+Shift+8)`}
                         icon={
                             <svg
                                 width="40"
@@ -1855,10 +2219,51 @@ const DocEditor = React.memo(function DocEditor({
                     <div ref={linkDropdownRef} style={{ position: "relative" }}>
                         <ToolbarButton
                             id="link"
-                            onClick={() =>
-                                setShowLinkDropdown(!showLinkDropdown)
-                            }
-                            tooltip="Link (⌘+K)"
+                            onClick={() => {
+                                if (!showLinkDropdown) {
+                                    // Opening dropdown - save selection
+                                    const selection = window.getSelection()
+                                    if (selection && selection.rangeCount > 0) {
+                                        const range = selection.getRangeAt(0)
+                                        setSavedRange(range)
+                                        
+                                        // Check if we're in a link and pre-populate the URL
+                                        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+                                            while (node && editorRef.current?.contains(node)) {
+                                                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                                                    return node as HTMLAnchorElement
+                                                }
+                                                node = node.parentNode
+                                            }
+                                            return null
+                                        }
+                                        
+                                        const existingLink = findLinkElement(range.startContainer) ||
+                                                           findLinkElement(range.endContainer) ||
+                                                           findLinkElement(range.commonAncestorContainer)
+                                        
+                                        if (existingLink) {
+                                            setLinkUrl(existingLink.href)
+                                        } else {
+                                            setLinkUrl("")
+                                        }
+                                        
+                                        setShowLinkDropdown(true)
+                                    }
+                                } else {
+                                    // Closing dropdown
+                                    setShowLinkDropdown(false)
+                                    setLinkUrl("")
+                                    setSavedRange(null)
+                                    setLinkDropdownPosition({
+                                        position: "fixed",
+                                        top: 0,
+                                        left: 0,
+                                        visibility: "hidden"
+                                    })
+                                }
+                            }}
+                            tooltip={`Link (${getModifierKey()}+K)`}
                             isActive={showLinkDropdown || isLinkActive}
                             icon={
                                 <svg
@@ -1889,58 +2294,113 @@ const DocEditor = React.memo(function DocEditor({
                                 setHoveredToolbarItem(hovered ? "link" : null)
                             }
                         />
-                        {showLinkDropdown && (
-                            <div
+                            {showLinkDropdown && (
+                            <div // Portal-like container for link dropdown
                                 style={{
-                                    position: "absolute",
-                                    top: "120%",
+                                    position: "fixed",
+                                    top: 0,
                                     left: 0,
-                                    background: "white",
-                                    border: "1px solid #eee",
-                                    borderRadius: 12,
-                                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                    padding: 8,
-                                    minWidth: 220,
+                                    width: "100%",
+                                    height: "100%",
+                                    pointerEvents: "none", // Let clicks pass through to everything else
                                     zIndex: 200,
                                 }}
                             >
+                                <div
+                                    ref={linkDropdownContentRef}
+                                    style={{
+                                        ...linkDropdownPosition,
+                                        background: "white",
+                                        border: "1px solid #eee",
+                                        borderRadius: 20, // Link overlay dropdown border radius
+                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                        padding: 8,
+                                        minWidth: 220,
+                                        pointerEvents: "auto", // Re-enable clicks for the dropdown itself
+                                    }}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
                                 <input
+                                    ref={linkInputRef}
                                     autoFocus
-                                    placeholder="Paste URL..."
+                                    type="text"
+                                    value={linkUrl}
+                                    onChange={(e) => setLinkUrl(e.target.value)}
+                                    placeholder="Type or paste a link"
                                     className="link-input"
                                     onKeyDown={(e) => {
-                                        if (e.key === "Enter")
-                                            handleInsertLink(
-                                                (e.target as HTMLInputElement)
-                                                    .value
-                                            )
+                                        if (e.key === "Enter") {
+                                            e.preventDefault()
+                                            handleInsertLink()
+                                        } else if (e.key === "Escape") {
+                                            e.preventDefault()
+                                            setShowLinkDropdown(false)
+                                            setLinkUrl("")
+                                            setSavedRange(null)
+                                            setLinkDropdownPosition({
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                visibility: "hidden"
+                                            })
+                                        }
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
                                     style={{
                                         width: "100%",
-                                        padding: "6px 10px",
-                                        borderRadius: 6,
+                                        padding: "8px 10px",
+                                        borderRadius: 12,
                                         border: "1px solid #ddd",
-                                        marginBottom: 4,
-                                        fontSize: 16,
+                                        marginBottom: 6,
+                                        fontSize: 14,
+                                        fontFamily: "Inter",
+                                        outline: "none",
                                     }}
                                 />
+                                <div style={{ display: "flex", gap: 4 }}>
+                                    <button
+                                        onClick={handleInsertLink}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        disabled={!linkUrl.trim()}
+                                        style={{
+                                            flex: 1,
+                                            padding: "6px 10px",
+                                            background: linkUrl.trim() ? "#0099FF" : "#E5E5E5",
+                                            color: linkUrl.trim() ? "white" : "#999",
+                                            border: "none",
+                                            borderRadius: 28,
+                                            cursor: linkUrl.trim() ? "pointer" : "not-allowed",
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            fontFamily: "Inter",
+                                        }}
+                                    >
+                                        Apply
+                                    </button>
                                 {isLinkActive && (
                                     <button
                                         onClick={handleRemoveLink}
+                                            onMouseDown={(e) => e.preventDefault()}
                                         style={{
-                                            width: "100%",
-                                            padding: "6px",
+                                                flex: 1,
+                                                padding: "6px 10px",
                                             background: "#ffebee",
                                             color: "#d32f2f",
                                             border: "none",
-                                            borderRadius: 6,
+                                                borderRadius: 28,
                                             cursor: "pointer",
+                                                fontSize: 13,
+                                                fontWeight: 600,
+                                                fontFamily: "Inter",
                                         }}
                                     >
-                                        Remove Link
+                                            Remove
                                     </button>
                                 )}
+                                </div>
                             </div>
+                        </div>
                         )}
                     </div>
                 </div>
@@ -1948,17 +2408,19 @@ const DocEditor = React.memo(function DocEditor({
                 {/* Download */}
                 <div
                     onClick={downloadDoc}
+                    onPointerDown={(e) => e.preventDefault()}
                     style={{
                         height: 40,
                         paddingLeft: 14,
                         paddingRight: 14,
                         background: "#0099FF",
-                        borderRadius: 35,
+                        borderRadius: 28,
                         justifyContent: "center",
                         alignItems: "center",
                         gap: 8,
                         display: "flex",
                         cursor: "pointer",
+                        userSelect: "none",
                     }}
                 >
                     <svg
@@ -1967,7 +2429,6 @@ const DocEditor = React.memo(function DocEditor({
                         viewBox="0 0 15 15"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
-                        style={{ pointerEvents: "none" }}
                     >
                         <path
                             d="M0.699219 10.3485V11.1839C0.699219 11.8512 0.96431 12.4912 1.43618 12.963C1.90804 13.4349 2.54803 13.7 3.21535 13.7H11.6024C12.2698 13.7 12.9097 13.4349 13.3816 12.963C13.8535 12.4912 14.1186 11.8512 14.1186 11.1839V10.3452M7.4089 0.699997V9.9258M7.4089 9.9258L10.3444 6.99032M7.4089 9.9258L4.47341 6.99032"
@@ -1990,7 +2451,6 @@ const DocEditor = React.memo(function DocEditor({
                                 fontWeight: "600",
                                 lineHeight: "19.32px",
                                 wordWrap: "break-word",
-                                pointerEvents: "none",
                             }}
                         >
                             Download
@@ -2020,6 +2480,20 @@ const DocEditor = React.memo(function DocEditor({
                     <div
                         ref={editorRef}
                         contentEditable
+                        enterKeyHint="enter"
+                        suppressContentEditableWarning
+                        onClick={(e) => {
+                            const target = e.target as HTMLElement
+                            if (target.tagName === "A") {
+                                e.preventDefault()
+                                const href = (
+                                    target as HTMLAnchorElement
+                                ).getAttribute("href")
+                                if (href) {
+                                    window.open(href, "_blank")
+                                }
+                            }
+                        }}
                         onInput={handleInput}
                         onBlur={() => {
                             if (
@@ -2186,10 +2660,15 @@ const ChatInput = React.memo(function ChatInput({
             const handleGlobalKeyDown = (e: KeyboardEvent) => {
                 // Ignore if focus is already on an input or textarea
                 const active = document.activeElement
+                const target = e.target as HTMLElement
                 const isInputActive =
                     active?.tagName === "INPUT" ||
                     active?.tagName === "TEXTAREA" ||
-                    active?.getAttribute("contenteditable") === "true"
+                    active?.getAttribute("contenteditable") === "true" ||
+                    (target &&
+                        (target.tagName === "INPUT" ||
+                            target.tagName === "TEXTAREA" ||
+                            target.isContentEditable))
 
                 if (
                     !isInputActive &&
@@ -2335,7 +2814,7 @@ const ChatInput = React.memo(function ChatInput({
 
         items.push({
             id: "whiteboard",
-            label: isWhiteboardOpen ? "Stop whiteboard" : "Whiteboard",
+            label: isWhiteboardOpen ? "Close whiteboard" : "Whiteboard",
             icon: isWhiteboardOpen ? (
                 <svg
                     width="16"
@@ -3171,7 +3650,7 @@ function DebugConsole({ logs }: { logs: string[] }) {
                 overflowY: "auto",
                 zIndex: 9999,
                 pointerEvents: "none",
-                borderRadius: 8,
+                borderRadius: 28,
                 border: "1px solid rgba(255,255,255,0.2)",
             }}
             ref={scrollRef}
@@ -6350,10 +6829,7 @@ Do not include markdown formatting or explanations.`
     const hasInitialResized = React.useRef(false)
 
     // Detect mobile for capture attribute
-    const isMobile = React.useMemo(() => {
-        if (typeof window === "undefined") return false
-        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    }, [])
+    const isMobile = React.useMemo(() => getDeviceInfo().isMobile, [])
 
     const generateVideoThumbnail = async (file: File): Promise<string> => {
         return new Promise((resolve) => {
