@@ -6726,6 +6726,7 @@ Do not include markdown formatting or explanations.`
 
     // --- STATE: AI CHAT (GEMINI) ---
     const [messages, setMessages] = React.useState<Message[]>([])
+    const hasMessages = messages.length > 0
     const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null)
     const copyTimeoutRef = React.useRef<number | null>(null)
 
@@ -6809,6 +6810,10 @@ Do not include markdown formatting or explanations.`
         }
     }, [chatHeight])
 
+    // --- CONSTANTS ---
+    const MIN_CHAT_HEIGHT = 172
+
+    // --- STATE: LAYOUT & DIMENSIONS ---
     const [containerSize, setContainerSize] = React.useState({
         width: 0,
         height: 0,
@@ -6891,7 +6896,7 @@ Do not include markdown formatting or explanations.`
             _sharedScreenSize: { width: number; height: number } | null
         ) => {
             // 1. Calculate Min Height (Max Video Height Constraint)
-            let minHeight = 100
+            let minHeight = MIN_CHAT_HEIGHT
 
             if (
                 !_isScreenSharing &&
@@ -6915,7 +6920,7 @@ Do not include markdown formatting or explanations.`
 
                 const calculatedMinChatHeight =
                     cHeight - 40 - maxVideoHeightNeeded
-                minHeight = Math.max(100, calculatedMinChatHeight)
+                minHeight = Math.max(MIN_CHAT_HEIGHT, calculatedMinChatHeight)
             } else {
                 // Screen Share / Whiteboard / Document Mode
                 let activeWidth = _sharedScreenSize?.width
@@ -6949,12 +6954,12 @@ Do not include markdown formatting or explanations.`
 
                     const calculatedMinChatHeight =
                         cHeight - chromeHeight - maxVideoHeightNeeded
-                    minHeight = Math.max(100, calculatedMinChatHeight)
+                    minHeight = Math.max(MIN_CHAT_HEIGHT, calculatedMinChatHeight)
                 }
             }
 
             // 2. Calculate Max Height (Min Video Height Constraint)
-            let maxHeight = cHeight - 100 // Default
+            let maxHeight = cHeight - MIN_CHAT_HEIGHT // Default
 
             if (
                 _isMobileLayout &&
@@ -6964,7 +6969,7 @@ Do not include markdown formatting or explanations.`
                 !_isDocOpen
             ) {
                 const minVideoSectionHeight = 80
-                maxHeight = Math.max(100, cHeight - 40 - minVideoSectionHeight)
+                maxHeight = Math.max(MIN_CHAT_HEIGHT, cHeight - 40 - minVideoSectionHeight)
             }
 
             if (
@@ -7035,7 +7040,7 @@ Do not include markdown formatting or explanations.`
         const maxChatHeight = containerSize.height - 16 - totalItemHeight - 24
 
         // Auto-maximize for new users
-        setChatHeight(Math.max(100, maxChatHeight))
+        setChatHeight(Math.max(MIN_CHAT_HEIGHT, maxChatHeight))
         hasInitialResized.current = true
     }, [containerSize])
 
@@ -7068,10 +7073,48 @@ Do not include markdown formatting or explanations.`
         calculateHeightConstraints,
     ])
 
+    // --- EFFECT: SNAP CHAT HEIGHT WHEN MESSAGING STARTS ---
+    // When the first message is sent, we snap the chat to a larger height.
+    // We want the TILES to be roughly 140px.
+    // Total Height = ChatHeight + DragBar(24) + Gap(8) + TileHeight(140) + TopPadding(16)
+    // ChatHeight = TotalHeight - 24 - 8 - 140 - 16 = TotalHeight - 188
+    React.useEffect(() => {
+        if (
+            !hasMessages ||
+            containerSize.width === 0 ||
+            containerSize.height === 0 ||
+            isWhiteboardOpen ||
+            isDocOpen
+        )
+            return
+
+        const { maxHeight } = calculateHeightConstraints(
+            containerSize.width,
+            containerSize.height,
+            isMobileLayout,
+            isScreenSharing,
+            remoteScreenStream,
+            isWhiteboardOpen,
+            isDocOpen,
+            sharedScreenSize
+        )
+
+        // Calculate height that leaves ~140px for video tiles
+        const targetTileHeight = 140
+        const topUIHeight = 16 + 8 + 24 // PaddingTop + Gap + DragBar
+        const targetChatHeight = containerSize.height - targetTileHeight - topUIHeight
+        
+        // Ensure we don't exceed the absolute max allowed height (which prevents video from disappearing entirely)
+        // But also snap to this target if possible.
+        const snapHeight = Math.min(targetChatHeight, maxHeight)
+        
+        setChatHeight(Math.max(MIN_CHAT_HEIGHT, snapHeight))
+    }, [hasMessages, isWhiteboardOpen, isDocOpen])
+
     // --- EFFECT: MINIMIZE CHAT WHEN DOC OR WHITEBOARD OPENS ---
     React.useEffect(() => {
         if (isDocOpen || isWhiteboardOpen) {
-            setChatHeight(100) // Minimize chat to allow doc/whiteboard to be full height
+            setChatHeight(MIN_CHAT_HEIGHT) // Minimize chat to allow doc/whiteboard to be full height
         }
     }, [isDocOpen, isWhiteboardOpen])
 
@@ -8748,7 +8791,7 @@ Do not include markdown formatting or explanations.`
                     !!remoteScreenStream ||
                     isWhiteboardOpen ||
                     isDocOpen
-                const effectiveMinHeight = isOverlayActive ? 100 : minHeight
+                const effectiveMinHeight = isOverlayActive ? MIN_CHAT_HEIGHT : minHeight
 
                 let newHeight = dragStartHeight.current
 
