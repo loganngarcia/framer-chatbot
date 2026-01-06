@@ -9787,6 +9787,7 @@ Do not include markdown formatting or explanations.`
                                                 onMount={(e) => {
                                                     log("Tldraw editor mounted")
                                                     setEditor(e)
+                                                    e.setCurrentTool("draw")
                                                 }}
                                             />
                                             {remoteCursor && (
@@ -9822,6 +9823,7 @@ Do not include markdown formatting or explanations.`
                                                                 "Hidden Tldraw editor mounted"
                                                             )
                                                             setEditor(e)
+                                                            e.setCurrentTool("draw")
                                                         }}
                                                     />
                                                 </div>
@@ -9879,9 +9881,9 @@ Do not include markdown formatting or explanations.`
                 >
                     <div
                         style={{
-                            width: 32,
-                            height: 4,
-                            borderRadius: 2,
+                            width: 48,
+                            height: 5,
+                            borderRadius: 4,
                             background:
                                 isDocOpen || isWhiteboardOpen
                                     ? "rgba(0,0,0,0.2)"
