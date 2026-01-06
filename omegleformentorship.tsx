@@ -8810,7 +8810,7 @@ Do not include markdown formatting or explanations.`
                                               height: isMobileLayout
                                                   ? "auto"
                                                   : "100%",
-                                              aspectRatio: "4/3",
+                                              aspectRatio: 1.55,
                                               borderRadius: 24,
                                               minWidth: 0,
                                           }
@@ -8913,7 +8913,7 @@ Do not include markdown formatting or explanations.`
                                               height: isMobileLayout
                                                   ? "auto"
                                                   : "100%",
-                                              aspectRatio: "4/3",
+                                              aspectRatio: 1.55,
                                               borderRadius: 24,
                                               minWidth: 0,
                                           }
