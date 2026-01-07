@@ -2908,6 +2908,7 @@ interface ChatInputProps {
     onReport?: () => void
     placeholder?: string
     showEndCall?: boolean
+    showAiLiveButton?: boolean
     attachments: Attachment[]
     onRemoveAttachment: (id: string) => void
     isLoading?: boolean
@@ -2935,6 +2936,7 @@ const ChatInput = React.memo(function ChatInput({
     onReport,
     placeholder = "Ask anything",
     showEndCall = true,
+    showAiLiveButton = false,
     attachments = [],
     onRemoveAttachment,
     isLoading = false,
@@ -3862,10 +3864,12 @@ const ChatInput = React.memo(function ChatInput({
                         </div>
 
                         {/* START LIVE AI CALL BUTTON (When idle and no input) */}
-                        {!hasContent && !showEndCall && onConnectWithAI && (
-                            <div
-                                data-svg-wrapper
-                                data-layer="start ai live call"
+                        {!hasContent &&
+                            (!showEndCall || showAiLiveButton) &&
+                            onConnectWithAI && (
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="start ai live call"
                                 className="StartAiLiveCall"
                                 onClick={onConnectWithAI}
                                 onMouseEnter={() =>
@@ -10578,6 +10582,9 @@ Do not include markdown formatting or explanations.`
                             onReport={handleReport}
                             placeholder="Ask anything"
                             showEndCall={status !== "idle"}
+                            showAiLiveButton={
+                                status === "searching" && role === "student"
+                            }
                             attachments={attachments}
                             onRemoveAttachment={handleRemoveAttachment}
                             isLoading={isLoading}
