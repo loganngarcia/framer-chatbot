@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     Tldraw,
     exportToBlob,
+    DefaultColorStyle,
+    DefaultSizeStyle,
 } from "https://esm.sh/tldraw@2.1.0?external=react,react-dom"
 
 // -----------------------------------------------------------------------------
@@ -2989,6 +2991,9 @@ interface ChatInputProps {
     onPasteFile?: (files: File[]) => void
     onConnectWithAI?: () => void
     themeColors?: typeof darkColors
+    role?: string | null
+    hasMessages?: boolean
+    onClearMessages?: () => void
 }
 
 const ChatInput = React.memo(function ChatInput({
@@ -3017,6 +3022,9 @@ const ChatInput = React.memo(function ChatInput({
     onPasteFile,
     onConnectWithAI,
     themeColors = darkColors,
+    role,
+    hasMessages = false,
+    onClearMessages,
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
@@ -3154,7 +3162,15 @@ const ChatInput = React.memo(function ChatInput({
     const hasContent = value.trim() || attachments.length > 0
 
     const menuItems = React.useMemo(() => {
-        const items = [
+        const items: {
+            id: string
+            label: string
+            icon: any
+            onClick: () => void
+            className: string
+            isDestructive: boolean
+            hasSeparator?: boolean
+        }[] = [
             {
                 id: "files",
                 label: "Add files & photos",
@@ -3181,6 +3197,7 @@ const ChatInput = React.memo(function ChatInput({
                 },
                 className: "AddFilesPhotos",
                 isDestructive: false,
+                hasSeparator: false,
             },
         ]
 
@@ -3320,7 +3337,35 @@ const ChatInput = React.memo(function ChatInput({
             isDestructive: isDocOpen,
         })
 
-        if (isConnected && !isLiveMode) {
+        // Only students (or no role) see the "New Chat" button so mentors can't delete student messages
+        // Also only show if there are messages to clear
+        const showNewChat = role !== "volunteer" && hasMessages
+        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages)
+
+        const showReport = isConnected && !isLiveMode
+
+        if (showNewChat) {
+            items.push({
+                id: "new_chat",
+                label: "New chat",
+                icon: (
+                    <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons." style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16 }} className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M14.7498 8.00011C14.7498 11.1823 14.7498 12.773 13.7613 13.7615C12.7728 14.75 11.1813 14.75 7.99989 14.75C4.81769 14.75 3.22697 14.75 2.23848 13.7615C1.25 12.773 1.25 11.1816 1.25 8.00011C1.25 4.81792 1.25 3.22719 2.23848 2.23871C3.22697 1.25023 4.81844 1.25023 7.99989 1.25023M6.14967 7.36262C5.89372 7.61895 5.74995 7.96637 5.74992 8.32861V10.2501H7.68339C8.04564 10.2501 8.39363 10.1061 8.65013 9.84958L14.35 4.14668C14.477 4.01979 14.5776 3.86913 14.6463 3.70332C14.715 3.53751 14.7504 3.3598 14.7504 3.18032C14.7504 3.00084 14.715 2.82313 14.6463 2.65732C14.5776 2.49151 14.477 2.34085 14.35 2.21396L13.7868 1.65072C13.6599 1.52369 13.5092 1.42291 13.3433 1.35415C13.1774 1.28539 12.9996 1.25 12.8201 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 11.9802 1.52369 11.8533 1.65072L6.14967 7.36262Z" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                ),
+                onClick: () => {
+                    if (onClearMessages) onClearMessages()
+                    setShowMenu(false)
+                },
+                className: "NewChat",
+                isDestructive: false,
+                hasSeparator: true,
+            })
+        }
+
+        if (showReport) {
             items.push({
                 id: "report",
                 label: "Report user",
@@ -3348,7 +3393,7 @@ const ChatInput = React.memo(function ChatInput({
                 },
                 className: "Report",
                 isDestructive: true,
-                hasSeparator: true,
+                hasSeparator: !showNewChat,
             })
         }
 
@@ -3366,6 +3411,8 @@ const ChatInput = React.memo(function ChatInput({
         toggleDoc,
         onReport,
         themeColors,
+        role,
+        hasMessages,
     ])
 
     return (
@@ -6059,50 +6106,49 @@ export default function OmegleMentorshipUI(props: Props) {
         return prompt
     }, [systemPrompt, locationInfo, role])
 
-    React.useEffect(() => {
-        if (typeof window === "undefined") return
+    const locationFetchedRef = React.useRef(false)
 
-        const fetchLocation = async () => {
-            try {
-                const cached = localStorage.getItem("user_location_info")
-                if (cached) {
-                    setLocationInfo(JSON.parse(cached))
-                    return
-                }
-            } catch (e) {}
+    const fetchLocation = React.useCallback(async () => {
+        if (typeof window === "undefined" || locationFetchedRef.current) return
+        locationFetchedRef.current = true
 
-            try {
-                // Free IP Geolocation API (ipwho.is) - No key required
-                // 5s timeout to prevent hanging
-                const controller = new AbortController()
-                const id = setTimeout(() => controller.abort(), 5000)
-
-                const res = await fetch("https://ipwho.is/", {
-                    signal: controller.signal,
-                })
-                clearTimeout(id)
-
-                if (res.ok) {
-                    const data = await res.json()
-                    if (data.success !== false) {
-                        const info: LocationInfo = {
-                            city: data.city,
-                            region: data.region,
-                            country: data.country,
-                        }
-                        setLocationInfo(info)
-                        localStorage.setItem(
-                            "user_location_info",
-                            JSON.stringify(info)
-                        )
-                    }
-                }
-            } catch (e) {
-                // Silently fail - optional enhancement allows graceful degradation
+        try {
+            const cached = localStorage.getItem("user_location_info")
+            if (cached) {
+                setLocationInfo(JSON.parse(cached))
+                return
             }
-        }
+        } catch (e) {}
 
-        fetchLocation()
+        try {
+            // Free IP Geolocation API (ipwho.is) - No key required
+            // 5s timeout to prevent hanging
+            const controller = new AbortController()
+            const id = setTimeout(() => controller.abort(), 5000)
+
+            const res = await fetch("https://ipwho.is/", {
+                signal: controller.signal,
+            })
+            clearTimeout(id)
+
+            if (res.ok) {
+                const data = await res.json()
+                if (data.success !== false) {
+                    const info: LocationInfo = {
+                        city: data.city,
+                        region: data.region,
+                        country: data.country,
+                    }
+                    setLocationInfo(info)
+                    localStorage.setItem(
+                        "user_location_info",
+                        JSON.stringify(info)
+                    )
+                }
+            }
+        } catch (e) {
+            // Silently fail - optional enhancement allows graceful degradation
+        }
     }, [])
 
     const docContentRef = React.useRef(docContent)
@@ -8290,6 +8336,11 @@ Do not include markdown formatting or explanations.`
         }
     }, [isScreenSharing, isWhiteboardOpen, stopLocalScreenShare])
 
+    const handleClearMessages = React.useCallback(() => {
+        setMessages([])
+        localStorage.removeItem("student_messages")
+    }, [])
+
     const handleReport = React.useCallback(() => {
         setShowReportModal(true)
     }, [])
@@ -9542,6 +9593,7 @@ Do not include markdown formatting or explanations.`
      * Handles message delivery to the Google Gemini API.
      */
     const handleSendMessage = React.useCallback(async (overrideText?: string) => {
+        fetchLocation()
         const textToCheck = overrideText !== undefined ? overrideText : inputText
         if (!textToCheck.trim() && attachments.length === 0) return
 
@@ -9706,7 +9758,7 @@ Do not include markdown formatting or explanations.`
         }
 
         await generateAIResponse(textToSend, attachmentsToSend, "user")
-    }, [inputText, attachments, generateAIResponse])
+    }, [inputText, attachments, generateAIResponse, fetchLocation])
 
     // --- DRAG-TO-RESIZE LOGIC ---
 
@@ -10790,6 +10842,18 @@ Do not include markdown formatting or explanations.`
                                                     log("Tldraw editor mounted")
                                                     setEditor(e)
                                                     e.setCurrentTool("draw")
+                                                    const defaultColor =
+                                                        role === "volunteer"
+                                                            ? "red"
+                                                            : "black"
+                                                    e.setStyleForNextShapes(
+                                                        DefaultColorStyle,
+                                                        defaultColor
+                                                    )
+                                                    e.setStyleForNextShapes(
+                                                        DefaultSizeStyle,
+                                                        "l"
+                                                    )
                                                 }}
                                             />
                                             {remoteCursor && (
@@ -10826,6 +10890,19 @@ Do not include markdown formatting or explanations.`
                                                             )
                                                             setEditor(e)
                                                             e.setCurrentTool("draw")
+                                                            const defaultColor =
+                                                                role ===
+                                                                "volunteer"
+                                                                    ? "red"
+                                                                    : "black"
+                                                            e.setStyleForNextShapes(
+                                                                DefaultColorStyle,
+                                                                defaultColor
+                                                            )
+                                                            e.setStyleForNextShapes(
+                                                                DefaultSizeStyle,
+                                                                "l"
+                                                            )
                                                         }}
                                                     />
                                                 </div>
@@ -11226,6 +11303,9 @@ Do not include markdown formatting or explanations.`
                             isLiveMode={isLiveMode}
                             onPasteFile={processFiles}
                             themeColors={chatThemeColors}
+                            role={role}
+                            hasMessages={messages.length > 0}
+                            onClearMessages={handleClearMessages}
                         />
                     </div>
                 </div>
