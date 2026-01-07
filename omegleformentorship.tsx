@@ -6340,6 +6340,9 @@ Do not include markdown formatting or explanations.`
                             },
                             generationConfig: {
                                 responseMimeType: "application/json",
+                                thinkingConfig: {
+                                    thinkingBudget: 0,
+                                },
                             },
                         }),
                     }
@@ -7426,7 +7429,7 @@ Do not include markdown formatting or explanations.`
     }, [chatHeight])
 
     // --- CONSTANTS ---
-    const MIN_CHAT_HEIGHT = 180
+    const MIN_CHAT_HEIGHT = 196
 
     // --- STATE: LAYOUT & DIMENSIONS ---
     const [containerSize, setContainerSize] = React.useState({
@@ -9050,6 +9053,9 @@ Do not include markdown formatting or explanations.`
                     generationConfig: {
                         temperature: 0.7,
                         maxOutputTokens: 2048,
+                        thinkingConfig: {
+                            thinkingBudget: 0,
+                        },
                     },
                 }
 
@@ -10749,7 +10755,10 @@ Do not include markdown formatting or explanations.`
                                 isMobileLayout={isMobileLayout}
                                 isLast={idx === messages.length - 1}
                                 themeColors={chatThemeColors}
-                                isStreaming={idx === messages.length - 1 && isLoading}
+                                isStreaming={
+                                    idx === messages.length - 1 &&
+                                    (isLoading || isLiveGenerating)
+                                }
                                 copiedMessageId={copiedMessageId}
                                 onCopy={handleCopyMessage}
                             />

@@ -1203,6 +1203,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                 temperature: 0.7,
                                 maxOutputTokens: 100,
                                 stopSequences: ["\n\n"],
+                                thinkingConfig: {
+                                    thinkingBudget: 0,
+                                },
                             },
                         }),
                     }
@@ -1270,6 +1273,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             model: liveModel,
                             generationConfig: {
                                 responseModalities: ["AUDIO"],
+                                thinkingConfig: {
+                                    thinkingBudget: 0,
+                                },
                                 speechConfig: {
                                     voiceConfig: {
                                         prebuiltVoiceConfig: {
@@ -2556,6 +2562,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
         const geminiPayload: any = {
             contents: geminiContents,
+            generationConfig: {
+                thinkingConfig: {
+                    thinkingBudget: 0,
+                },
+            },
         }
 
         if (
