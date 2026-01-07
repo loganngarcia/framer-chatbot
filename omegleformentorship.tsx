@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
@@ -1297,6 +1298,10 @@ const DocEditor = React.memo(function DocEditor({
     )
     const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
     const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
+    const [showDownloadMenu, setShowDownloadMenu] = React.useState(false)
+    const [selectedDownloadMenuIndex, setSelectedDownloadMenuIndex] = React.useState(-1)
+    const [downloadMenuPosition, setDownloadMenuPosition] = React.useState({ top: 0, right: 0 })
+    const downloadMenuRef = React.useRef<HTMLDivElement>(null)
     const [linkUrl, setLinkUrl] = React.useState("")
     const [linkDropdownPosition, setLinkDropdownPosition] = React.useState<React.CSSProperties>({
         position: "fixed", // Changed to fixed to avoid layout shift
@@ -1901,27 +1906,278 @@ const DocEditor = React.memo(function DocEditor({
     }, [savedRange, handleInput])
 
     // --- File Export ---
-    const downloadDoc = () => {
-        let filename = "Note.doc"
+    const handleDownload = React.useCallback(async (format: "pdf" | "docx") => {
+        if (format === "pdf") {
+            const iframe = document.createElement("iframe")
+            iframe.style.position = "fixed"
+            iframe.style.right = "0"
+            iframe.style.bottom = "0"
+            iframe.style.width = "0"
+            iframe.style.height = "0"
+            iframe.style.border = "0"
+            document.body.appendChild(iframe)
+
+            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${settings.pSize}pt;line-height:1.6;}h1{font-size:${settings.h1Size}px;font-weight:700;}h2{font-size:${settings.h2Size}px;font-weight:700;border-bottom:1px solid #000;}a{color:#0099FF;text-decoration:underline;}</style></head><body>`
+            const footer = "</body></html>"
+            const sourceHTML = header + content + footer
+
+            const doc = iframe.contentWindow?.document
+            if (doc) {
+                doc.open()
+                doc.write(sourceHTML)
+                doc.close()
+                
+                // Print after content is loaded
+                setTimeout(() => {
+                    iframe.contentWindow?.focus()
+                    iframe.contentWindow?.print()
+                    // Cleanup after print dialog closes (approximate)
+                    setTimeout(() => {
+                        document.body.removeChild(iframe)
+                    }, 1000)
+                }, 250)
+            }
+            
+            setShowDownloadMenu(false)
+            return
+        }
+
+        let filename = "Note.docx"
         if (editorRef.current) {
             const text = editorRef.current.innerText.trim()
             const firstLine = text.split("\n")[0].trim()
             if (firstLine) {
-                filename = `${firstLine.replace(/\s+/g, "_")}.doc`
+                filename = `${firstLine.replace(/\s+/g, "_")}.docx`
             }
         }
 
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${settings.pSize}pt;}</style></head><body>`
-        const footer = "</body></html>"
-        const sourceHTML = header + content + footer
-        const source =
-            "data:application/vnd.ms-word;charset=utf-8," +
-            encodeURIComponent(sourceHTML)
-        const link = document.createElement("a")
-        link.href = source
-        link.download = filename
-        link.click()
-    }
+        try {
+            // Dynamically import docx library
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink, UnderlineType } = await import("https://esm.sh/docx@8.5.0")
+            
+            // Parse HTML content to DOCX elements
+            const tempDiv = document.createElement("div")
+            tempDiv.innerHTML = content
+            
+            const docxChildren: any[] = []
+            
+            // Helper to get adjusted size (points * 2 for half-points)
+            // Subtract 4px from the visual size for better DOCX printing
+            const getAdjustedSize = (visualSize: number) => Math.max(1, visualSize - 4) * 2
+
+            // Styles context type
+            type StyleOptions = {
+                bold?: boolean
+                italics?: boolean
+                underline?: boolean
+                strike?: boolean
+                color?: string
+                font?: string
+                size?: number
+            }
+
+            // Recursive function to process inline nodes
+            const processInlineNodes = (nodes: NodeList, styles: StyleOptions): any[] => {
+                const runs: any[] = []
+                
+                nodes.forEach(node => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        if (node.textContent) {
+                            runs.push(new TextRun({ 
+                                text: node.textContent,
+                                font: styles.font,
+                                size: styles.size,
+                                color: styles.color,
+                                bold: styles.bold,
+                                italics: styles.italics,
+                                underline: styles.underline ? { type: UnderlineType.SINGLE } : undefined,
+                                strike: styles.strike
+                            }))
+                        }
+                    } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        const el = node as HTMLElement
+                        const tagName = el.tagName.toLowerCase()
+
+                        if (tagName === "br") {
+                            runs.push(new TextRun({ break: 1, text: "" }))
+                        } else if (tagName === "a") {
+                             // Create a specialized style for the link's text content
+                            const linkStyles = { 
+                                ...styles, 
+                                color: "0099FF", 
+                                underline: true 
+                            }
+                            // Recurse to get text runs for the link content
+                            const childRuns = processInlineNodes(el.childNodes, linkStyles)
+                            
+                            runs.push(new ExternalHyperlink({
+                                children: childRuns,
+                                link: el.getAttribute("href") || ""
+                            }))
+                        } else {
+                            // Update styles for nesting
+                            const newStyles = { ...styles }
+                            if (["b", "strong"].includes(tagName)) newStyles.bold = true
+                            if (["i", "em"].includes(tagName)) newStyles.italics = true
+                            if (tagName === "u") newStyles.underline = true
+                            if (tagName === "s", "strike".includes(tagName)) newStyles.strike = true
+                            
+                            runs.push(...processInlineNodes(el.childNodes, newStyles))
+                        }
+                    }
+                })
+                return runs
+            }
+
+            // docxChildren needs to be declared outside if we are using it (though it is declared below in current code, causing error)
+            // But actually we declared it twice in the previous block.
+            // Let's fix by removing the second declaration.
+            
+            // Helper to process block-level nodes
+            const processBlockNode = (node: Node) => {
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    // Orphan text at root level? treat as paragraph
+                    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+                        const runs = processInlineNodes(document.createDocumentFragment().appendChild(node.cloneNode(true)).parentNode!.childNodes, {
+                            font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                            size: getAdjustedSize(settings.pSize),
+                            color: "000000"
+                        })
+                        docxChildren.push(new Paragraph({ children: runs, spacing: { after: 120 } }))
+                    }
+                    return
+                }
+
+                const el = node as HTMLElement
+                const tagName = el.tagName.toLowerCase()
+
+                if (tagName === "h1") {
+                     // For headings, we use specific sizing/bolding manually
+                    const runs = processInlineNodes(el.childNodes, {
+                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                        size: getAdjustedSize(settings.h1Size),
+                        bold: true,
+                        color: "000000"
+                    })
+                    docxChildren.push(new Paragraph({
+                        children: runs,
+                        spacing: { before: 240, after: 120 }
+                    }))
+                } else if (tagName === "h2") {
+                    const runs = processInlineNodes(el.childNodes, {
+                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                        size: getAdjustedSize(settings.h2Size),
+                        bold: true,
+                        color: "000000"
+                    })
+                    docxChildren.push(new Paragraph({
+                        children: runs,
+                        border: {
+                            bottom: {
+                                color: "000000",
+                                space: 1,
+                                value: "single",
+                                size: 6
+                            }
+                        },
+                        spacing: { before: 240, after: 120 }
+                    }))
+                } else if (tagName === "ul") {
+                    el.childNodes.forEach(child => {
+                        if (child.nodeName.toLowerCase() === "li") {
+                             const runs = processInlineNodes(child.childNodes, {
+                                font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                                size: getAdjustedSize(settings.pSize),
+                                color: "000000"
+                             })
+                             docxChildren.push(new Paragraph({
+                                 children: runs,
+                                 bullet: { level: 0 },
+                                 spacing: { after: 120 }
+                             }))
+                        }
+                    })
+                } else if (tagName === "ol") {
+                    el.childNodes.forEach(child => {
+                        if (child.nodeName.toLowerCase() === "li") {
+                             const runs = processInlineNodes(child.childNodes, {
+                                font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                                size: getAdjustedSize(settings.pSize),
+                                color: "000000"
+                             })
+                             docxChildren.push(new Paragraph({
+                                 children: runs,
+                                 numbering: { reference: "default-numbering", level: 0 },
+                                 spacing: { after: 120 }
+                             }))
+                        }
+                    })
+                } else if (tagName === "p" || tagName === "div") {
+                    const runs = processInlineNodes(el.childNodes, {
+                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
+                        size: getAdjustedSize(settings.pSize),
+                        color: "000000"
+                    })
+                    // Ensure empty paragraphs still take up space
+                    if (runs.length === 0) {
+                        runs.push(new TextRun(""))
+                    }
+                    docxChildren.push(new Paragraph({
+                        children: runs,
+                        spacing: { after: 120 }
+                    }))
+                } else {
+                     // Fallback for unknown block containers, just process children as blocks
+                     el.childNodes.forEach(child => processBlockNode(child))
+                }
+            }
+            
+            // Process all root nodes
+            tempDiv.childNodes.forEach(node => processBlockNode(node))
+
+            const doc = new Document({
+                sections: [{
+                    properties: {
+                        page: {
+                            margin: {
+                                top: 720, // 0.5 inches (1440 twips = 1 inch)
+                                right: 720,
+                                bottom: 720,
+                                left: 720,
+                            },
+                        },
+                    },
+                    children: docxChildren.flat().filter(c => c), // Ensure flattened and defined
+                }],
+            })
+
+            const blob = await Packer.toBlob(doc)
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = url
+            link.download = filename
+            link.click()
+            window.URL.revokeObjectURL(url)
+        } catch (e) {
+            console.error("Docx generation failed", e)
+            alert("Failed to generate DOCX file. Please try again.")
+        }
+        
+        setShowDownloadMenu(false)
+    }, [content, settings.fontStyle, settings.pSize])
+
+    const downloadMenuItems = React.useMemo(() => [
+        {
+            id: "pdf",
+            label: ".pdf",
+            onClick: () => handleDownload("pdf")
+        },
+        {
+            id: "docx",
+            label: ".docx",
+            onClick: () => handleDownload("docx")
+        }
+    ], [handleDownload])
 
     const handleEditorPointerMove = React.useCallback(
         (e: React.PointerEvent) => {
@@ -2406,55 +2662,149 @@ const DocEditor = React.memo(function DocEditor({
                 </div>
 
                 {/* Download */}
-                <div
-                    onClick={downloadDoc}
-                    onPointerDown={(e) => e.preventDefault()}
-                    style={{
-                        height: 40,
-                        paddingLeft: 14,
-                        paddingRight: 14,
-                        background: "#0099FF",
-                        borderRadius: 28,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        gap: 8,
-                        display: "flex",
-                        cursor: "pointer",
-                        userSelect: "none",
-                    }}
-                >
-                    <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 15 15"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
+                <div style={{ position: "relative" }} ref={downloadMenuRef}>
+                    <div
+                        onClick={() => {
+                            if (!showDownloadMenu && downloadMenuRef.current) {
+                                const rect = downloadMenuRef.current.getBoundingClientRect()
+                                setDownloadMenuPosition({
+                                    top: rect.bottom + 8,
+                                    right: window.innerWidth - rect.right
+                                })
+                            }
+                            setShowDownloadMenu(!showDownloadMenu)
+                        }}
+                        onPointerDown={(e) => e.preventDefault()}
+                        style={{
+                            height: 40,
+                            paddingLeft: 14,
+                            paddingRight: 14,
+                            background: "#0099FF",
+                            borderRadius: 28,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: 8,
+                            display: "flex",
+                            cursor: "pointer",
+                            userSelect: "none",
+                        }}
                     >
-                        <path
-                            d="M0.699219 10.3485V11.1839C0.699219 11.8512 0.96431 12.4912 1.43618 12.963C1.90804 13.4349 2.54803 13.7 3.21535 13.7H11.6024C12.2698 13.7 12.9097 13.4349 13.3816 12.963C13.8535 12.4912 14.1186 11.8512 14.1186 11.1839V10.3452M7.4089 0.699997V9.9258M7.4089 9.9258L10.3444 6.99032M7.4089 9.9258L4.47341 6.99032"
-                            stroke="white"
-                            strokeOpacity="0.95"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                    {!isMobileLayout && (
-                        <div
-                            style={{
-                                justifyContent: "center",
-                                display: "flex",
-                                flexDirection: "column",
-                                color: "rgba(255, 255, 255, 0.95)",
-                                fontSize: 14,
-                                fontFamily: "Inter",
-                                fontWeight: "600",
-                                lineHeight: "19.32px",
-                                wordWrap: "break-word",
-                            }}
+                        <svg
+                            width="15"
+                            height="15"
+                            viewBox="0 0 15 15"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
                         >
-                            Download
-                        </div>
+                            <path
+                                d="M0.699219 10.3485V11.1839C0.699219 11.8512 0.96431 12.4912 1.43618 12.963C1.90804 13.4349 2.54803 13.7 3.21535 13.7H11.6024C12.2698 13.7 12.9097 13.4349 13.3816 12.963C13.8535 12.4912 14.1186 11.8512 14.1186 11.1839V10.3452M7.4089 0.699997V9.9258M7.4089 9.9258L10.3444 6.99032M7.4089 9.9258L4.47341 6.99032"
+                                stroke="white"
+                                strokeOpacity="0.95"
+                                strokeWidth="1.4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        {!isMobileLayout && (
+                            <div
+                                style={{
+                                    justifyContent: "center",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    color: "rgba(255, 255, 255, 0.95)",
+                                    fontSize: 14,
+                                    fontFamily: "Inter",
+                                    fontWeight: "600",
+                                    lineHeight: "19.32px",
+                                    wordWrap: "break-word",
+                                }}
+                            >
+                                Download
+                            </div>
+                        )}
+                    </div>
+                    {showDownloadMenu && createPortal(
+                        <>
+                            <div
+                                style={{
+                                    position: "fixed",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    zIndex: 2000,
+                                }}
+                                onClick={() => setShowDownloadMenu(false)}
+                            />
+                            <div
+                                onMouseLeave={() => setSelectedDownloadMenuIndex(-1)}
+                                style={{
+                                    position: "fixed",
+                                    top: downloadMenuPosition.top,
+                                    right: downloadMenuPosition.right,
+                                    width: 128,
+                                    padding: 10,
+                                    background: themeColors.surfaceMenu,
+                                    boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                                    borderRadius: 28,
+                                    outline: `0.33px ${themeColors.border.subtle} solid`,
+                                    outlineOffset: "-0.33px",
+                                    flexDirection: "column",
+                                    justifyContent: "flex-start",
+                                    alignItems: "flex-start",
+                                    gap: 4,
+                                    display: "flex",
+                                    zIndex: 2001,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        padding: "4px 12px",
+                                        color: "rgba(0, 0, 0, 0.65)",
+                                        fontSize: 12,
+                                        fontFamily: "Inter",
+                                        fontWeight: "500",
+                                        lineHeight: "16px",
+                                    }}
+                                >
+                                    Save as
+                                </div>
+                                {downloadMenuItems.map((item, index) => (
+                                    <div
+                                        key={item.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            item.onClick()
+                                        }}
+                                        onMouseEnter={() => setSelectedDownloadMenuIndex(index)}
+                                        style={{
+                                            alignSelf: "stretch",
+                                            borderRadius: 20,
+                                            padding: "8px 12px",
+                                            background: index === selectedDownloadMenuIndex ? (themeColors.state?.hover || "rgba(0,0,0,0.04)") : "transparent",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 12
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                flex: "1 1 0",
+                                                color: themeColors.text.primary,
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "500",
+                                                lineHeight: "20px",
+                                            }}
+                                        >
+                                            {item.label}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>,
+                        document.body
                     )}
                 </div>
             </div>
@@ -3015,6 +3365,7 @@ const ChatInput = React.memo(function ChatInput({
                         <div
                             data-layer="conversation actions"
                             className="ConversationActions"
+                            onMouseLeave={() => setSelectedMenuIndex(-1)}
                             style={{
                                 width: isMobileLayout ? "auto" : 196,
                                 padding: 10,
@@ -3061,6 +3412,7 @@ const ChatInput = React.memo(function ChatInput({
                                         style={{
                                             ...localStyles.menuItem,
                                             height: isMobileLayout ? 44 : 36,
+                                            transition: "none",
                                             ...(index === selectedMenuIndex
                                                 ? item.isDestructive
                                                     ? localStyles.menuItemDestructiveHover
@@ -3072,8 +3424,7 @@ const ChatInput = React.memo(function ChatInput({
                                             setSelectedMenuIndex(index)
                                         }}
                                         onMouseLeave={(e) => {
-                                            // Keep selection on mouse leave to support keyboard resumption
-                                            // e.currentTarget.style.background = "transparent" // Removed to let React control style
+                                            // Handled by parent container
                                         }}
                                     >
                                         <div
@@ -9857,7 +10208,7 @@ Do not include markdown formatting or explanations.`
                                             onChange={handleDocChange}
                                             settings={docSettings}
                                             onSettingsChange={setDocSettings}
-                                            themeColors={themeColors}
+                                            themeColors={lightColors}
                                             isMobileLayout={isMobileLayout}
                                             remoteCursor={remoteCursor}
                                             onCursorMove={handleDocPointerMove}
@@ -9964,7 +10315,7 @@ Do not include markdown formatting or explanations.`
                     onPointerEnter={() => {
                         hoverTimeoutRef.current = window.setTimeout(() => {
                             setIsDragBarHovered(true)
-                        }, 200) // 0.2 second delay to prevent jitter
+                        }, 50) // 0.05 second delay to prevent jitter
                     }}
                     onPointerLeave={() => {
                         if (hoverTimeoutRef.current) {
@@ -10009,8 +10360,8 @@ Do not include markdown formatting or explanations.`
                             }}
                         >
                             {chatHeight <= currentConstraints.minHeight + 5
-                                ? "Drag to collapse"
-                                : "Drag to expand"}
+                                ? "Drag to expand"
+                                : "Drag to collapse"}
                         </Tooltip>
                     )}
                 </div>
