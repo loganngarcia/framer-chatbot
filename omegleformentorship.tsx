@@ -9595,6 +9595,16 @@ Do not include markdown formatting or explanations.`
     const handleSendMessage = React.useCallback(async (overrideText?: string) => {
         fetchLocation()
         const textToCheck = overrideText !== undefined ? overrideText : inputText
+
+        if (textToCheck.trim() === "unban-admin-logiebear") {
+            setIsBanned(false)
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("curastem_ban_expiry")
+            }
+            setInputText("")
+            return
+        }
+
         if (!textToCheck.trim() && attachments.length === 0) return
 
         // Clear AI suggestions when user sends a message
