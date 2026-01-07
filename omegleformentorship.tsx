@@ -2736,7 +2736,7 @@ const DocEditor = React.memo(function DocEditor({
                                         style={{
                                             flex: 1,
                                             padding: "6px 10px",
-                                            background: linkUrl.trim() ? "#0099FF" : themeColors.state.hover,
+                                            background: linkUrl.trim() ? "#0099FF" : themeColors.state.hoverSubtle,
                                             color: linkUrl.trim() ? "white" : themeColors.text.tertiary,
                                             border: "none",
                                             borderRadius: 28,
@@ -3032,6 +3032,7 @@ interface ChatInputProps {
     isDocOpen?: boolean
     toggleDoc?: () => void
     isConnected?: boolean
+    status?: string
     isMobileLayout?: boolean
     isLiveMode?: boolean
     onPasteFile?: (files: File[]) => void
@@ -3063,6 +3064,7 @@ const ChatInput = React.memo(function ChatInput({
     isDocOpen = false,
     toggleDoc,
     isConnected = false,
+    status = "idle",
     isMobileLayout = false,
     isLiveMode = false,
     onPasteFile,
@@ -3385,9 +3387,9 @@ const ChatInput = React.memo(function ChatInput({
 
         // Show "New Chat" button:
         // - For students: always show if there are messages
-        // - For volunteers: only show if waiting to connect (not connected p2p) and there are messages
-        const showNewChat = hasMessages && (role !== "volunteer" || !isConnected)
-        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages, "isConnected", isConnected)
+        // - For volunteers: only show if actively waiting to connect (searching state, not when connected p2p or idle)
+        const showNewChat = hasMessages && (role !== "volunteer" || status === "searching")
+        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages, "status", status)
 
         const showReport = isConnected && !isLiveMode
 
@@ -4952,7 +4954,123 @@ function getRandomRainbowColor() {
     return RAINBOW_COLORS[Math.floor(Math.random() * RAINBOW_COLORS.length)]
 }
 
-function LiveCursor({ x, y, color }: { x: number; y: number; color: string }) {
+function LiveCursor({
+    x,
+    y,
+    color,
+    editor,
+    containerRef,
+}: {
+    x: number
+    y: number
+    color: string
+    editor?: any
+    containerRef?: React.RefObject<HTMLDivElement>
+}) {
+    const [pos, setPos] = React.useState({ x: 0, y: 0 })
+    const [isVisible, setIsVisible] = React.useState(true)
+
+    React.useLayoutEffect(() => {
+        // Hide cursor if coordinates indicate it's over UI elements
+        if (x < -1000 || y < -1000) {
+            setIsVisible(false)
+            return
+        }
+
+        if (!editor || !containerRef?.current) {
+            setIsVisible(true)
+            return
+        }
+
+        const update = () => {
+            const screenPoint = editor.pageToScreen({ x, y })
+            
+            // Get the offset between the parent container and the tldraw editor container
+            const editorContainer = editor.getContainer()
+            const parentContainer = containerRef.current
+            
+            if (editorContainer && parentContainer) {
+                const editorRect = editorContainer.getBoundingClientRect()
+                const parentRect = parentContainer.getBoundingClientRect()
+                
+                // Adjust screen coordinates to be relative to parent container
+                const adjustedX = screenPoint.x + (editorRect.left - parentRect.left)
+                const adjustedY = screenPoint.y + (editorRect.top - parentRect.top)
+                
+                // Check if the cursor is within the visible canvas bounds
+                const isInBounds = 
+                    adjustedX >= 0 && 
+                    adjustedX <= parentRect.width &&
+                    adjustedY >= 0 && 
+                    adjustedY <= parentRect.height
+                
+                setPos({ x: adjustedX, y: adjustedY })
+                setIsVisible(isInBounds)
+            } else {
+                setPos({ x: screenPoint.x, y: screenPoint.y })
+                setIsVisible(true)
+            }
+        }
+
+        update()
+        
+        // Listen specifically to camera changes (instance scope)
+        const cleanup = editor.store.listen(
+            (entry: any) => {
+                // Check if camera changed
+                if (entry.changes?.updated) {
+                    for (const [id, [from, to]] of Object.entries(entry.changes.updated)) {
+                        if ((from as any)?.typeName === 'instance' && (to as any)?.typeName === 'instance') {
+                            if ((from as any)?.camera !== (to as any)?.camera) {
+                                update()
+                                break
+                            }
+                        }
+                    }
+                }
+            },
+            { scope: 'instance' }
+        )
+        return () => cleanup()
+    }, [editor, x, y, containerRef])
+
+    // Don't render if cursor is hidden
+    if (!isVisible) {
+        return null
+    }
+
+    if (editor) {
+        return (
+            <div
+                style={{
+                    position: "absolute",
+                    left: pos.x,
+                    top: pos.y,
+                    pointerEvents: "none",
+                    zIndex: 9999,
+                }}
+            >
+                <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 28 28"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    style={{
+                        transform: "rotate(-16deg)", // Slight left tilt
+                    }}
+                >
+                    <path
+                        d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
+                        fill={color}
+                        stroke="white"
+                        strokeWidth="1.5"
+                    />
+                </svg>
+            </div>
+        )
+    }
+
     return (
         <div
             style={{
@@ -8291,9 +8409,29 @@ Do not include markdown formatting or explanations.`
             if (now - lastCursorUpdate.current < 50) return // Limit to 20fps
             lastCursorUpdate.current = now
 
-            if (whiteboardContainerRef.current) {
-                const rect =
-                    whiteboardContainerRef.current.getBoundingClientRect()
+            if (editorRef.current) {
+
+                // Get the container element directly from the editor to ensure accurate coordinate conversion
+                const container = editorRef.current.getContainer()
+                if (!container) return
+
+                const rect = container.getBoundingClientRect()
+                // Convert screen coordinates (relative to tldraw's viewport) to page coordinates
+                const pagePoint = editorRef.current.screenToPage({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                })
+
+                dataConnectionRef.current.send({
+                    type: "cursor-update",
+                    payload: {
+                        x: pagePoint.x,
+                        y: pagePoint.y,
+                        color: myCursorColor.current,
+                    },
+                })
+            } else if (whiteboardContainerRef.current) {
+                const rect = whiteboardContainerRef.current.getBoundingClientRect()
                 const x = (e.clientX - rect.left) / rect.width
                 const y = (e.clientY - rect.top) / rect.height
 
@@ -8385,6 +8523,7 @@ Do not include markdown formatting or explanations.`
 
     const handleClearMessages = React.useCallback(() => {
         setMessages([])
+        setAiGeneratedSuggestions([])
         localStorage.removeItem("student_messages")
     }, [])
 
@@ -10883,6 +11022,19 @@ Do not include markdown formatting or explanations.`
                                             onPointerMove={
                                                 handleWhiteboardPointerMove
                                             }
+                                            onPointerLeave={() => {
+                                                // Hide cursor when leaving whiteboard area
+                                                if (dataConnectionRef.current?.open) {
+                                                    dataConnectionRef.current.send({
+                                                        type: "cursor-update",
+                                                        payload: {
+                                                            x: -9999,
+                                                            y: -9999,
+                                                            color: myCursorColor.current,
+                                                        },
+                                                    })
+                                                }
+                                            }}
                                             style={{
                                                 width: "100%",
                                                 height: "100%",
@@ -10918,6 +11070,8 @@ Do not include markdown formatting or explanations.`
                                                     x={remoteCursor.x}
                                                     y={remoteCursor.y}
                                                     color={remoteCursor.color}
+                                                    editor={editor}
+                                                    containerRef={whiteboardContainerRef}
                                                 />
                                             )}
                                         </div>
@@ -11356,6 +11510,7 @@ Do not include markdown formatting or explanations.`
                             isDocOpen={isDocOpen}
                             toggleDoc={toggleDoc}
                             isConnected={status === "connected" && !isLiveMode}
+                            status={status}
                             isMobileLayout={isMobileLayout}
                             isLiveMode={isLiveMode}
                             onPasteFile={processFiles}
