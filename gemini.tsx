@@ -532,7 +532,7 @@ const renderTable = (
     )
 
     return (
-        <div key={key} style={{ overflowX: "auto", width: "100%" }}>
+        <div key={key} style={{ overflowX: "auto", maxWidth: "100%", display: "block" }}>
             <table className="chat-markdown-table">
                 <thead>
                     <tr>

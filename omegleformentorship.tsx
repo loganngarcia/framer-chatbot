@@ -620,7 +620,7 @@ const renderTable = (
     )
 
     return (
-        <div key={key} style={{ overflowX: "auto", width: "100%" }}>
+        <div key={key} style={{ overflowX: "auto", maxWidth: "100%", display: "block" }}>
             <table className="chat-markdown-table">
                 <thead>
                     <tr>
@@ -5102,7 +5102,7 @@ const MessageBubble = React.memo(
                 
                 // Inline formatting parser with comprehensive regex matching the React component
                 const processInlineFormatting = (textSegment: string, x: number, maxW: number, isBullet = false) => {
-                    const combinedRegex = /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\))/gi
+                    const combinedRegex = /(\*\*([\s\S]*?)\*\*|__([\s\S]*?)__|<strong>([\s\S]*?)<\/strong>|<b>([\s\S]*?)<\/b>|\`([^`]+)\`|~~([\s\S]*?)~~|(\*|_)([\s\S]*?)\8|<em>([\s\S]*?)<\/em>|<i>([\s\S]*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\))/gi
                     
                     let currentX = isBullet ? x + 12 : x  // Indent for bullet items
                     const lineStartX = isBullet ? x + 12 : x
@@ -5282,6 +5282,84 @@ const MessageBubble = React.memo(
                                 })
                                 currentY += 4
                                 return
+                            }
+                            
+                            // Table
+                            const tableRegex = /^\|.*\|$/m
+                            if (tableRegex.test(trimmed)) {
+                                const lines = trimmed.split("\n").filter(l => l.trim().length > 0)
+                                if (lines.length >= 2) {
+                                    const headerLine = lines[0]
+                                    const separatorLine = lines[1]
+                                    const bodyLines = lines.slice(2)
+                                    
+                                    if (separatorLine.includes("-") && separatorLine.includes("|")) {
+                                        const headers = headerLine.split("|").filter(h => h.trim().length > 0).map(h => h.trim())
+                                        const rows = bodyLines.map(line => line.split("|").filter(c => c.trim().length > 0).map(c => c.trim()))
+                                        
+                                        // Basic layout: equal width columns
+                                        const colCount = headers.length
+                                        if (colCount > 0) {
+                                            const cellPadding = 8
+                                            const colWidth = (maxWidth - (cellPadding * 2 * colCount)) / colCount
+                                            
+                                            // Draw headers
+                                            let tableX = startX
+                                            const headerHeight = 32 // Approximate header height
+                                            
+                                            // Draw header background
+                                            ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
+                                            ctx.fillRect(startX, currentY, maxWidth, headerHeight)
+                                            
+                                            // Draw header text
+                                            ctx.font = "600 14px Inter, sans-serif"
+                                            ctx.fillStyle = baseColor
+                                            headers.forEach((header, i) => {
+                                                ctx.fillText(header, tableX + cellPadding, currentY + 8)
+                                                tableX += colWidth + (cellPadding * 2)
+                                            })
+                                            
+                                            currentY += headerHeight
+                                            
+                                            // Draw rows
+                                            ctx.font = "400 14px Inter, sans-serif"
+                                            rows.forEach((row, i) => {
+                                                tableX = startX
+                                                // Alternating row background
+                                                if (i % 2 === 1) {
+                                                    ctx.fillStyle = "rgba(0, 0, 0, 0.02)"
+                                                    ctx.fillRect(startX, currentY, maxWidth, 24)
+                                                }
+                                                ctx.fillStyle = baseColor
+                                                
+                                                row.forEach((cell, j) => {
+                                                    if (j < colCount) {
+                                                        // Simple truncation for cell text
+                                                        let cellText = cell
+                                                        const maxCellW = colWidth
+                                                        if (ctx.measureText(cellText).width > maxCellW) {
+                                                            while (ctx.measureText(cellText + "...").width > maxCellW && cellText.length > 0) {
+                                                                cellText = cellText.slice(0, -1)
+                                                            }
+                                                            cellText += "..."
+                                                        }
+                                                        ctx.fillText(cellText, tableX + cellPadding, currentY + 4)
+                                                        tableX += colWidth + (cellPadding * 2)
+                                                    }
+                                                })
+                                                currentY += 24
+                                            })
+                                            
+                                            // Draw borders
+                                            ctx.strokeStyle = "rgba(0, 0, 0, 0.1)"
+                                            ctx.lineWidth = 1
+                                            ctx.strokeRect(startX, currentY - (rows.length * 24) - headerHeight, maxWidth, (rows.length * 24) + headerHeight)
+                                            
+                                            currentY += 16
+                                            return
+                                        }
+                                    }
+                                }
                             }
                             
                             // Regular paragraph with inline formatting
@@ -5557,6 +5635,7 @@ const MessageBubble = React.memo(
                                     msg.role === "user"
                                         ? "flex-end"
                                         : "flex-start",
+                                maxWidth: "100%",
                             }}
                         >
                             {msg.role === "user" || msg.role === "peer"
@@ -6555,22 +6634,20 @@ Do not include markdown formatting or explanations.`
 
             // ROLE RESET LOGIC:
             // If manual hangup, ALWAYS reset role (so they can select again).
-            // If student (and not manual), keep role to allow easy reconnection.
+            // If remote hangup (not manual), keep role to allow auto-reconnection for BOTH students and volunteers.
             if (isManualHangup) {
                 setRole(null)
                 if (typeof window !== "undefined") {
                     localStorage.removeItem("user_role")
                 }
-            } else if (roleRef.current !== "student") {
-                setRole(null)
-                if (typeof window !== "undefined") {
-                    localStorage.removeItem("user_role")
-                }
             } else {
-                // Ensure role is saved for student (if not manual hangup)
-                if (typeof window !== "undefined") {
-                    localStorage.setItem("user_role", "student")
+                // Not manual hangup (remote disconnect).
+                // Preserve role for everyone (Student AND Volunteer) so they auto-queue.
+                if (typeof window !== "undefined" && roleRef.current) {
+                    localStorage.setItem("user_role", roleRef.current)
                 }
+                // Refresh ID to prevent PeerJS "ID taken" errors on immediate reconnect
+                myId.current = "user_" + Math.random().toString(36).substr(2, 6)
             }
             
             setLocalStream(null)
@@ -7165,11 +7242,11 @@ Do not include markdown formatting or explanations.`
     // --- EFFECT: MODERATION SCREENSHOTS ---
     React.useEffect(() => {
         if (status === "connected") {
-            const timer = setTimeout(async () => {
+            const runModeration = async (reason: string) => {
                 // Double check status to avoid race conditions
                 if (statusRef.current !== "connected") return
 
-                console.log("Capturing moderation screenshot (5s check)...")
+                console.log(`Capturing moderation screenshot (${reason})...`)
                 try {
                     // Only capture and check REMOTE stream (check your partner)
                     const remoteBlob = await captureVideoFrame(
@@ -7204,10 +7281,20 @@ Do not include markdown formatting or explanations.`
                         }
                     }
                 } catch (e) {
-                    console.error("Failed to capture moderation screenshots", e)
+                    console.error(`Failed to capture moderation screenshots (${reason})`, e)
                 }
-            }, 5000)
-            return () => clearTimeout(timer)
+            }
+
+            // Initial check after 5 seconds
+            const timer = setTimeout(() => runModeration("5s check"), 5000)
+            
+            // Periodic check every 5 minutes
+            const interval = setInterval(() => runModeration("5m check"), 5 * 60 * 1000)
+
+            return () => {
+                clearTimeout(timer)
+                clearInterval(interval)
+            }
         }
     }, [status, geminiApiKey, model])
 
@@ -7933,7 +8020,7 @@ Do not include markdown formatting or explanations.`
             log(`Auto-starting as ${role}...`)
             startChat()
         }
-    }, [role, ready])
+    }, [role, ready, status])
 
     // --- EFFECT: INITIALIZATION ---
     // Loads required external dependencies and handles component teardown.
@@ -10819,7 +10906,7 @@ Do not include markdown formatting or explanations.`
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            {chatHeight <= currentConstraints.minHeight + 5
+                            {chatHeight < currentConstraints.maxHeight - 5
                                 ? "Click to expand chat"
                                 : "Click to collapse chat"}
                         </Tooltip>
