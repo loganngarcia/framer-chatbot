@@ -5775,15 +5775,40 @@ export default function OmegleMentorshipUI(props: Props) {
      * student: "Get free help" user seeking guidance.
      * volunteer:  "Volunteer" user providing guidance.
      */
-    const [role, setRole] = React.useState<"student" | "volunteer" | null>(null)
+    const [role, setRole] = React.useState<"student" | "volunteer" | null>(() => {
+        if (typeof window !== "undefined") {
+            const savedRole = localStorage.getItem("user_role")
+            if (savedRole === "student" || savedRole === "volunteer") {
+                return savedRole
+            }
+        }
+        return null
+    })
     const roleRef = React.useRef(role)
     React.useEffect(() => {
         roleRef.current = role
+        if (typeof window !== "undefined") {
+             if (role) {
+                localStorage.setItem("user_role", role)
+             } else {
+                 // Don't clear role on null, to allow persistence?
+                 // Actually, if role is null (user is at selection screen), we might want to keep the saved role 
+                 // UNLESS they actively disconnected/reset. 
+                 // But wait, our cleanup logic sets role to null for mentors but KEEPS it for students.
+                 // So if it's null, it might be intentional.
+                 // HOWEVER, to support reload, we should only clear it if explicitly requested.
+                 // For now, let's just save it when it's set.
+             }
+        }
     }, [role])
 
     // --- STATE: WEBRTC & CONNECTIVITY ---
     // status: tracks the lifecycle of the connection (idle -> searching -> connected)
     const [status, setStatus] = React.useState("idle")
+    const statusRef = React.useRef(status)
+    React.useEffect(() => {
+        statusRef.current = status
+    }, [status])
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
@@ -5923,6 +5948,11 @@ export default function OmegleMentorshipUI(props: Props) {
 
         fetchLocation()
     }, [])
+
+    const docContentRef = React.useRef(docContent)
+    React.useEffect(() => {
+        docContentRef.current = docContent
+    }, [docContent])
 
     const isWhiteboardOpenRef = React.useRef(false)
     const docTimeoutRef = React.useRef<any>(null) // Debounce/Throttle for doc editor
@@ -6382,68 +6412,101 @@ Do not include markdown formatting or explanations.`
         isUserMessageInProgressRef.current = false
     }, [stopAllAudio])
 
-    const cleanup = React.useCallback(() => {
-        const isAiSession = isLiveMode || !!liveClientRef.current
+    const cleanup = React.useCallback(
+        (isManualHangup = false) => {
+            const isAiSession = isLiveMode || !!liveClientRef.current
 
-        // Always attempt to stop live session to ensure state is reset
-        stopLiveSession()
+            // Always attempt to stop live session to ensure state is reset
+            stopLiveSession()
 
-        if (localStreamRef.current)
-            localStreamRef.current.getTracks().forEach((t) => t.stop())
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach((t) => t.stop())
+                localStreamRef.current = null
+            }
+            setLocalStream(null)
 
-        // Stop screen share when call ends
-        // Manually stop screen share logic here instead of calling function that might not be defined
-        if (screenStreamRef.current) {
-            screenStreamRef.current
-                .getTracks()
-                .forEach((track: any) => track.stop())
-            screenStreamRef.current = null
-        }
-        if (screenCallRef.current) {
-            screenCallRef.current.close()
-            screenCallRef.current = null
-        }
-        setIsScreenSharing(false)
-        if (isWhiteboardOpenRef.current) {
-            // Re-open whiteboard if it was closed due to screen share
-            // But here we are cleaning up everything, so no need.
-        }
+            // Stop screen share when call ends
+            // Manually stop screen share logic here instead of calling function that might not be defined
+            if (screenStreamRef.current) {
+                screenStreamRef.current
+                    .getTracks()
+                    .forEach((track: any) => track.stop())
+                screenStreamRef.current = null
+            }
+            if (screenCallRef.current) {
+                screenCallRef.current.close()
+                screenCallRef.current = null
+            }
+            setIsScreenSharing(false)
+            if (isWhiteboardOpenRef.current) {
+                // Re-open whiteboard if it was closed due to screen share
+                // But here we are cleaning up everything, so no need.
+            }
 
-        if (activeCall.current) activeCall.current.close()
-        if (dataConnectionRef.current) dataConnectionRef.current.close()
+            if (activeCall.current) activeCall.current.close()
+            if (dataConnectionRef.current) dataConnectionRef.current.close()
 
-        if (peerInstance.current) peerInstance.current.destroy()
-        if (mqttClient.current) mqttClient.current.end()
+            if (peerInstance.current) peerInstance.current.destroy()
+            if (mqttClient.current) mqttClient.current.end()
 
-        // Clear state ONLY if it was NOT an AI session (P2P Reset)
-        if (!isAiSession) {
-            // Clear whiteboard state
-            setIsWhiteboardOpen(false)
-            setHasWhiteboardStarted(false)
-            setEditor(null)
-            setIsDocOpen(false)
-            setDocContent(
-                `
+            // Clear state ONLY if it was NOT an AI session (P2P Reset)
+            if (!isAiSession) {
+                // Check if volunteer is hanging up without ever connecting (draft state)
+                const isVolunteerDraft = roleRef.current === "volunteer" && statusRef.current !== "connected"
+
+                // Only clear state if NOT a student (keep student history for reconnection)
+                // AND not a volunteer in draft state
+                if (roleRef.current !== "student" && !isVolunteerDraft) {
+                    // Clear whiteboard state
+                    setIsWhiteboardOpen(false)
+                    setHasWhiteboardStarted(false)
+                    setEditor(null)
+                    setIsDocOpen(false)
+                    setDocContent(
+                        `
 <h1>Welcome to your notes 🩵 </h1>
 <p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
             `.trim()
-            )
+                    )
 
-            setMessages([])
-            setAttachments([])
-            setLogs([])
-        }
+                    setMessages([])
+                    setAttachments([])
+                    setLogs([])
+                }
+            }
 
-        setStatus("idle")
-        setRole(null)
-        setLocalStream(null)
-        setRemoteStream(null)
-        setRemoteScreenStream(null)
+            setStatus("idle")
 
-        if (typeof window !== "undefined") {
-            window.location.hash = ""
-        }
-    }, [isLiveMode, stopLiveSession])
+            // ROLE RESET LOGIC:
+            // If manual hangup, ALWAYS reset role (so they can select again).
+            // If student (and not manual), keep role to allow easy reconnection.
+            if (isManualHangup) {
+                setRole(null)
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("user_role")
+                }
+            } else if (roleRef.current !== "student") {
+                setRole(null)
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("user_role")
+                }
+            } else {
+                // Ensure role is saved for student (if not manual hangup)
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("user_role", "student")
+                }
+            }
+            
+            setLocalStream(null)
+            setRemoteStream(null)
+            setRemoteScreenStream(null)
+
+            if (typeof window !== "undefined") {
+                window.location.hash = ""
+            }
+        },
+        [isLiveMode, stopLiveSession]
+    )
 
     const resetSilenceTimer = React.useCallback(() => {
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
@@ -6954,10 +7017,6 @@ Do not include markdown formatting or explanations.`
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null)
     const dataConnectionRef = React.useRef<any>(null)
-    const statusRef = React.useRef(status)
-    React.useEffect(() => {
-        statusRef.current = status
-    }, [status])
 
     // Unique session ID for the user
     const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
@@ -7080,7 +7139,208 @@ Do not include markdown formatting or explanations.`
     }, [status, geminiApiKey, model])
 
     // --- STATE: AI CHAT (GEMINI) ---
-    const [messages, setMessages] = React.useState<Message[]>([])
+    const [messages, setMessages] = React.useState<Message[]>(() => {
+        if (typeof window !== "undefined") {
+             // Try to restore messages synchronously to prevent empty state render
+             // Check if we have a valid timestamp
+             const savedTime = localStorage.getItem("student_data_timestamp")
+             if (savedTime) {
+                 const timeDiff = Date.now() - parseInt(savedTime, 10)
+                 if (timeDiff < 24 * 60 * 60 * 1000) {
+                     const savedMessages = localStorage.getItem("student_messages")
+                     if (savedMessages) {
+                         try {
+                             return JSON.parse(savedMessages)
+                         } catch (e) {
+                             console.error("Failed to parse saved messages", e)
+                         }
+                     }
+                 }
+             }
+        }
+        return []
+    })
+
+    // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
+    React.useEffect(() => {
+        // Restore OTHER state if student OR if no role (initial state)
+        if (role === "student" || role === null) {
+            const savedTime = localStorage.getItem("student_data_timestamp")
+            if (savedTime) {
+                const timeDiff = Date.now() - parseInt(savedTime, 10)
+                if (timeDiff < 24 * 60 * 60 * 1000) {
+                    // Note: Messages are restored via lazy init now.
+                    
+                    // Restore Doc if default
+                    if (docContent.includes("Welcome to your notes")) {
+                        const savedDoc = localStorage.getItem("student_doc")
+                        if (savedDoc && savedDoc !== docContent) {
+                            setDocContent(savedDoc)
+                        }
+                    }
+                    // Restore Whiteboard (pending snapshot)
+                    if (!editor) {
+                        const savedWhiteboard = localStorage.getItem("student_whiteboard")
+                        if (savedWhiteboard) {
+                            try {
+                                pendingSnapshotRef.current = JSON.parse(savedWhiteboard)
+                            } catch (e) {
+                                console.error("Failed to restore whiteboard", e)
+                            }
+                        }
+                    }
+                } else {
+                    // Expired
+                    localStorage.removeItem("student_messages")
+                    localStorage.removeItem("student_doc")
+                    localStorage.removeItem("student_whiteboard")
+                    localStorage.removeItem("student_data_timestamp")
+                }
+            }
+        }
+    }, [role])
+
+    // Save student / no-role / volunteer-pre-connect data
+    React.useEffect(() => {
+        // Save if student, OR if no role, OR if volunteer (until they connect)
+        // Note: Volunteer data gets wiped on connect in handleCall, so saving it here is fine (it's "draft" state).
+        // We use "student_" keys for the generic "my saved work" storage.
+        if (role === "student" || role === null || role === "volunteer") {
+            // Check if we are connected as a volunteer - if so, DO NOT overwrite the saved "student" data with empty volunteer state?
+            // Actually, if I am a volunteer and I am chatting with a student, I DON'T want to save that chat history to my "personal" storage.
+            // But the requirements say: "saves ur msgs until u become a volunteer then in which it deletes ur msgs ONCE u connect with a student"
+            
+            // Refined Logic:
+            // 1. If role is STUDENT: Always save.
+            // 2. If role is NULL: Always save.
+            // 3. If role is VOLUNTEER: Only save if NOT connected. (Preserve draft state).
+            //    Once connected, we wiped the state in handleCall. If we save now, we save empty state (which effectively clears storage).
+            //    That seems correct per "deletes ur msgs ONCE u connect".
+            
+            // Wait, if I am a volunteer and I connect, handleCall wipes my state.
+            // Then this effect runs (msg changed to empty).
+            // Then it saves empty state to localStorage.
+            // This effectively "deletes" the saved messages. This matches the requirement.
+            
+            // Exception: If I am a volunteer connected to a student, do I want to save the *active* session to localStorage?
+            // "Mentors get no chat history saved". So NO.
+            // So if role is volunteer AND status is connected, do NOT save.
+            
+            if (role === "volunteer" && status === "connected") {
+                return 
+            }
+
+            localStorage.setItem("student_messages", JSON.stringify(messages))
+            localStorage.setItem("student_doc", docContent)
+            localStorage.setItem("student_data_timestamp", Date.now().toString())
+
+            // Save whiteboard snapshot if editor exists
+            if (editor) {
+                try {
+                    const snapshot = editor.store.getSnapshot()
+                    localStorage.setItem("student_whiteboard", JSON.stringify(snapshot))
+                } catch (e) {
+                    // Ignore errors during save
+                }
+            }
+        }
+    }, [role, messages, docContent, editor, status])
+
+    // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
+    React.useEffect(() => {
+        // Restore if student OR if no role (initial state)
+        if (role === "student" || role === null) {
+            const savedTime = localStorage.getItem("student_data_timestamp")
+            if (savedTime) {
+                const timeDiff = Date.now() - parseInt(savedTime, 10)
+                if (timeDiff < 24 * 60 * 60 * 1000) {
+                    // Restore Messages if empty
+                    if (messages.length === 0) {
+                        const savedMessages = localStorage.getItem("student_messages")
+                        if (savedMessages) {
+                            try {
+                                setMessages(JSON.parse(savedMessages))
+                            } catch (e) {
+                                console.error("Failed to restore messages", e)
+                            }
+                        }
+                    }
+                    // Restore Doc if default
+                    if (docContent.includes("Welcome to your notes")) {
+                        const savedDoc = localStorage.getItem("student_doc")
+                        if (savedDoc && savedDoc !== docContent) {
+                            setDocContent(savedDoc)
+                        }
+                    }
+                    // Restore Whiteboard (pending snapshot)
+                    if (!editor) {
+                        const savedWhiteboard = localStorage.getItem("student_whiteboard")
+                        if (savedWhiteboard) {
+                            try {
+                                pendingSnapshotRef.current = JSON.parse(savedWhiteboard)
+                            } catch (e) {
+                                console.error("Failed to restore whiteboard", e)
+                            }
+                        }
+                    }
+                } else {
+                    // Expired
+                    localStorage.removeItem("student_messages")
+                    localStorage.removeItem("student_doc")
+                    localStorage.removeItem("student_whiteboard")
+                    localStorage.removeItem("student_data_timestamp")
+                }
+            }
+        }
+    }, [role])
+
+    // Save student / no-role / volunteer-pre-connect data
+    React.useEffect(() => {
+        // Save if student, OR if no role, OR if volunteer (until they connect)
+        // Note: Volunteer data gets wiped on connect in handleCall, so saving it here is fine (it's "draft" state).
+        // We use "student_" keys for the generic "my saved work" storage.
+        if (role === "student" || role === null || role === "volunteer") {
+            // Check if we are connected as a volunteer - if so, DO NOT overwrite the saved "student" data with empty volunteer state?
+            // Actually, if I am a volunteer and I am chatting with a student, I DON'T want to save that chat history to my "personal" storage.
+            // But the requirements say: "saves ur msgs until u become a volunteer then in which it deletes ur msgs ONCE u connect with a student"
+            
+            // Refined Logic:
+            // 1. If role is STUDENT: Always save.
+            // 2. If role is NULL: Always save.
+            // 3. If role is VOLUNTEER: Only save if NOT connected. (Preserve draft state).
+            //    Once connected, we wiped the state in handleCall. If we save now, we save empty state (which effectively clears storage).
+            //    That seems correct per "deletes ur msgs ONCE u connect".
+            
+            // Wait, if I am a volunteer and I connect, handleCall wipes my state.
+            // Then this effect runs (msg changed to empty).
+            // Then it saves empty state to localStorage.
+            // This effectively "deletes" the saved messages. This matches the requirement.
+            
+            // Exception: If I am a volunteer connected to a student, do I want to save the *active* session to localStorage?
+            // "Mentors get no chat history saved". So NO.
+            // So if role is volunteer AND status is connected, do NOT save.
+            
+            if (role === "volunteer" && status === "connected") {
+                return 
+            }
+
+            localStorage.setItem("student_messages", JSON.stringify(messages))
+            localStorage.setItem("student_doc", docContent)
+            localStorage.setItem("student_data_timestamp", Date.now().toString())
+
+            // Save whiteboard snapshot if editor exists
+            if (editor) {
+                try {
+                    const snapshot = editor.store.getSnapshot()
+                    localStorage.setItem("student_whiteboard", JSON.stringify(snapshot))
+                } catch (e) {
+                    // Ignore errors during save
+                }
+            }
+        }
+    }, [role, messages, docContent, editor, status]) // Triggers on message/doc change. Whiteboard might lag if no other activity.
+
+
     const hasMessages = messages.length > 0
     const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null)
     const copyTimeoutRef = React.useRef<number | null>(null)
@@ -8115,6 +8375,25 @@ Do not include markdown formatting or explanations.`
         activeCall.current = call
         setStatus("connected")
         if (mqttClient.current) mqttClient.current.end() // Stop signaling once connected
+        
+        // VOLUNTEER WIPE LOGIC
+        // If I am a volunteer and I just connected to a student, wipe my local state to start fresh.
+        if (roleRef.current === "volunteer") {
+             log("Volunteer connected - Wiping previous session data...")
+             setMessages([])
+             setAttachments([])
+             setLogs([])
+             setIsDocOpen(false)
+             setDocContent(
+                `
+<h1>Welcome to your notes 🩵 </h1>
+<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
+            `.trim()
+            )
+            setIsWhiteboardOpen(false)
+            setHasWhiteboardStarted(false)
+            setEditor(null)
+        }
 
         // If we are already screen sharing, start a call for that too
         if (screenStreamRef.current && peerInstance.current) {
@@ -8383,6 +8662,28 @@ Do not include markdown formatting or explanations.`
 
         const onOpen = () => {
             log("Data connection established")
+
+            // SYNC STRATEGY:
+            // The Student is the "source of truth".
+            // If I am a Student, I MUST send my current state to the mentor immediately.
+            // If I am a Mentor, I wait for the Student's state.
+
+            if (roleRef.current === "student") {
+                log("Student syncing state to mentor...")
+                
+                // 1. Sync Document
+                // Always send doc content to ensure mentor has it
+                if (dataConnectionRef.current?.open) {
+                    dataConnectionRef.current.send({
+                        type: "doc-update",
+                        payload: docContentRef.current,
+                    })
+
+                    if (isDocOpenRef.current) {
+                         dataConnectionRef.current.send({ type: "doc-start" })
+                    }
+                }
+            }
 
             // Check if whiteboard is already open and sync state with new peer
             if (
@@ -10364,8 +10665,8 @@ Do not include markdown formatting or explanations.`
                             }}
                         >
                             {chatHeight <= currentConstraints.minHeight + 5
-                                ? "Drag to expand"
-                                : "Drag to collapse"}
+                                ? "Click to expand chat"
+                                : "Click to collapse chat"}
                         </Tooltip>
                     )}
                 </div>
@@ -10576,7 +10877,7 @@ Do not include markdown formatting or explanations.`
                             onSend={handleSendMessage}
                             onConnectWithAI={handleConnectWithAI}
                             onStop={handleStop}
-                            onEndCall={cleanup}
+                            onEndCall={() => cleanup(true)}
                             onFileSelect={handleFileSelect}
                             onScreenShare={toggleScreenShare}
                             onReport={handleReport}
