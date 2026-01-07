@@ -217,7 +217,7 @@ const Tooltip = ({ children, style }: TooltipProps) => {
             ref={tooltipRef}
             style={{
                 position: "absolute",
-                background: "#000000",
+                background: "#141414",
                 color: "white",
                 padding: "4px 12px",
                 borderRadius: "28px",
@@ -355,6 +355,11 @@ const lightColors = {
         ppt: "#FBBC04",
         default: "#4285F4",
     },
+}
+
+const pureBlackColors = {
+    ...darkColors,
+    background: "#141414",
 }
 
 const colors = darkColors
@@ -1195,6 +1200,7 @@ const ToolbarButton = React.memo(
         isActive = false,
         isHovered,
         onHoverChange,
+        themeColors,
     }: {
         id: string
         icon: React.ReactNode
@@ -1203,6 +1209,7 @@ const ToolbarButton = React.memo(
         isActive?: boolean
         isHovered: boolean
         onHoverChange: (isHovered: boolean) => void
+        themeColors: any
     }) => (
         <button
             className={id}
@@ -1214,7 +1221,7 @@ const ToolbarButton = React.memo(
             style={{
                 width: 40,
                 height: 40,
-                background: isActive ? "#E5E5E5" : "#F6F6F6",
+                background: isActive ? themeColors.state.hover : "transparent",
                 borderRadius: 28,
                 justifyContent: "center",
                 alignItems: "center",
@@ -1222,6 +1229,7 @@ const ToolbarButton = React.memo(
                 cursor: "pointer",
                 position: "relative",
                 border: "none",
+                outline: "none",
                 padding: 0,
             }}
             type="button"
@@ -1363,12 +1371,13 @@ const DocEditor = React.memo(function DocEditor({
                 "--doc-font-serif": '"Times New Roman", serif',
                 "--doc-font-sans": "Inter, sans-serif",
                 "--doc-accent": "#0099FF",
+                "--doc-border-color": themeColors.border?.subtle || "rgba(0,0,0,0.1)",
                 "--doc-current-font":
                     settings.fontStyle === "serif"
                         ? "var(--doc-font-serif)"
                         : "var(--doc-font-sans)",
             }) as React.CSSProperties,
-        [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle]
+        [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle, themeColors]
     )
 
     // --- Core Editor Logic ---
@@ -2241,8 +2250,8 @@ const DocEditor = React.memo(function DocEditor({
                 width: "100%",
                 height: "100%",
                 position: "relative",
-                background: "white",
-                color: "rgba(0, 0, 0, 0.95)",
+                background: themeColors.background,
+                color: themeColors.text.primary,
                 display: "flex",
                 flexDirection: "column",
             }}
@@ -2269,7 +2278,7 @@ const DocEditor = React.memo(function DocEditor({
                     className="Left"
                     style={{
                         maxWidth: 808.89,
-                        background: "#F6F6F6",
+                        background: themeColors.surface,
                         borderRadius: 28,
                         justifyContent: "flex-start",
                         alignItems: "center",
@@ -2285,7 +2294,7 @@ const DocEditor = React.memo(function DocEditor({
                             height: 40,
                             paddingLeft: 8,
                             paddingRight: 4,
-                            background: "#F6F6F6",
+                            background: themeColors.surface,
                             borderRadius: 28,
                             justifyContent: "center",
                             alignItems: "center",
@@ -2318,7 +2327,7 @@ const DocEditor = React.memo(function DocEditor({
                             >
                                 <path
                                     d="M2 20H14"
-                                    stroke="black"
+                                    stroke={themeColors.text.primary}
                                     strokeOpacity="0.95"
                                     strokeWidth="1.23935"
                                     strokeLinecap="round"
@@ -2346,7 +2355,7 @@ const DocEditor = React.memo(function DocEditor({
                                 justifyContent: "center",
                                 display: "flex",
                                 flexDirection: "column",
-                                color: "rgba(0, 0, 0, 0.95)",
+                                color: themeColors.text.primary,
                                 fontSize: 14,
                                 fontFamily: "Inter",
                                 fontWeight: "400",
@@ -2403,7 +2412,7 @@ const DocEditor = React.memo(function DocEditor({
                             >
                                 <path
                                     d="M14 20H8M8 20H2M8 20V14M8 20V26"
-                                    stroke="black"
+                                    stroke={themeColors.text.primary}
                                     strokeOpacity="0.95"
                                     strokeWidth="1.28"
                                     strokeLinecap="round"
@@ -2430,9 +2439,18 @@ const DocEditor = React.memo(function DocEditor({
                         id="bold"
                         onClick={() => handleSmartFormat("bold")}
                         tooltip={`Bold (${getModifierKey()}+B)`}
+                        themeColors={themeColors}
                         icon={
                             <div
                                 style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    background: themeColors.surface,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: themeColors.text.primary,
                                     fontWeight: 700,
                                     fontSize: 17.5,
                                     lineHeight: "24.15px",
@@ -2452,17 +2470,24 @@ const DocEditor = React.memo(function DocEditor({
                         id="italic"
                         onClick={() => handleSmartFormat("italic")}
                         tooltip={`Italic (${getModifierKey()}+I)`}
+                        themeColors={themeColors}
                         icon={
                             <svg
-                                width="32"
-                                height="32"
-                                viewBox="0 0 32 32"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 40 40"
                                 fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
                             >
+                                <rect
+                                    width="40"
+                                    height="40"
+                                    rx="20"
+                                    fill={themeColors.surface}
+                                />
                                 <path
-                                    d="M20.2782 10.5H14.1671M17.8338 21.5H11.7227M17.5282 10.5L14.7782 21.5"
-                                    stroke="black"
+                                    d="M24.2782 14.5H18.1671M21.8338 25.5H15.7227M21.5282 14.5L18.7782 25.5"
+                                    stroke={themeColors.text.primary}
                                     strokeOpacity="0.95"
                                     strokeWidth="1.32"
                                     strokeLinecap="round"
@@ -2481,6 +2506,7 @@ const DocEditor = React.memo(function DocEditor({
                         id="list"
                         onClick={() => handleFormat("insertUnorderedList")}
                         tooltip={`Bullet list (${getModifierKey()}+Shift+8)`}
+                        themeColors={themeColors}
                         icon={
                             <svg
                                 width="40"
@@ -2493,11 +2519,11 @@ const DocEditor = React.memo(function DocEditor({
                                     width="40"
                                     height="40"
                                     rx="20"
-                                    fill="#F6F6F6"
+                                    fill={themeColors.surface}
                                 />
                                 <path
                                     d="M12.5 15.2857C12.5 15.1152 12.5677 14.9517 12.6883 14.8311C12.8088 14.7106 12.9724 14.6429 13.1429 14.6429H14C14.1705 14.6429 14.334 14.7106 14.4546 14.8311C14.5751 14.9517 14.6429 15.1152 14.6429 15.2857C14.6429 15.4562 14.5751 15.6197 14.4546 15.7403C14.334 15.8608 14.1705 15.9286 14 15.9286H13.1429C12.9724 15.9286 12.8088 15.8608 12.6883 15.7403C12.5677 15.6197 12.5 15.4562 12.5 15.2857ZM15.9286 15.2857C15.9286 15.1152 15.9963 14.9517 16.1169 14.8311C16.2374 14.7106 16.4009 14.6429 16.5714 14.6429H26.8571C27.0276 14.6429 27.1912 14.7106 27.3117 14.8311C27.4323 14.9517 27.5 15.1152 27.5 15.2857C27.5 15.4562 27.4323 15.6197 27.3117 15.7403C27.1912 15.8608 27.0276 15.9286 26.8571 15.9286H16.5714C16.4009 15.9286 16.2374 15.8608 16.1169 15.7403C15.9963 15.6197 15.9286 15.4562 15.9286 15.2857ZM12.5 20C12.5 19.8295 12.5677 19.666 12.6883 19.5454C12.8088 19.4249 12.9724 19.3571 13.1429 19.3571H14C14.1705 19.3571 14.334 19.4249 14.4546 19.5454C14.5751 19.666 14.6429 19.8295 14.6429 20C14.6429 20.1705 14.5751 20.334 14.4546 20.4546C14.334 20.5751 14.1705 20.6429 14 20.6429H13.1429C12.9724 20.6429 12.8088 20.5751 12.6883 20.4546C12.5677 20.334 12.5 20.1705 12.5 20ZM15.9286 20C15.9286 19.8295 15.9963 19.666 16.1169 19.5454C16.2374 19.4249 16.4009 19.3571 16.5714 19.3571H26.8571C27.0276 19.3571 27.1912 19.4249 27.3117 19.5454C27.4323 19.666 27.5 19.8295 27.5 20C27.5 20.1705 27.4323 20.334 27.3117 20.4546C27.1912 20.5751 27.0276 20.6429 26.8571 20.6429H16.5714C16.4009 20.6429 16.2374 20.5751 16.1169 20.4546C15.9963 20.334 15.9286 20.1705 15.9286 20ZM12.5 24.7143C12.5 24.5438 12.5677 24.3803 12.6883 24.2597C12.8088 24.1392 12.9724 24.0714 13.1429 24.0714H14C14.1705 24.0714 14.334 24.1392 14.4546 24.2597C14.5751 24.3803 14.6429 24.5438 14.6429 24.7143C14.6429 24.8848 14.5751 25.0483 14.4546 25.1689C14.334 25.2894 14.1705 25.3571 14 25.3571H13.1429C12.9724 25.3571 12.8088 25.2894 12.6883 25.1689C12.5677 25.0483 12.5 24.8848 12.5 24.7143ZM15.9286 24.7143C15.9286 24.5438 15.9963 24.3803 16.1169 24.2597C16.2374 24.1392 16.4009 24.0714 16.5714 24.0714H26.8571C27.0276 24.0714 27.1912 24.1392 27.3117 24.2597C27.4323 24.3803 27.5 24.5438 27.5 24.7143C27.5 24.8848 27.4323 25.0483 27.3117 25.1689C27.1912 25.2894 27.0276 25.3571 26.8571 25.3571H16.5714C16.4009 25.3571 16.2374 25.2894 16.1169 25.1689C15.9963 25.0483 15.9286 24.8848 15.9286 24.7143Z"
-                                    fill="black"
+                                    fill={themeColors.text.primary}
                                     fillOpacity="0.95"
                                 />
                             </svg>
@@ -2512,6 +2538,7 @@ const DocEditor = React.memo(function DocEditor({
                     <div ref={linkDropdownRef} style={{ position: "relative" }}>
                         <ToolbarButton
                             id="link"
+                            themeColors={themeColors}
                             onClick={() => {
                                 if (!showLinkDropdown) {
                                     // Opening dropdown - save selection
@@ -2570,11 +2597,11 @@ const DocEditor = React.memo(function DocEditor({
                                         width="40"
                                         height="40"
                                         rx="20"
-                                        fill="#F6F6F6"
+                                        fill={themeColors.surface}
                                     />
                                     <path
                                         d="M23.4335 20.9139L25.548 18.7993C26.7844 17.563 26.8124 15.5859 25.6102 14.3837C24.408 13.1815 22.4309 13.2095 21.1946 14.4459L19.08 16.5604M20.9458 23.4016L18.8288 25.5099C17.5911 26.7438 15.6737 26.8912 14.4106 25.5721C13.1481 24.2536 13.2364 22.4003 14.474 21.1664L16.5911 19.0581M17.3741 22.6198L22.6517 17.3422"
-                                        stroke="black"
+                                        stroke={themeColors.text.primary}
                                         strokeOpacity="0.95"
                                         strokeWidth="1.13455"
                                         strokeLinecap="round"
@@ -2603,8 +2630,8 @@ const DocEditor = React.memo(function DocEditor({
                                     ref={linkDropdownContentRef}
                                     style={{
                                         ...linkDropdownPosition,
-                                        background: "white",
-                                        border: "1px solid #eee",
+                                        background: themeColors.surfaceModal,
+                                        border: `1px solid ${themeColors.border.subtle}`,
                                         borderRadius: 20, // Link overlay dropdown border radius
                                         boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                                         padding: 8,
@@ -2644,11 +2671,13 @@ const DocEditor = React.memo(function DocEditor({
                                         width: "100%",
                                         padding: "8px 10px",
                                         borderRadius: 12,
-                                        border: "1px solid #ddd",
+                                        border: `1px solid ${themeColors.border.subtle}`,
                                         marginBottom: 6,
                                         fontSize: 14,
                                         fontFamily: "Inter",
                                         outline: "none",
+                                        background: "transparent",
+                                        color: themeColors.text.primary,
                                     }}
                                 />
                                 <div style={{ display: "flex", gap: 4 }}>
@@ -2659,8 +2688,8 @@ const DocEditor = React.memo(function DocEditor({
                                         style={{
                                             flex: 1,
                                             padding: "6px 10px",
-                                            background: linkUrl.trim() ? "#0099FF" : "#E5E5E5",
-                                            color: linkUrl.trim() ? "white" : "#999",
+                                            background: linkUrl.trim() ? "#0099FF" : themeColors.state.hover,
+                                            color: linkUrl.trim() ? "white" : themeColors.text.tertiary,
                                             border: "none",
                                             borderRadius: 28,
                                             cursor: linkUrl.trim() ? "pointer" : "not-allowed",
@@ -2678,8 +2707,8 @@ const DocEditor = React.memo(function DocEditor({
                                         style={{
                                                 flex: 1,
                                                 padding: "6px 10px",
-                                            background: "#ffebee",
-                                            color: "#d32f2f",
+                                            background: "rgba(239, 68, 68, 0.15)", // Red tint for delete
+                                            color: "#EF4444",
                                             border: "none",
                                                 borderRadius: 28,
                                             cursor: "pointer",
@@ -2797,7 +2826,7 @@ const DocEditor = React.memo(function DocEditor({
                                 <div
                                     style={{
                                         padding: "4px 12px",
-                                        color: "rgba(0, 0, 0, 0.65)",
+                                        color: themeColors.text.secondary,
                                         fontSize: 12,
                                         fontFamily: "Inter",
                                         fontWeight: "500",
@@ -2898,7 +2927,7 @@ const DocEditor = React.memo(function DocEditor({
                         }}
                         style={{
                             outline: "none",
-                            minHeight: "80vh",
+                            minHeight: "100%",
                             fontSize: "var(--doc-p-size)",
                             fontFamily: "var(--doc-current-font)",
                             lineHeight: 1.6,
@@ -2914,7 +2943,7 @@ const DocEditor = React.memo(function DocEditor({
 
             <style>{`
                 .DocEditor h1 { font-size: var(--doc-h1-size); font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; }
-                .DocEditor h2 { font-size: var(--doc-h2-size); font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 1.2em; margin-bottom: 0.5em; }
+                .DocEditor h2 { font-size: var(--doc-h2-size); font-weight: 700; text-transform: uppercase; border-bottom: 1px solid var(--doc-border-color, #000); margin-top: 1.2em; margin-bottom: 0.5em; }
                 .DocEditor ul, .DocEditor ol { padding-left: 24px; margin: 12px 0; }
                 .DocEditor a { color: var(--doc-accent); text-decoration: underline; cursor: pointer; }
             `}</style>
@@ -3534,9 +3563,7 @@ const ChatInput = React.memo(function ChatInput({
                         background:
                             themeColors === lightColors
                                 ? themeColors.background
-                                : isDocOpen || isWhiteboardOpen
-                                  ? "transparent"
-                                  : themeColors.surface,
+                                : themeColors.surface,
                         outline:
                             isDocOpen || isWhiteboardOpen
                                 ? `0.33px ${themeColors.border.subtle} solid`
@@ -3614,7 +3641,7 @@ const ChatInput = React.memo(function ChatInput({
                                                 >
                                                     <path
                                                         d="M1 1L9 9M9 1L1 9"
-                                                        stroke="black"
+                                                        stroke={themeColors.text.primary}
                                                         strokeWidth="1.5"
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
@@ -5861,9 +5888,18 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- THEME LOGIC ---
     const isLightMode = false // Always dark mode for shell, DocEditor handles its own light theme
-    const themeColors = isLightMode ? lightColors : darkColors
-    const chatThemeColors =
-        isDocOpen || isWhiteboardOpen ? lightColors : themeColors
+    
+    // Determine base theme (default dark or light)
+    const baseTheme = isLightMode ? lightColors : darkColors
+    const themeColors = baseTheme
+    
+    // Determine Chat/Doc theme:
+    // 1. Doc Open -> Pure Black
+    // 2. Whiteboard Open (and no Doc) -> Light
+    // 3. Default -> Base Theme (Dark)
+    const chatThemeColors = isDocOpen 
+        ? pureBlackColors 
+        : (isWhiteboardOpen ? lightColors : themeColors)
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(
@@ -7465,7 +7501,7 @@ Do not include markdown formatting or explanations.`
     }, [chatHeight])
 
     // --- CONSTANTS ---
-    const MIN_CHAT_HEIGHT = 196
+    const MIN_CHAT_HEIGHT = 204
 
     // --- STATE: LAYOUT & DIMENSIONS ---
     const [containerSize, setContainerSize] = React.useState({
@@ -10622,7 +10658,7 @@ Do not include markdown formatting or explanations.`
                                                 : 14,
                                         position: "relative",
                                         background:
-                                            isDocOpen || isWhiteboardOpen
+                                            isWhiteboardOpen && !isDocOpen
                                                 ? "white"
                                                 : "transparent",
                                     }}
@@ -10633,7 +10669,7 @@ Do not include markdown formatting or explanations.`
                                             onChange={handleDocChange}
                                             settings={docSettings}
                                             onSettingsChange={setDocSettings}
-                                            themeColors={lightColors}
+                                            themeColors={chatThemeColors}
                                             isMobileLayout={isMobileLayout}
                                             remoteCursor={remoteCursor}
                                             onCursorMove={handleDocPointerMove}
@@ -10753,7 +10789,9 @@ Do not include markdown formatting or explanations.`
                         height: 24,
                         width: "100%",
                         background:
-                            isDocOpen || isWhiteboardOpen
+                            isDocOpen
+                                ? chatThemeColors.background
+                                : isWhiteboardOpen
                                 ? "white"
                                 : "transparent",
                         ...styles.flexCenter,
@@ -10769,10 +10807,7 @@ Do not include markdown formatting or explanations.`
                             width: 48,
                             height: 5,
                             borderRadius: 4,
-                            background:
-                                isDocOpen || isWhiteboardOpen
-                                    ? "rgba(0,0,0,0.2)"
-                                    : "rgba(255,255,255,0.2)",
+                            background: "rgba(255,255,255,0.2)",
                         }}
                     />
                     {isDragBarHovered && !isDragging.current && (
@@ -10807,7 +10842,11 @@ Do not include markdown formatting or explanations.`
                             ? "100%"
                             : "auto",
                     background:
-                        isDocOpen || isWhiteboardOpen ? "white" : "transparent",
+                        isDocOpen
+                            ? chatThemeColors.background
+                            : isWhiteboardOpen
+                            ? "white"
+                            : "transparent",
                     display: "flex",
                     justifyContent: "center",
                 }}
