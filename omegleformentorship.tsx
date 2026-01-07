@@ -308,6 +308,7 @@ const darkColors = {
 
     state: {
         hover: "rgba(255, 255, 255, 0.12)",
+        hoverSubtle: "rgba(255, 255, 255, 0.04)",
         destructive: "#EC1313", // Red
         accent: "#0B87DA", // Blue, default student card color
         overlay: "rgba(0, 0, 0, 0.7)",
@@ -342,6 +343,7 @@ const lightColors = {
 
     state: {
         hover: "rgba(0, 0, 0, 0.05)",
+        hoverSubtle: "rgba(0, 0, 0, 0.04)",
         destructive: "#EF4444", // Red
         accent: "#0EA5E9", // Sky Blue
         overlay: "rgba(255, 255, 255, 0.8)",
@@ -673,39 +675,111 @@ const renderSimpleMarkdown = (
             )
         }
 
-        const blocks = segment.split(/\n{2,}/)
+        // Split by lines to handle mixed content better
+        const lines = segment.split("\n")
+        const nodes: JSX.Element[] = []
+        
+        let currentListType: "ul" | "ol" | null = null
+        let currentListItems: string[] = []
+        let currentTableLines: string[] = []
+        
+        const flushList = () => {
+            if (!currentListType || currentListItems.length === 0) return
+            const ListTag = currentListType === "ul" ? "ul" : "ol"
+            const key = `list-${segIndex}-${nodes.length}`
+            nodes.push(
+                <ListTag
+                    key={key}
+                    style={{
+                        paddingLeft: 20,
+                        margin: "0.5em 0",
+                        listStyleType: currentListType === "ul" ? "disc" : "decimal",
+                    }}
+                >
+                    {currentListItems.map((item, i) => (
+                        <li key={`${key}-li-${i}`} style={baseTextStyle}>
+                            {applyInlineFormatting(item, `${key}-li-${i}`, linkStyle)}
+                        </li>
+                    ))}
+                </ListTag>
+            )
+            currentListItems = []
+            currentListType = null
+        }
 
-        return blocks.map((block, blockIndex) => {
-            const key = `seg-${segIndex}-blk-${blockIndex}`
-            const trimmed = block.trim()
-            if (!trimmed) return null
+        const flushTable = () => {
+             if (currentTableLines.length === 0) return
+             // Basic validation: needs at least header and separator
+             if (currentTableLines.length >= 2 && currentTableLines[1].includes("---")) {
+                 const key = `table-${segIndex}-${nodes.length}`
+                 const tableBlock = currentTableLines.join("\n")
+                 const table = renderTable(tableBlock, key, baseTextStyle, linkStyle)
+                 if (table) nodes.push(table)
+                 else {
+                     // Fallback: render as text lines if table parsing failed
+                     currentTableLines.forEach((line, i) => {
+                        nodes.push(
+                            <div key={`p-tbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
+                                {applyInlineFormatting(line, `p-tbl-${segIndex}-${nodes.length}-${i}`, linkStyle)}
+                            </div>
+                        )
+                     })
+                 }
+             } else {
+                 // Not a valid table, render as text lines
+                 currentTableLines.forEach((line, i) => {
+                    nodes.push(
+                        <div key={`p-badtbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
+                            {applyInlineFormatting(line, `p-badtbl-${segIndex}-${nodes.length}-${i}`, linkStyle)}
+                        </div>
+                    )
+                 })
+             }
+             currentTableLines = []
+        }
 
-            if (
-                trimmed.includes("|") &&
-                trimmed.includes("\n") &&
-                trimmed.split("\n")[1].includes("---")
-            ) {
-                const table = renderTable(
-                    trimmed,
-                    key,
-                    baseTextStyle,
-                    linkStyle
-                )
-                if (table) return table
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
+            const trimmed = line.trim()
+            
+            // Table handling
+            if (trimmed.includes("|")) {
+                flushList() // Close list if we enter a table
+                currentTableLines.push(line)
+                continue
+            } else {
+                flushTable() // Close table if we hit a non-table line
             }
 
-            if (/^---+$|^\*\*\*+$/.test(trimmed)) {
-                return <hr key={key} className="chat-markdown-hr" />
+            // List handling
+            const ulMatch = trimmed.match(/^[-*]\s+(.*)/)
+            const olMatch = trimmed.match(/^(\d+)\.\s+(.*)/)
+            
+            if (ulMatch) {
+                if (currentListType !== "ul") flushList()
+                currentListType = "ul"
+                currentListItems.push(ulMatch[1])
+                continue
+            } else if (olMatch) {
+                if (currentListType !== "ol") flushList()
+                currentListType = "ol"
+                currentListItems.push(olMatch[2])
+                continue
+            } else {
+                flushList()
             }
+            
+            if (!trimmed) continue
 
+            // Headings
             const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
             if (headingMatch) {
                 const level = headingMatch[1].length
                 const content = headingMatch[2]
                 const sizes = [24, 20, 18, 16, 14, 12]
-                return (
+                nodes.push(
                     <div
-                        key={key}
+                        key={`h-${segIndex}-${i}`}
                         style={{
                             ...baseTextStyle,
                             fontSize: `${Math.max(sizes[level - 1], 14)}px`,
@@ -713,78 +787,41 @@ const renderSimpleMarkdown = (
                             margin: "0.5em 0",
                         }}
                     >
-                        {applyInlineFormatting(content, `${key}-h`, linkStyle)}
+                        {applyInlineFormatting(content, `h-${segIndex}-${i}`, linkStyle)}
                     </div>
                 )
+                continue
             }
-
+            
+            // Blockquote
             if (trimmed.startsWith(">")) {
                 const content = trimmed.replace(/^>\s?/gm, "").trim()
-                return (
-                    <blockquote key={key} className="chat-markdown-blockquote">
-                        {applyInlineFormatting(content, `${key}-qt`, linkStyle)}
+                nodes.push(
+                    <blockquote key={`qt-${segIndex}-${i}`} className="chat-markdown-blockquote">
+                        {applyInlineFormatting(content, `qt-${segIndex}-${i}`, linkStyle)}
                     </blockquote>
                 )
+                continue
+            }
+            
+            // Horizontal Rule
+            if (/^---+$|^\*\*\*+$/.test(trimmed)) {
+                nodes.push(<hr key={`hr-${segIndex}-${i}`} className="chat-markdown-hr" />)
+                continue
             }
 
-            if (/^[-*]\s/.test(trimmed)) {
-                const items = trimmed
-                    .split("\n")
-                    .map((l) => l.replace(/^[-*]\s+/, ""))
-                return (
-                    <ul
-                        key={key}
-                        style={{
-                            paddingLeft: 20,
-                            margin: "0.5em 0",
-                            listStyleType: "disc",
-                        }}
-                    >
-                        {items.map((item, i) => (
-                            <li key={`${key}-li-${i}`} style={baseTextStyle}>
-                                {applyInlineFormatting(
-                                    item,
-                                    `${key}-li-${i}`,
-                                    linkStyle
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                )
-            }
-
-            if (/^\d+\.\s/.test(trimmed)) {
-                const items = trimmed
-                    .split("\n")
-                    .map((l) => l.replace(/^\d+\.\s+/, ""))
-                return (
-                    <ol
-                        key={key}
-                        style={{
-                            paddingLeft: 20,
-                            margin: "0.5em 0",
-                            listStyleType: "decimal",
-                        }}
-                    >
-                        {items.map((item, i) => (
-                            <li key={`${key}-li-${i}`} style={baseTextStyle}>
-                                {applyInlineFormatting(
-                                    item,
-                                    `${key}-li-${i}`,
-                                    linkStyle
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                )
-            }
-
-            return (
-                <div key={key} style={{ ...baseTextStyle, margin: "0.5em 0" }}>
-                    {applyInlineFormatting(trimmed, `${key}-p`, linkStyle)}
+            // Regular Paragraph Line
+            nodes.push(
+                <div key={`p-${segIndex}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
+                    {applyInlineFormatting(trimmed, `p-${segIndex}-${i}`, linkStyle)}
                 </div>
             )
-        })
+        }
+        
+        flushList()
+        flushTable()
+
+        return <React.Fragment key={`seg-${segIndex}`}>{nodes}</React.Fragment>
     })
 
     return <React.Fragment>{renderedSegments}</React.Fragment>
@@ -7058,10 +7095,12 @@ Do not include markdown formatting or explanations.`
     ): Promise<string> => {
         if (!geminiApiKey || evidenceParts.length === 0) return "UNKNOWN"
 
+        const moderationModel = "gemini-2.5-flash-lite"
+
         try {
             console.log("Sending moderation request to Gemini...")
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${moderationModel}:generateContent?key=${geminiApiKey}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -7071,11 +7110,6 @@ Do not include markdown formatting or explanations.`
                                 parts: [{ text: prompt }, ...evidenceParts],
                             },
                         ],
-                        generationConfig: {
-                            thinkingConfig: {
-                                thinkingBudget: 0,
-                            },
-                        },
                     }),
                 }
             )
@@ -7163,6 +7197,8 @@ Do not include markdown formatting or explanations.`
         }
         return []
     })
+
+    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<string[]>([])
 
     // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
     React.useEffect(() => {
@@ -8893,6 +8929,71 @@ Do not include markdown formatting or explanations.`
         })
     }
 
+    const generateSuggestedReplies = React.useCallback(async (lastAiText: string) => {
+        if (!geminiApiKey || !lastAiText.trim()) {
+            setAiGeneratedSuggestions([])
+            return
+        }
+
+        setAiGeneratedSuggestions([])
+
+        const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiText}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
+
+        try {
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: suggestionPrompt }] }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 100,
+                            stopSequences: ["\n\n"],
+                        },
+                    }),
+                }
+            )
+
+            if (!response.ok) {
+                console.warn("Failed to generate suggestions")
+                setAiGeneratedSuggestions([])
+                return
+            }
+
+            const data = await response.json()
+            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+
+            if (responseText) {
+                try {
+                    const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
+                    if (jsonMatch && jsonMatch[0]) {
+                        const suggestionsArray = JSON.parse(jsonMatch[0])
+                        if (Array.isArray(suggestionsArray) && suggestionsArray.every((s) => typeof s === "string")) {
+                            console.log("Generated suggestions:", suggestionsArray)
+                            setAiGeneratedSuggestions(
+                                suggestionsArray.slice(0, 3).filter((s) => s.trim() !== "")
+                            )
+                        } else {
+                            setAiGeneratedSuggestions([])
+                        }
+                    } else {
+                        setAiGeneratedSuggestions([])
+                    }
+                } catch (e) {
+                    console.error("Failed to parse suggestions", e)
+                    setAiGeneratedSuggestions([])
+                }
+            } else {
+                setAiGeneratedSuggestions([])
+            }
+        } catch (e) {
+            console.error("Failed to generate suggestions", e)
+            setAiGeneratedSuggestions([])
+        }
+    }, [geminiApiKey])
+
     const generateAIResponse = React.useCallback(
         async (
             text: string,
@@ -9260,6 +9361,10 @@ Do not include markdown formatting or explanations.`
                         payload: { text: accumulatedText },
                     })
                 }
+
+                if (accumulatedText) {
+                    generateSuggestedReplies(accumulatedText)
+                }
             } catch (err: any) {
                 if (err.name === "AbortError") return
                 console.error("AI Error:", err)
@@ -9289,6 +9394,7 @@ Do not include markdown formatting or explanations.`
             geminiApiKey,
             isDocOpen,
             getSystemPromptWithContext,
+            generateSuggestedReplies,
         ]
     )
 
@@ -9308,10 +9414,14 @@ Do not include markdown formatting or explanations.`
     /**
      * Handles message delivery to the Google Gemini API.
      */
-    const handleSendMessage = React.useCallback(async () => {
-        if (!inputText.trim() && attachments.length === 0) return
+    const handleSendMessage = React.useCallback(async (overrideText?: string) => {
+        const textToCheck = overrideText !== undefined ? overrideText : inputText
+        if (!textToCheck.trim() && attachments.length === 0) return
 
-        const textToSend = sanitizeMessage(inputText)
+        // Clear AI suggestions when user sends a message
+        setAiGeneratedSuggestions([])
+
+        const textToSend = sanitizeMessage(textToCheck)
 
         // Input length check
         if (textToSend.length > MAX_INPUT_LENGTH) {
@@ -9851,18 +9961,18 @@ Do not include markdown formatting or explanations.`
         }
         .chat-markdown-table th,
         .chat-markdown-table td {
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid ${chatThemeColors.border.subtle};
             padding: 8px 12px;
             text-align: left;
-            color: rgba(255,255,255,0.95);
+            color: ${chatThemeColors.text.primary};
         }
         .chat-markdown-table th {
             font-weight: 600;
         }
         .chat-markdown-code-block {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.9);
+            background: ${chatThemeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(0,0,0,0.2)"};
+            border: 1px solid ${chatThemeColors.border.subtle};
+            color: ${chatThemeColors.text.primary};
             padding: 12px;
             border-radius: 8px;
             overflow-x: auto;
@@ -9872,12 +9982,12 @@ Do not include markdown formatting or explanations.`
             white-space: pre;
         }
         .chat-markdown-inline-code {
-            background: rgba(255,255,255,0.1);
+            background: ${chatThemeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.1)"};
             padding: 2px 4px;
             border-radius: 4px;
             font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
             font-size: 0.9em;
-            color: #FFD700;
+            color: ${chatThemeColors.background === "#FFFFFF" ? "#D97706" : "#FFD700"};
         }
         .chat-markdown-blockquote {
             border-left: 4px solid ${accentColor};
@@ -9885,12 +9995,18 @@ Do not include markdown formatting or explanations.`
             margin: 1em 0;
             opacity: 0.8;
             font-style: italic;
+            color: ${chatThemeColors.text.secondary};
         }
         .chat-markdown-hr {
             border: 0;
             height: 1px;
-            background: rgba(255,255,255,0.1);
+            background: ${chatThemeColors.border.subtle};
             margin: 1.5em 0;
+        }
+        .chat-markdown-img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 0.5em 0;
         }
         @keyframes pulseStar {
             0% { opacity: 0.5; transform: scale(0.85); }
@@ -9917,7 +10033,7 @@ Do not include markdown formatting or explanations.`
             --color-panel: #FFFFFF !important;
         }
     `,
-        [accentColor]
+        [accentColor, chatThemeColors]
     )
 
     // --- MEMOIZED HELPERS ---
@@ -10014,8 +10130,6 @@ Do not include markdown formatting or explanations.`
             {/* DEBUG CONSOLE OVERLAY */}
             {debugMode && <DebugConsole logs={logs} />}
 
-            {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
-            <style>{markdownStyles}</style>
             {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
             <style>{markdownStyles}</style>
             {(isScreenSharing ||
@@ -10819,6 +10933,76 @@ Do not include markdown formatting or explanations.`
                                     </div>
                                 </div>
                             )}
+
+                        {/* AI SUGGESTED REPLIES - Inside chat area (Column Layout) */}
+                        {aiGeneratedSuggestions.length > 0 && !isLoading && (
+                            <div
+                                data-layer="ai suggested replies"
+                                className="AiSuggestedReplies"
+                                style={{
+                                    width: "100%",
+                                    maxWidth: 336,
+                                    flexDirection: "column",
+                                    justifyContent: "center",
+                                    alignItems: "flex-end",
+                                    gap: 8,
+                                    display: "flex", 
+                                    alignSelf: "flex-end",
+                                    marginTop: 12,
+                                    marginRight: 4,
+                                }}
+                            >
+                                {aiGeneratedSuggestions.map((suggestion, index) => (
+                                    <div
+                                        key={index}
+                                        onClick={() => handleSendMessage(suggestion)}
+                                        data-layer={`suggestion ${index + 1}`}
+                                        className={`Suggestion${index + 1}`}
+                                        style={{
+                                            maxWidth: 380,
+                                            paddingLeft: 12,
+                                            paddingRight: 12,
+                                            paddingTop: 8,
+                                            paddingBottom: 8,
+                                            overflow: "hidden",
+                                            borderRadius: 20,
+                                            outline: `1px ${chatThemeColors.border.subtle} solid`,
+                                            outlineOffset: "-1px",
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                            cursor: "pointer",
+                                            background: "transparent",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = chatThemeColors.state.hoverSubtle
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = "transparent"
+                                        }}
+                                    >
+                                        <div
+                                            data-layer={suggestion}
+                                            style={{
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: chatThemeColors.text.secondary,
+                                                fontSize: 15,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: 1.5,
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            {suggestion}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
                         <div />
                     </div>
 
