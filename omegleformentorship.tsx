@@ -1436,10 +1436,19 @@ const DocEditor = React.memo(function DocEditor({
 
     const getSelectionInfo = React.useCallback(() => {
         const selection = window.getSelection()
-        if (!selection || !selection.rangeCount)
-            return { tag: "P", size: settings.pSize }
+        let node: Node | null = null
 
-        let node = selection.anchorNode
+        // Try to get node from current selection
+        if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
+            node = selection.anchorNode
+        } 
+        // Fallback to savedRange
+        else if (savedRange && editorRef.current?.contains(savedRange.startContainer)) {
+            node = savedRange.startContainer
+        }
+
+        if (!node) return { tag: "P", size: settings.pSize }
+
         while (node && node !== editorRef.current) {
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tag = (node as HTMLElement).tagName
@@ -1451,41 +1460,71 @@ const DocEditor = React.memo(function DocEditor({
             node = node.parentNode
         }
         return { tag: "P", size: settings.pSize }
-    }, [settings, editorRef])
+    }, [settings, editorRef, savedRange])
 
     const updateFontSize = React.useCallback(
         (newSize: number) => {
             const size = Math.max(8, Math.min(72, newSize))
             
+            // Restore selection if needed (when clicking buttons outside editor)
+            if (editorRef.current && !editorRef.current.contains(document.activeElement)) {
+                editorRef.current.focus()
+                const selection = window.getSelection()
+                if (selection && savedRange) {
+                    selection.removeAllRanges()
+                    selection.addRange(savedRange)
+                }
+            }
+            
             // Always update the global setting for the current text category
-                const info = getSelectionInfo()
+            const info = getSelectionInfo()
             if (info.tag === "H1") {
-                    onSettingsChange({ ...settings, h1Size: size })
+                onSettingsChange({ ...settings, h1Size: size })
             } else if (info.tag === "H2") {
-                    onSettingsChange({ ...settings, h2Size: size })
+                onSettingsChange({ ...settings, h2Size: size })
             } else {
                 onSettingsChange({ ...settings, pSize: size })
             }
 
             setSelectedFontSize(size)
             if (!isEditingFontSize) setFontSizeInput(size.toString())
+            
+            // Save the selection after update
+            saveSelection()
         },
         [
             getSelectionInfo,
             settings,
             onSettingsChange,
             isEditingFontSize,
+            savedRange,
+            saveSelection,
         ]
     )
 
     const handleSmartFormat = React.useCallback(
         (command: string) => {
-            restoreSelection()
+            if (!editorRef.current) return
+            
             const selection = window.getSelection()
-            if (!selection || !editorRef.current) return
+            if (!selection) return
 
+            // Check if we need to restore selection (editor doesn't have focus)
+            if (!editorRef.current.contains(document.activeElement)) {
+                editorRef.current.focus()
+                if (savedRange) {
+                    selection.removeAllRanges()
+                    selection.addRange(savedRange)
+                }
+            }
+
+            // SPECIAL FEATURE: If no text is selected (collapsed cursor),
+            // apply formatting to the entire line/paragraph the cursor is on
             if (selection.isCollapsed) {
                 const range = selection.getRangeAt(0)
+                const originalOffset = getCaretCharacterOffsetWithin(editorRef.current)
+                
+                // Find the containing block element (P, LI, H1, H2, DIV)
                 let node = range.commonAncestorContainer as HTMLElement | null
                 while (node && node !== editorRef.current) {
                     if (
@@ -1498,20 +1537,27 @@ const DocEditor = React.memo(function DocEditor({
                 }
 
                 if (node && node !== editorRef.current) {
+                    // Select the entire block
                     const newRange = document.createRange()
                     newRange.selectNodeContents(node)
                     selection.removeAllRanges()
                     selection.addRange(newRange)
-                    document.execCommand(command, false)
-                    selection.collapseToEnd()
+                    
+                    // Apply formatting to the entire block
+                    document.execCommand(command, false, undefined)
+                    
+                    // Restore the cursor to its original position
+                    setCaretPosition(editorRef.current, originalOffset)
                 }
             } else {
-                document.execCommand(command, false)
+                // Text is selected - apply formatting to selection only
+                document.execCommand(command, false, undefined)
             }
+            
             handleInput()
             saveSelection()
         },
-        [restoreSelection, handleInput, saveSelection]
+        [savedRange, handleInput, saveSelection]
     )
 
     const handleFormat = React.useCallback(
@@ -3337,10 +3383,11 @@ const ChatInput = React.memo(function ChatInput({
             isDestructive: isDocOpen,
         })
 
-        // Only students (or no role) see the "New Chat" button so mentors can't delete student messages
-        // Also only show if there are messages to clear
-        const showNewChat = role !== "volunteer" && hasMessages
-        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages)
+        // Show "New Chat" button:
+        // - For students: always show if there are messages
+        // - For volunteers: only show if waiting to connect (not connected p2p) and there are messages
+        const showNewChat = hasMessages && (role !== "volunteer" || !isConnected)
+        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages, "isConnected", isConnected)
 
         const showReport = isConnected && !isLiveMode
 
@@ -9596,7 +9643,7 @@ Do not include markdown formatting or explanations.`
         fetchLocation()
         const textToCheck = overrideText !== undefined ? overrideText : inputText
 
-        if (textToCheck.trim() === "unban-admin-logiebear") {
+        if (textToCheck.trim() === "unban-admin-logiebear") { // Secret code to unban yourself
             setIsBanned(false)
             if (typeof window !== "undefined") {
                 localStorage.removeItem("curastem_ban_expiry")
