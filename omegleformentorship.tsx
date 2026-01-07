@@ -6827,15 +6827,27 @@ Do not include markdown formatting or explanations.`
         width: number
         height: number
     } | null>(null)
+    const [isDragBarHovered, setIsDragBarHovered] = React.useState(false) // Added for tooltip
+    const hoverTimeoutRef = React.useRef<number | null>(null) // Added for tooltip delay
     const isDragging = React.useRef(false)
     const dragStartY = React.useRef(0)
     const dragStartX = React.useRef(0) // Added for horizontal drag
     const dragStartHeight = React.useRef(0)
     const dragMode = React.useRef<"vertical" | "left" | "right">("vertical") // Added mode
     const dragStartRatio = React.useRef(1) // Added ratio capture
+    const hasDragged = React.useRef(false) // Added for click detection
     const containerRef = React.useRef<HTMLDivElement>(null)
     const rafRef = React.useRef<number | null>(null)
     const hasInitialResized = React.useRef(false)
+
+    // Cleanup hover timeout
+    React.useEffect(() => {
+        return () => {
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current)
+            }
+        }
+    }, [])
 
     // Detect mobile for capture attribute
     const isMobile = React.useMemo(() => getDeviceInfo().isMobile, [])
@@ -8808,6 +8820,7 @@ Do not include markdown formatting or explanations.`
             e.stopPropagation() // Prevent bubbling to parent handlers
 
             isDragging.current = true
+            hasDragged.current = false // Reset drag status
             dragMode.current = mode
             dragStartY.current = e.clientY
             dragStartX.current = e.clientX
@@ -8835,6 +8848,20 @@ Do not include markdown formatting or explanations.`
         (e: PointerEvent) => {
             if (!isDragging.current) return
             e.preventDefault()
+
+            // Check for drag threshold to avoid jitter on clicks
+            const moveThreshold = 5
+            const deltaY = Math.abs(e.clientY - dragStartY.current)
+            const deltaX = Math.abs(e.clientX - dragStartX.current)
+
+            if (
+                !hasDragged.current &&
+                deltaY < moveThreshold &&
+                deltaX < moveThreshold
+            ) {
+                return
+            }
+            hasDragged.current = true
 
             // Batch updates into animation frames for 60fps performance
             if (rafRef.current) cancelAnimationFrame(rafRef.current)
@@ -8935,9 +8962,78 @@ Do not include markdown formatting or explanations.`
         }
         window.removeEventListener("pointermove", handlePointerMove)
         window.removeEventListener("pointerup", handlePointerUp)
-    }, [handlePointerMove])
+
+        // Handle Click Toggle Logic
+        if (!hasDragged.current && dragMode.current === "vertical") {
+            const containerHeight =
+                containerRef.current?.clientHeight || window.innerHeight
+            const containerWidth =
+                containerRef.current?.clientWidth || window.innerWidth
+
+            const { minHeight, maxHeight } = calculateHeightConstraints(
+                containerWidth,
+                containerHeight,
+                isMobileLayout,
+                isScreenSharing,
+                remoteScreenStream,
+                isWhiteboardOpen,
+                isDocOpen,
+                sharedScreenSize
+            )
+
+            const isOverlayActive =
+                isScreenSharing ||
+                !!remoteScreenStream ||
+                isWhiteboardOpen ||
+                isDocOpen
+            const effectiveMinHeight = isOverlayActive
+                ? MIN_CHAT_HEIGHT
+                : minHeight
+
+            // If close to max (within 5px), collapse to min. Otherwise expand to max.
+            if (chatHeight >= maxHeight - 5) {
+                setChatHeight(effectiveMinHeight)
+            } else {
+                setChatHeight(maxHeight)
+            }
+        }
+    }, [
+        handlePointerMove,
+        chatHeight,
+        calculateHeightConstraints,
+        isMobileLayout,
+        isScreenSharing,
+        remoteScreenStream,
+        isWhiteboardOpen,
+        isDocOpen,
+        sharedScreenSize,
+    ])
 
     // --- UI DIMENSION CALCULATIONS ---
+
+    // Calculate current constraints for UI feedback (e.g. tooltip)
+    const currentConstraints = React.useMemo(() => {
+        return calculateHeightConstraints(
+            containerSize.width,
+            containerSize.height,
+            isMobileLayout,
+            isScreenSharing,
+            remoteScreenStream,
+            isWhiteboardOpen,
+            isDocOpen,
+            sharedScreenSize
+        )
+    }, [
+        containerSize.width,
+        containerSize.height,
+        calculateHeightConstraints,
+        isMobileLayout,
+        isScreenSharing,
+        remoteScreenStream,
+        isWhiteboardOpen,
+        isDocOpen,
+        sharedScreenSize,
+    ])
 
     // Calculate dynamic size for screen share container to match aspect ratio
     const screenShareContainerStyle = React.useMemo(() => {
@@ -9865,6 +9961,18 @@ Do not include markdown formatting or explanations.`
                 isDocOpen) && (
                 <div
                     onPointerDown={handlePointerDown}
+                    onPointerEnter={() => {
+                        hoverTimeoutRef.current = window.setTimeout(() => {
+                            setIsDragBarHovered(true)
+                        }, 200) // 0.2 second delay to prevent jitter
+                    }}
+                    onPointerLeave={() => {
+                        if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current)
+                            hoverTimeoutRef.current = null
+                        }
+                        setIsDragBarHovered(false)
+                    }}
                     style={{
                         height: 24,
                         width: "100%",
@@ -9877,6 +9985,7 @@ Do not include markdown formatting or explanations.`
                         flexShrink: 0,
                         touchAction: "none",
                         zIndex: 20, // Lowered from 25 to be below menu (100)
+                        position: "relative",
                     }}
                 >
                     <div
@@ -9890,6 +9999,20 @@ Do not include markdown formatting or explanations.`
                                     : "rgba(255,255,255,0.2)",
                         }}
                     />
+                    {isDragBarHovered && !isDragging.current && (
+                        <Tooltip
+                            style={{
+                                top: "100%",
+                                left: "50%",
+                                transform: "translate(-50%, 4px)",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {chatHeight <= currentConstraints.minHeight + 5
+                                ? "Drag to collapse"
+                                : "Drag to expand"}
+                        </Tooltip>
+                    )}
                 </div>
             )}
 
