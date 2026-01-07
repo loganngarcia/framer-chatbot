@@ -620,7 +620,7 @@ const renderTable = (
     )
 
     return (
-        <div key={key} style={{ overflowX: "auto", maxWidth: "100%", display: "block" }}>
+        <div key={key} style={{ overflowX: "auto", width: "100%", display: "block" }}>
             <table className="chat-markdown-table">
                 <thead>
                     <tr>
@@ -734,7 +734,7 @@ const renderSimpleMarkdown = (
                  // Not a valid table, render as text lines
                  currentTableLines.forEach((line, i) => {
                     nodes.push(
-                        <div key={`p-badtbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
+                        <div key={`p-badtbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: 0, minHeight: "1.2em" }}>
                             {applyInlineFormatting(line, `p-badtbl-${segIndex}-${nodes.length}-${i}`, linkStyle)}
                         </div>
                     )
@@ -774,7 +774,7 @@ const renderSimpleMarkdown = (
                 flushList()
             }
             
-            if (!trimmed) continue
+            // if (!trimmed) continue
 
             // Headings
             const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
@@ -817,7 +817,7 @@ const renderSimpleMarkdown = (
 
             // Regular Paragraph Line
             nodes.push(
-                <div key={`p-${segIndex}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
+                <div key={`p-${segIndex}-${i}`} style={{ ...baseTextStyle, margin: 0, minHeight: "1.2em" }}>
                     {applyInlineFormatting(trimmed, `p-${segIndex}-${i}`, linkStyle)}
                 </div>
             )
@@ -4952,6 +4952,8 @@ const MessageBubble = React.memo(
             () => ({
                 color: themeColors.text.link,
                 textDecoration: "underline",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
             }),
             [themeColors]
         )
@@ -5636,15 +5638,17 @@ const MessageBubble = React.memo(
                                         ? "flex-end"
                                         : "flex-start",
                                 maxWidth: "100%",
+                                minWidth: 0,
+                                overflowWrap: "anywhere",
+                                wordBreak: "break-word",
+                                whiteSpace: "pre-wrap",
                             }}
                         >
-                            {msg.role === "user" || msg.role === "peer"
-                                ? msg.text
-                                : renderSimpleMarkdown(
-                                      msg.text,
-                                      baseTextStyle,
-                                      linkStyle
-                                  )}
+                            {renderSimpleMarkdown(
+                                msg.text,
+                                baseTextStyle,
+                                linkStyle
+                            )}
                         </div>
                     )}
 
@@ -10077,7 +10081,8 @@ Do not include markdown formatting or explanations.`
     const markdownStyles = React.useMemo(
         () => `
         .chat-markdown-table {
-            width: 100%;
+            width: max-content;
+            min-width: 100%;
             border-collapse: collapse;
             margin: 1em 0;
             font-size: 16px;
@@ -10088,6 +10093,8 @@ Do not include markdown formatting or explanations.`
             padding: 8px 12px;
             text-align: left;
             color: ${chatThemeColors.text.primary};
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         .chat-markdown-table th {
             font-weight: 600;
@@ -10978,6 +10985,7 @@ Do not include markdown formatting or explanations.`
                             // This removes the permanent giant void at the bottom.
                             paddingBottom: 90,
                             overflowY: "auto",
+                            overflowX: "hidden",
                             display: "flex",
                             flexDirection: "column",
                             gap: 16,
