@@ -9381,7 +9381,7 @@ Do not include markdown formatting or explanations.`
                     console.error("Gemini API Error:", data)
                     setMessages((prev) => [
                         ...prev,
-                        { role: "model", text: `Error: ${errorMsg}` },
+                        { role: "model", text: "Message not sent. Please try again. If this issue persists, please contact support@curastem.org" },
                     ])
                     return
                 }
@@ -9493,7 +9493,7 @@ Do not include markdown formatting or explanations.`
                         }
 
                         if (!accumulatedText) {
-                            accumulatedText = "I've updated the document."
+                            accumulatedText = "Check out these notes."
                             setMessages((prev) => {
                                 const newArr = [...prev]
                                 if (
@@ -9551,11 +9551,11 @@ Do not include markdown formatting or explanations.`
                     const last = newArr[newArr.length - 1]
                     if (last?.role === "model" && !last.text) {
                         last.text =
-                            "Sorry, I encountered an error processing that request."
+                            "Message not sent. Please try again. If this issue persists, please contact support@curastem.org"
                     } else {
                         newArr.push({
                             role: "model",
-                            text: "Sorry, I encountered an error processing that request.",
+                            text: "Message not sent. Please try again. If this issue persists, please contact support@curastem.org",
                         })
                     }
                     return newArr

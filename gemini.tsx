@@ -2614,7 +2614,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             errMsg = (await response.text()) || errMsg
                         } catch (tE) {}
                     }
-                    setError(errMsg.substring(0, 300))
+                    setError("Message not sent. Please try again. If this issue persists, please contact support@curastem.org")
                 }
             } else if (!response.body && !signal.aborted) {
                 throw new Error("No response body from API.")
@@ -2658,7 +2658,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                                     ) {
                                         displayError = `Blocked due to safety settings.`
                                     }
-                                    setError(displayError)
+                                    setError("Message not sent. Please try again. If this issue persists, please contact support@curastem.org")
                                     fullResp = ""
                                     setStreamed("")
                                     setIsLoading(false)
@@ -2710,7 +2710,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             if (e.name === "AbortError") {
                 setStreamed("")
             } else if (!error) {
-                setError(e?.message || "Error contacting Gemini API")
+                setError("Message not sent. Please try again. If this issue persists, please contact support@curastem.org")
                 setStreamed("")
             }
         } finally {
