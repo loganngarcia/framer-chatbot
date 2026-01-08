@@ -18,6 +18,36 @@ const MODEL_OUTPUT_SAMPLE_RATE = 24000
 const INPUT_TARGET_SAMPLE_RATE = 16000
 
 // -----------------------------------------------------------------------------
+// Word List for Hash Generation
+// -----------------------------------------------------------------------------
+const THREE_LETTER_WORDS = [
+    "ant", "art", "ash", "bad", "bag", "bat", "bed", "bee", "big", "bin",
+    "bit", "box", "boy", "bug", "bus", "can", "cap", "car", "cat", "cow",
+    "cry", "cup", "cut", "dad", "day", "dog", "dry", "ear", "eat", "egg",
+    "end", "eye", "fan", "far", "fat", "few", "fit", "fix", "fly", "fog",
+    "for", "fox", "fun", "fur", "gap", "gas", "gem", "get", "gym", "hat",
+    "hen", "hot", "hug", "ice", "ink", "jam", "jar", "jaw", "jet", "job",
+    "joy", "key", "kid", "kit", "lab", "lap", "law", "lay", "leg", "let",
+    "lid", "lie", "lip", "log", "lot", "low", "mad", "man", "map", "mat",
+    "mix", "mom", "mud", "mug", "net", "new", "nut", "oar", "oil", "old",
+    "one", "owl", "pan", "paw", "pay", "pea", "pen", "pet", "pie", "pig",
+    "pin", "pit", "pot", "pro", "put", "rag", "ram", "rat", "ray", "red",
+    "rib", "rig", "rim", "rip", "rod", "row", "rub", "rug", "run", "sad",
+    "sea", "see", "set", "sew", "shy", "sin", "sip", "sir", "sit", "six",
+    "ski", "sky", "sly", "son", "spy", "sun", "tab", "tag", "tan", "tap",
+    "tax", "tea", "ten", "tie", "tin", "tip", "toe", "ton", "top", "toy",
+    "try", "tub", "two", "use", "van", "vet", "war", "way", "web", "wet",
+    "wig", "win", "wit", "wow", "yak", "yam", "yes", "yet", "zip", "zoo"
+]
+
+const generateLinkHash = () => {
+    const w1 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
+    const w2 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
+    const w3 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
+    return `#${w1}-${w2}-${w3}`
+}
+
+// -----------------------------------------------------------------------------
 // Audio Processing Helpers for Live API
 // -----------------------------------------------------------------------------
 
@@ -4142,12 +4172,23 @@ const ChatInput = React.memo(function ChatInput({
 // --- HELPER COMPONENT: DEBUG CONSOLE ---
 function DebugConsole({ logs }: { logs: string[] }) {
     const scrollRef = React.useRef<HTMLDivElement>(null)
+    const [copied, setCopied] = React.useState(false)
 
     React.useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
     }, [logs])
+
+    const handleCopy = () => {
+        const logsText = logs.join('\n')
+        navigator.clipboard.writeText(logsText).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        }).catch(err => {
+            console.error('Failed to copy logs:', err)
+        })
+    }
 
     return (
         <div
@@ -4157,24 +4198,53 @@ function DebugConsole({ logs }: { logs: string[] }) {
                 left: 10,
                 right: 10,
                 height: 150,
-                background: "rgba(0,0,0,0.8)",
+                background: "rgba(0,0,0,0.9)",
                 color: "#0f0",
                 fontFamily: "monospace",
                 fontSize: 12,
                 padding: 8,
                 overflowY: "auto",
                 zIndex: 9999,
-                pointerEvents: "none",
+                pointerEvents: "auto",
                 borderRadius: 28,
                 border: "1px solid rgba(255,255,255,0.2)",
+                display: "flex",
+                flexDirection: "column",
             }}
-            ref={scrollRef}
         >
-            {logs.map((log, i) => (
-                <div key={i} style={{ marginBottom: 4 }}>
-                    {log}
-                </div>
-            ))}
+            <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginBottom: 8,
+                borderBottom: "1px solid rgba(255,255,255,0.2)",
+                paddingBottom: 8,
+            }}>
+                <div style={{ color: "#fff", fontWeight: "bold" }}>🔍 Debug Console</div>
+                <button
+                    onClick={handleCopy}
+                    style={{
+                        background: copied ? "#22c55e" : "#3b82f6",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "6px 12px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        transition: "all 0.2s",
+                    }}
+                >
+                    {copied ? "✓ Copied!" : "📋 Copy Logs"}
+                </button>
+            </div>
+            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
+                {logs.slice(-200).map((log, i) => (
+                    <div key={i} style={{ marginBottom: 4 }}>
+                        {log}
+                    </div>
+                ))}
+            </div>
         </div>
     )
 }
@@ -6143,6 +6213,26 @@ export default function OmegleMentorshipUI(props: Props) {
         }
         return null
     })
+    
+    // Hash Management - Generate hash on initial load for private room connections
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            const currentHash = window.location.hash
+            const hasHash = currentHash && currentHash.length > 1
+            
+            log(`🔗 Hash Check - Current: ${currentHash}, Has hash: ${hasHash}, Role: ${role}`)
+            
+            // Generate hash on first load if none exists (for private room mode)
+            if (!hasHash && !role) {
+                const newHash = generateLinkHash()
+                window.history.replaceState(null, "", newHash)
+                log(`🔗 Generated new private room hash: ${newHash}`)
+            } else if (hasHash) {
+                log(`🔗 Using existing hash: ${currentHash}`)
+            }
+        }
+    }, [])
+
     const roleRef = React.useRef(role)
     React.useEffect(() => {
         roleRef.current = role
@@ -6173,6 +6263,9 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] =
         React.useState(false)
+    
+    // Track if connection was made in private room mode (no roles)
+    const [isPrivateRoomConnection, setIsPrivateRoomConnection] = React.useState(false)
 
     // --- STATE: DOC EDITOR ---
     const [isDocOpen, setIsDocOpen] = React.useState(false)
@@ -6786,6 +6879,11 @@ Do not include markdown formatting or explanations.`
         (isManualHangup = false) => {
             const isAiSession = isLiveMode || !!liveClientRef.current
 
+            log(`Cleanup called. Manual hangup: ${isManualHangup}`)
+
+            // Reset private room connection state
+            setIsPrivateRoomConnection(false)
+
             // Always attempt to stop live session to ensure state is reset
             stopLiveSession()
 
@@ -6808,16 +6906,24 @@ Do not include markdown formatting or explanations.`
                 screenCallRef.current = null
             }
             setIsScreenSharing(false)
-            if (isWhiteboardOpenRef.current) {
-                // Re-open whiteboard if it was closed due to screen share
-                // But here we are cleaning up everything, so no need.
+
+            if (activeCall.current) {
+                activeCall.current.close()
+                activeCall.current = null
+            }
+            if (dataConnectionRef.current) {
+                dataConnectionRef.current.close()
+                dataConnectionRef.current = null
             }
 
-            if (activeCall.current) activeCall.current.close()
-            if (dataConnectionRef.current) dataConnectionRef.current.close()
-
-            if (peerInstance.current) peerInstance.current.destroy()
-            if (mqttClient.current) mqttClient.current.end()
+            if (peerInstance.current) {
+                peerInstance.current.destroy()
+                peerInstance.current = null
+            }
+            if (mqttClient.current) {
+                mqttClient.current.end()
+                mqttClient.current = null
+            }
 
             // Clear state ONLY if it was NOT an AI session (P2P Reset)
             if (!isAiSession) {
@@ -6846,16 +6952,56 @@ Do not include markdown formatting or explanations.`
             }
 
             setStatus("idle")
+            
+            // Explicitly force a UI refresh for the status change
+            if (!isManualHangup && roleRef.current === "volunteer") {
+                 // If a volunteer gets disconnected remotely, we want them to feel like they are "waiting" again
+                 // But cleanup() stops the camera.
+                 // We need to restart it if we want continuous searching.
+                 // The handleCall.on('close') logic above handles the restart.
+            }
 
             // ROLE RESET LOGIC:
             // If manual hangup, ALWAYS reset role (so they can select again).
             // If remote hangup (not manual), keep role to allow auto-reconnection for BOTH students and volunteers.
             if (isManualHangup) {
+                // If I am a VOLUNTEER, clear my hash when I hang up manually
+                let justClearedHash = false
+                if (roleRef.current === "volunteer") {
+                    if (typeof window !== "undefined") {
+                        window.history.replaceState(null, "", " ") 
+                        justClearedHash = true
+                        log("Volunteer manual hangup - cleared hash")
+                    }
+                }
+                
                 setRole(null)
                 if (typeof window !== "undefined") {
                     localStorage.removeItem("user_role")
+                    
+                    // If no role, ensure we have a hash for Private Room Mode
+                    // Force generation if we just cleared it as a volunteer
+                    if (justClearedHash || !window.location.hash || window.location.hash.length <= 1) {
+                        const newHash = generateLinkHash()
+                        window.history.replaceState(null, "", newHash)
+                        log(`No role reset - Generated new private room hash: ${newHash}`)
+                        
+                        // Restart passive MQTT since we now have a room
+                        if (mqttClient.current) mqttClient.current.end()
+                        setTimeout(() => initPassiveMQTT(), 100)
+                    }
                 }
             } else {
+                // Remote hangup (peer disconnected)
+                
+                // If I am a VOLUNTEER and student hung up, clear my hash
+                if (roleRef.current === "volunteer") {
+                    if (typeof window !== "undefined") {
+                        window.history.replaceState(null, "", " ") 
+                        log("Volunteer remote disconnect - cleared hash")
+                    }
+                }
+                
                 // Not manual hangup (remote disconnect).
                 // Preserve role for everyone (Student AND Volunteer) so they auto-queue.
                 if (typeof window !== "undefined" && roleRef.current) {
@@ -6868,10 +7014,12 @@ Do not include markdown formatting or explanations.`
             setLocalStream(null)
             setRemoteStream(null)
             setRemoteScreenStream(null)
-
-            if (typeof window !== "undefined") {
-                window.location.hash = ""
-            }
+            setIsScreenSharing(false) // Ensure screen share flag is cleared
+            
+            // Clear refs to prevent stale references
+            localStreamRef.current = null
+            remoteStreamRef.current = null
+            activeCall.current = null
         },
         [isLiveMode, stopLiveSession]
     )
@@ -7386,8 +7534,11 @@ Do not include markdown formatting or explanations.`
     const activeCall = React.useRef<any>(null)
     const dataConnectionRef = React.useRef<any>(null)
 
-    // Unique session ID for the user
+    // Unique session ID for the user (per tab/refresh)
     const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
+    // Session ID (per tab) - used for anti-echo but allows multi-tab testing
+    const sessionId = React.useRef("session_" + Math.random().toString(36).substr(2, 9))
+
 
     const enforceBan = () => {
         log("Enforcing ban locally due to violation.")
@@ -7426,7 +7577,7 @@ Do not include markdown formatting or explanations.`
         const moderationModel = "gemini-2.5-flash-lite"
 
         try {
-            console.log("Sending moderation request to Gemini...")
+            log("Sending moderation request to Gemini...")
             const response = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${moderationModel}:generateContent?key=${geminiApiKey}`,
                 {
@@ -7446,10 +7597,10 @@ Do not include markdown formatting or explanations.`
             const verdict = data?.candidates?.[0]?.content?.parts?.[0]?.text
                 ?.trim()
                 ?.toUpperCase()
-            console.log(`AI Verdict: ${verdict}`)
+            log(`AI Verdict: ${verdict}`)
             return verdict || "UNKNOWN"
         } catch (e) {
-            console.error(`Moderation check failed: ${e}`)
+            log(`Moderation check failed: ${e}`)
             return "UNKNOWN"
         }
     }
@@ -8195,59 +8346,102 @@ Do not include markdown formatting or explanations.`
 
     const handleRoleSelect = React.useCallback(
         (selectedRole: "student" | "volunteer") => {
+            log(`Role selected: ${selectedRole}`)
+            
             if (typeof window !== "undefined") {
-                window.location.hash = `#${selectedRole}`
+                const currentHash = window.location.hash
+                const hasHash = currentHash && currentHash.length > 1
+
+                if (selectedRole === "student") {
+                    // Generate a new hash if we don't have one
+                    // OR if we have a hash but it's just a private room hash (we want to ensure they have a unique room for volunteers to join)
+                    // Actually, the requirement is "if they dont have one yet".
+                    // Since page load generates one now (for private rooms), they usually WILL have one.
+                    // But if they came from a direct link (no hash) or cleared it?
+                    if (!hasHash) {
+                        const newHash = generateLinkHash()
+                        window.location.hash = newHash
+                        log(`Student generated new hash: ${newHash}`)
+                    } else {
+                        log(`Student keeping existing hash: ${currentHash}`)
+                    }
+                } else {
+                    // Volunteer - ALWAYS clear hash to start fresh search
+                    // They only get a hash when they JOIN a student
+                    window.history.replaceState(null, "", " ")
+                    log(`Volunteer cleared hash, searching for students...`)
+                }
             }
+            
             setRole(selectedRole)
-            // Removed setChatHeight(300) to persist user preference
+            
+            // Restart MQTT to subscribe to new topics based on role
+            if (mqttClient.current) {
+                mqttClient.current.end()
+                // Will reconnect automatically via initMQTT in the next heartbeat
+                setTimeout(() => {
+                    if (statusRef.current === "searching") {
+                        initMQTT()
+                    }
+                }, 100)
+            }
         },
         []
     )
 
     // --- EFFECT: DETECT URL HASH AND SET ROLE ---
-    /**
-     * Synchronizes internal role state with the URL hash on mount.
-     * #student -> Set as seeker/student.
-     * #volunteer  -> Set as volunteer.
-     */
+    // NO-OP: Role is now only managed via localStorage and UI selection.
+    // We do NOT set role based on #student or #volunteer anymore.
     React.useEffect(() => {
         if (typeof window === "undefined") return
-
-        const hash = window.location.hash.toLowerCase()
-        if (hash === "#student") {
-            // student = get free help
-            setRole("student")
-            log("Auto-detected role: Student")
-        } else if (hash === "#volunteer") {
-            // volunteer
-            setRole("volunteer")
-            log("Auto-detected role: Volunteer")
-        }
+        // We leave the hash alone here. 
+        // If it's a private room hash, the user acts based on their saved role.
     }, [])
 
-    // --- EFFECT: AUTO-START WHEN ROLE IS DETECTED ---
+    // --- EFFECT: AUTO-START WHEN ROLE SELECTED ---
     /**
-     * Automatically triggers the camera and matching process once a role
-     * has been assigned (via URL hash or manual selection).
+     * Automatically triggers the camera when a role is selected.
+     * - No role: passive mode (wait for detection, no camera yet)
+     * - Role selected: active mode (turn on camera immediately)
      */
     React.useEffect(() => {
+        // Only start camera if role is selected
         if (role && ready && status === "idle") {
-            log(`Auto-starting as ${role}...`)
+            log(`Auto-starting camera for ${role}...`)
             startChat()
         }
     }, [role, ready, status])
 
     // --- EFFECT: INITIALIZATION ---
-    // Loads required external dependencies and handles component teardown.
+    // Loads required external dependencies and starts passive listening.
     React.useEffect(() => {
+        log(`🚀 INITIALIZATION STARTED`)
+        log(`🚀 Role: ${role}`)
+        log(`🚀 Hash: ${typeof window !== "undefined" ? window.location.hash : "none"}`)
+        log(`🚀 Session ID: ${sessionId.current}`)
+        log(`🚀 My ID: ${myId.current}`)
+        
         const loadDependencies = async () => {
             // @ts-ignore - window.mqtt and window.Peer are added via script tags
             if (!window.mqtt || !window.Peer) {
+                log(`🚀 Loading external scripts (MQTT & PeerJS)...`)
                 await loadScript(MQTT_SCRIPT)
                 await loadScript(PEER_SCRIPT)
+                log(`🚀 Scripts loaded successfully`)
+            } else {
+                log(`🚀 Scripts already loaded`)
             }
             setReady(true)
-            log("System initialized and ready.")
+            log(`🚀 System initialized and ready.`)
+            
+            // Start passive MQTT listening (no camera yet)
+            // This will detect if someone joins our private room
+            if (!roleRef.current) {
+                log(`🚀 No role detected - starting passive MQTT mode`)
+                initPassiveMQTT()
+            } else {
+                log(`🚀 Role detected (${roleRef.current}) - will start camera immediately`)
+            }
         }
         loadDependencies()
         return () => cleanup()
@@ -8349,6 +8543,16 @@ Do not include markdown formatting or explanations.`
             }
         }
     }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isDocOpen])
+
+    // Reset whiteboard tool and color when opened
+    React.useEffect(() => {
+        if (isWhiteboardOpen && editor) {
+            editor.setCurrentTool("draw")
+            const defaultColor = role === "volunteer" ? "red" : "black"
+            editor.setStyleForNextShapes(DefaultColorStyle, defaultColor)
+            editor.setStyleForNextShapes(DefaultSizeStyle, "l")
+        }
+    }, [isWhiteboardOpen, editor, role])
 
     const handleDocChange = React.useCallback((content: string) => {
         setDocContent(content)
@@ -8668,10 +8872,6 @@ Do not include markdown formatting or explanations.`
      * Initializes the user's camera/microphone and starts the PeerJS session.
      */
     const startChat = async () => {
-        if (!role) {
-            log("Cannot start chat without a role.")
-            return
-        }
         setStatus("searching")
         log("Requesting media permissions...")
 
@@ -8694,7 +8894,7 @@ Do not include markdown formatting or explanations.`
      * Initializes PeerJS for P2P video communication.
      */
     const initPeerJS = () => {
-        log("Establishing PeerJS connection...")
+        log(`🟢 [PeerJS] Initializing with ID: ${myId.current}`)
         // @ts-ignore
         const peer = new window.Peer(myId.current, {
             config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
@@ -8702,7 +8902,8 @@ Do not include markdown formatting or explanations.`
         peerInstance.current = peer
 
         peer.on("open", (id: string) => {
-            log(`P2P Identity assigned: ${id}`)
+            log(`🟢 [PeerJS] Connection established. ID: ${id}`)
+            log(`🟢 [PeerJS] Now starting active MQTT signaling...`)
             initMQTT() // Start looking for partners after P2P is ready
         })
 
@@ -8716,13 +8917,17 @@ Do not include markdown formatting or explanations.`
             const activePeerId = activeCall.current?.peer
 
             // Check for screen share metadata OR if we are already connected to this peer (assume secondary stream)
-            // Note: Mobile browsers might strip metadata or handle connections differently, so we also rely on ID matching.
-            const isScreenShare =
-                (call.metadata && call.metadata.type === "screen") ||
-                (statusRef.current === "connected" &&
+            // IMPORTANT: Only treat as screen share if explicitly marked OR if it's truly a second stream
+            const hasScreenMetadata = call.metadata && call.metadata.type === "screen"
+            const isSecondaryStream = statusRef.current === "connected" &&
                     incomingPeerId &&
                     activePeerId &&
-                    incomingPeerId === activePeerId)
+                    incomingPeerId === activePeerId &&
+                    activeCall.current !== call // Make sure it's not the same call object
+            
+            const isScreenShare = hasScreenMetadata || isSecondaryStream
+            
+            log(`📞 Incoming call from ${incomingPeerId}. Screen share: ${isScreenShare}, Metadata: ${JSON.stringify(call.metadata)}`)
 
             if (isScreenShare) {
                 log(
@@ -8765,7 +8970,10 @@ Do not include markdown formatting or explanations.`
 
             log("Incoming call detected. Auto-answering...")
             call.answer(localStreamRef.current)
-            handleCall(call)
+            
+            // If no role is set, this is a private room connection
+            const isPrivateRoomCall = !roleRef.current
+            handleCall(call, isPrivateRoomCall)
         })
 
         peer.on("error", (e: any) => log(`P2P Error: ${e.type}`))
@@ -8774,61 +8982,192 @@ Do not include markdown formatting or explanations.`
     /**
      * Configures the active P2P call and handles media streams.
      */
-    const handleCall = (call: any) => {
+    const handleCall = (call: any, isPrivateRoom: boolean = false) => {
         activeCall.current = call
-        setStatus("connected")
-        if (mqttClient.current) mqttClient.current.end() // Stop signaling once connected
         
-        // VOLUNTEER WIPE LOGIC
-        // If I am a volunteer and I just connected to a student, wipe my local state to start fresh.
-        if (roleRef.current === "volunteer") {
-             log("Volunteer connected - Wiping previous session data...")
-             setMessages([])
-             setAttachments([])
-             setLogs([])
-             setIsDocOpen(false)
-             setDocContent(
-                `
-<h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
-            `.trim()
-            )
-            setIsWhiteboardOpen(false)
-            setHasWhiteboardStarted(false)
-            setEditor(null)
+        // If this is a private room connection, mark it
+        if (isPrivateRoom && !roleRef.current) {
+            setIsPrivateRoomConnection(true)
+            log(`Private room connection established`)
         }
-
-        // If we are already screen sharing, start a call for that too
-        if (screenStreamRef.current && peerInstance.current) {
-            const peerId = call.peer
-            log(`Connected. Starting existing screen share to ${peerId}...`)
-            const screenCall = peerInstance.current.call(
-                peerId,
-                screenStreamRef.current,
-                {
-                    metadata: { type: "screen" },
-                }
-            )
-            screenCall.on("error", (err: any) =>
-                log(`Sender Screen Call Error: ${err}`)
-            )
-            screenCallRef.current = screenCall
-        }
-
+        
+        // Wait for stream to actually confirm connection
         call.on("stream", (remoteStreamIn: any) => {
             log("Remote stream received. Synchronizing video...")
             remoteStreamRef.current = remoteStreamIn
             setRemoteStream(remoteStreamIn)
-        })
+            
+            // Only set connected ONCE we have a stream or at least confirmation
+            if (statusRef.current !== "connected") {
+                setStatus("connected")
+                if (mqttClient.current) mqttClient.current.end() // Stop signaling once connected
+                
+                // VOLUNTEER WIPE LOGIC
+                // If I am a volunteer and I just connected to a student, wipe my local state to start fresh.
+                if (roleRef.current === "volunteer") {
+                     log("Volunteer connected - Wiping previous session data...")
+                     setMessages([])
+                     setAttachments([])
+                     setLogs([])
+                     setIsDocOpen(false)
+                     setDocContent(
+                        `
+<h1>Welcome to your notes 🩵 </h1>
+<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
+                    `.trim()
+                    )
+                    setIsWhiteboardOpen(false)
+                    setHasWhiteboardStarted(false)
+                    setEditor(null)
+                }
 
+                // If we are already screen sharing, start a call for that too
+                if (screenStreamRef.current && peerInstance.current) {
+                    const peerId = call.peer
+                    log(`Connected. Starting existing screen share to ${peerId}...`)
+                    const screenCall = peerInstance.current.call(
+                        peerId,
+                        screenStreamRef.current,
+                        {
+                            metadata: { type: "screen" },
+                        }
+                    )
+                    screenCall.on("error", (err: any) =>
+                        log(`Sender Screen Call Error: ${err}`)
+                    )
+                    screenCallRef.current = screenCall
+                }
+            }
+        })
+        
         call.on("close", () => {
             log("Session terminated by remote peer.")
+            setIsPrivateRoomConnection(false)
+            
+            // If I am a volunteer, this means the student hung up.
+            // I should go back to searching automatically?
+            // Or just idle?
+            // User requirement: "if theres no student... waiting to be connected still"
+            // So if I was a volunteer, I should probably auto-restart search?
+            // Actually, cleanup() sets status to idle.
+            // If we want auto-search, we need to trigger startChat() again if role is set.
+            
+            const wasVolunteer = roleRef.current === "volunteer"
+            
             cleanup()
+            
+            if (wasVolunteer) {
+                log("Student disconnected. Restarting search as volunteer...")
+                // Small delay to ensure cleanup finishes
+                setTimeout(() => {
+                    startChat()
+                }, 500)
+            }
+        })
+        
+        call.on("error", (err: any) => {
+             log(`Call Error: ${err}`)
         })
     }
 
     /**
-     * Initializes MQTT signaling for the matchmaking lobby.
+     * Initializes MQTT signaling for passive listening (before camera starts).
+     */
+    const initPassiveMQTT = () => {
+        log("Starting passive room detection...")
+        // @ts-ignore
+        const client = window.mqtt.connect(MQTT_SERVER)
+        mqttClient.current = client
+
+        client.on("connect", () => {
+            const hash = typeof window !== "undefined" ? window.location.hash : ""
+            
+            log(`🟡 [Passive MQTT] Connected to broker`)
+            log(`🟡 [Passive MQTT] My ID: ${myId.current}`)
+            log(`🟡 [Passive MQTT] Hash: ${hash}`)
+            
+            // Subscribe to private room topic to detect peers
+            if (hash && hash.length > 1) {
+                const privateTopic = `${TOPIC_LOBBY}/${hash.replace("#", "")}`
+                client.subscribe(privateTopic)
+                log(`🟡 [Passive MQTT] Subscribed to: ${privateTopic}`)
+                
+                // Broadcast our presence periodically so others can find us
+                const passiveHeartbeat = setInterval(() => {
+                    if (!client.connected || statusRef.current !== "idle") {
+                        log(`🟡 [Passive MQTT] Stopping heartbeat - connected: ${client.connected}, status: ${statusRef.current}`)
+                        clearInterval(passiveHeartbeat)
+                        return
+                    }
+                    
+                    const message = {
+                        id: myId.current,
+                        sessionId: sessionId.current, // Add Session ID
+                        role: null, 
+                        hash: hash,
+                        isPassive: true, 
+                        timestamp: Date.now()
+                    }
+                    // log(`📡 [Passive MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
+                    client.publish(
+                        privateTopic,
+                        JSON.stringify(message),
+                        { retain: false }
+                    )
+                }, 2000)
+            }
+        })
+
+        // Passive listener - detect other peers in the room
+        client.on("message", (topic: string, msg: any) => {
+            try {
+                const data = JSON.parse(msg.toString())
+                
+                // log(`[Passive] Received message: ${JSON.stringify(data)}`)
+                
+                // Ignore self by Session ID (prevents echo from same tab)
+                if (data.sessionId && data.sessionId === sessionId.current) {
+                    // log(`[Passive] Ignoring own message (Session match)`)
+                    return
+                }
+                
+                // Check timestamp (allow 5 second window)
+                if (data.timestamp && Date.now() - data.timestamp > 5000) {
+                    // log(`[Passive] Message too old (${Date.now() - data.timestamp}ms)`)
+                    return
+                }
+
+                const currentHash = typeof window !== "undefined" ? window.location.hash : ""
+                const isMyPrivateRoom = topic.includes(currentHash.replace("#", "")) && currentHash.length > 1
+                
+                // Someone with our hash detected!
+                if (isMyPrivateRoom && data.hash === currentHash) {
+                    log(`🎉 Peer detected in private room ${currentHash}! Peer ID: ${data.id}`)
+                    
+                    // Mark as private room connection
+                    setIsPrivateRoomConnection(true)
+                    
+                    // End passive MQTT and start full connection
+                    client.end()
+                    
+                    // Start camera now
+                    if (statusRef.current === "idle") {
+                        log(`Starting camera for private room connection...`)
+                        startChat()
+                    } else {
+                        log(`Cannot start chat, status is: ${statusRef.current}`)
+                    }
+                } else {
+                    // log(`[Passive] Not my room. Topic: ${topic}, My hash: ${currentHash}`)
+                }
+            } catch (err) {
+                log(`[Passive] Error processing message: ${err}`)
+            }
+        })
+    }
+
+    /**
+     * Initializes MQTT signaling for active matchmaking (after camera starts).
      */
     const initMQTT = () => {
         log("Connecting to matchmaking lobby...")
@@ -8837,10 +9176,30 @@ Do not include markdown formatting or explanations.`
         mqttClient.current = client
 
         client.on("connect", () => {
+            const hash = typeof window !== "undefined" ? window.location.hash : ""
+            const currentRole = roleRef.current
+            
             log(
-                `Connected to lobby as ${roleRef.current || "unspecified"}. Searching for ${roleRef.current === "student" ? "volunteer" : roleRef.current === "volunteer" ? "student" : "partner"}...`
+                `Connected to lobby. Mode: ${currentRole || "private room"}, Hash: ${hash}`
             )
-            client.subscribe(TOPIC_LOBBY)
+            
+            // ALWAYS subscribe to private room topic (for hash-based connections)
+            if (hash && hash.length > 1) {
+                const privateTopic = `${TOPIC_LOBBY}/${hash.replace("#", "")}`
+                client.subscribe(privateTopic)
+                log(`Subscribed to private room: ${privateTopic}`)
+            }
+            
+            // If role is selected, ALSO subscribe to role-based matching topics
+            if (currentRole === "student") {
+                const studentTopic = `${TOPIC_LOBBY}/students-waiting`
+                client.subscribe(studentTopic)
+                log(`Subscribed to student matching database`)
+            } else if (currentRole === "volunteer") {
+                const studentTopic = `${TOPIC_LOBBY}/students-waiting`
+                client.subscribe(studentTopic)
+                log(`Subscribed to find students`)
+            }
 
             // Periodic heartbeat to broadcast presence to other users
             const heartbeat = setInterval(() => {
@@ -8848,52 +9207,141 @@ Do not include markdown formatting or explanations.`
                     clearInterval(heartbeat)
                     return
                 }
-                client.publish(
-                    TOPIC_LOBBY,
-                    JSON.stringify({
+                
+                const currentHash = typeof window !== "undefined" ? window.location.hash : ""
+                const currentRole = roleRef.current
+                
+                // 1. ALWAYS broadcast to private room (hash-based matching)
+                if (currentHash && currentHash.length > 1) {
+                    const privateTopic = `${TOPIC_LOBBY}/${currentHash.replace("#", "")}`
+                    const message = {
                         id: myId.current,
-                        role: roleRef.current, // Include role in broadcast
-                    })
-                )
+                        sessionId: sessionId.current,
+                        role: currentRole,
+                        hash: currentHash,
+                        timestamp: Date.now()
+                    }
+                    // log(`📡 [Active MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
+                    client.publish(
+                        privateTopic,
+                        JSON.stringify(message),
+                        { retain: false }
+                    )
+                }
+                
+                // 2. If Student role, ALSO broadcast to student matching database
+                if (currentRole === "student") {
+                    const studentTopic = `${TOPIC_LOBBY}/students-waiting`
+                    client.publish(
+                        studentTopic,
+                        JSON.stringify({
+                            id: myId.current,
+                            sessionId: sessionId.current,
+                            role: "student",
+                            hash: currentHash,
+                            timestamp: Date.now()
+                        }),
+                        { retain: false }
+                    )
+                }
             }, 2000)
         })
 
         client.on("message", (topic: string, msg: any) => {
-            if (statusRef.current === "connected") return
-
-            const data = JSON.parse(msg.toString())
-            if (data.id === myId.current) return
-
-            // Role-based matching: only connect with opposite roles
-            const currentRole = roleRef.current
-            if (currentRole) {
-                if (!data.role) {
-                    log(`Skipping peer ${data.id} (peer has no role)`)
-                    return
-                }
-                const oppositeRole =
-                    currentRole === "student" ? "volunteer" : "student"
-                if (data.role !== oppositeRole) {
-                    log(
-                        `Skipping peer ${data.id} (incompatible role: ${data.role})`
-                    )
-                    return
-                }
+            if (statusRef.current === "connected") {
+                log(`🔵 [Active MQTT] Ignoring message - already connected`)
+                return
             }
 
-            // Simple deterministic handshake: user with lexicographically larger ID initiates the call
-            if (myId.current > data.id) {
-                log(`Handshaking with ${data.role || "peer"}: ${data.id}`)
-                const call = peerInstance.current.call(
-                    data.id,
-                    localStreamRef.current
-                )
-                handleCall(call)
-                connectToDataPeer(data.id)
-            } else {
-                log(
-                    `Waiting for handshake from ${data.role || "peer"}: ${data.id}`
-                )
+            const data = JSON.parse(msg.toString())
+            // log(`🔵 [Active MQTT] Message received on topic: ${topic}`)
+            // log(`🔵 [Active MQTT] Message data: ${JSON.stringify(data)}`)
+            
+            if (data.id === myId.current) {
+                // log(`🔵 [Active MQTT] Ignoring own message (ID match)`)
+                return
+            }
+            
+            // IGNORE SELF (Session Check)
+            if (data.sessionId && data.sessionId === sessionId.current) {
+                // log(`🔵 [Active MQTT] Ignoring own message (Session match)`)
+                return
+            }
+
+            // Check timestamp to avoid stale peers (5 second window)
+            if (data.timestamp && Date.now() - data.timestamp > 5000) {
+                log(`🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`)
+                return
+            }
+
+            // Safety checks
+            if (!peerInstance.current || !localStreamRef.current) {
+                log(`🔵 [Active MQTT] Not ready - peer: ${!!peerInstance.current}, stream: ${!!localStreamRef.current}`)
+                return
+            }
+
+            const currentHash = typeof window !== "undefined" ? window.location.hash : ""
+            const currentRole = roleRef.current
+            log(`🔵 [Active MQTT] Current hash: ${currentHash}, Current role: ${currentRole}`)
+            
+            // PRIORITY 1: PRIVATE ROOM MATCHING (Hash-based, no role required)
+            // If message is from our private room topic, connect immediately
+            const isMyPrivateRoom = topic.includes(currentHash.replace("#", "")) && currentHash.length > 1
+            if (isMyPrivateRoom && data.hash === currentHash) {
+                 log(`🔵 [Active MQTT] Peer found in private room ${currentHash}: ${data.id}`)
+                 log(`🔵 [Active MQTT] My ID: ${myId.current}, Peer ID: ${data.id}`)
+                 log(`🔵 [Active MQTT] My Role: ${currentRole}, Peer Role: ${data.role}`)
+                 
+                 // Determine if this is a private room connection (both without roles)
+                 const isPrivateRoomConnection = !currentRole && !data.role
+                 log(`🔵 [Active MQTT] Is Private Room Connection: ${isPrivateRoomConnection}`)
+                 
+                 // Connect regardless of roles
+                 if (myId.current > data.id) {
+                    log(`🔵 [Active MQTT] I have higher ID, initiating call to ${data.id}`)
+                    const call = peerInstance.current.call(
+                        data.id,
+                        localStreamRef.current
+                    )
+                    handleCall(call, isPrivateRoomConnection)
+                    connectToDataPeer(data.id)
+                } else {
+                    log(`🔵 [Active MQTT] Peer has higher ID, waiting for their call...`)
+                }
+                return
+            }
+
+            // PRIORITY 2: ROLE-BASED MATCHING (Student/Volunteer Database)
+            // Only process if message is from student-waiting topic AND I am a volunteer
+            const isStudentDatabase = topic.includes("students-waiting")
+            
+            if (isStudentDatabase && currentRole === "volunteer") {
+                // I am a volunteer looking for students
+                if (data.role !== "student") {
+                    return
+                }
+                
+                log(`Volunteer found student: ${data.id}`)
+                
+                // Adopt student's hash for the connection
+                if (data.hash && data.hash.length > 1) {
+                    log(`Adopting student hash: ${data.hash}`)
+                    window.history.replaceState(null, "", data.hash)
+                }
+
+                // Connect to student
+                if (myId.current > data.id) {
+                    log(`Handshaking with student: ${data.id}`)
+                    const call = peerInstance.current.call(
+                        data.id,
+                        localStreamRef.current
+                    )
+                    handleCall(call)
+                    connectToDataPeer(data.id)
+                } else {
+                    log(`Waiting for handshake from student: ${data.id}`)
+                }
+                return
             }
         })
     }
@@ -10506,7 +10954,51 @@ Do not include markdown formatting or explanations.`
             />
 
             {/* DEBUG CONSOLE OVERLAY */}
-            {debugMode && <DebugConsole logs={logs} />}
+            {debugMode && (
+                <>
+                    <DebugConsole logs={logs} />
+                    {/* Hash Display */}
+                    <div style={{
+                        position: "absolute",
+                        top: 170,
+                        left: 10,
+                        right: 10,
+                        background: "rgba(0,0,0,0.8)",
+                        color: "#fff",
+                        fontFamily: "monospace",
+                        fontSize: 14,
+                        padding: 12,
+                        zIndex: 9998,
+                        borderRadius: 16,
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                    }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ opacity: 0.7 }}>🔗 Room:</span>
+                            <span style={{ color: "#3b82f6", fontWeight: "bold" }}>
+                                {typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ opacity: 0.7 }}>👤 Role:</span>
+                            <span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>
+                                {role || "None (Passive Mode)"}
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ opacity: 0.7 }}>📊 Status:</span>
+                            <span style={{ 
+                                color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8",
+                                fontWeight: "bold" 
+                            }}>
+                                {status}
+                            </span>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
             <style>{markdownStyles}</style>
@@ -10617,7 +11109,7 @@ Do not include markdown formatting or explanations.`
                                       }),
                             }}
                         >
-                            {/* TILE 1: Student */}
+                            {/* TILE 1: Student / Local User (Always Left) */}
                             <div
                                 style={{
                                     overflow: "hidden",
@@ -10686,14 +11178,14 @@ Do not include markdown formatting or explanations.`
                                         }
                                         isMobileLayout={isMobileLayout}
                                     />
-                                ) : role === "student" || isLiveMode ? (
+                                ) : (!role && status === "searching") || role === "student" || isLiveMode || (isPrivateRoomConnection && status === "connected") ? (
                                     <VideoPlayer
                                         stream={localStream}
                                         isMirrored={true}
                                         muted={true}
                                         themeColors={themeColors}
                                     />
-                                ) : status === "connected" ? (
+                                ) : status === "connected" && !isPrivateRoomConnection ? (
                                     <VideoPlayer
                                         stream={remoteStream}
                                         isMirrored={false}
@@ -10719,14 +11211,16 @@ Do not include markdown formatting or explanations.`
                                             justifyContent: "center",
                                             color: themeColors.text.secondary,
                                             fontSize: 15,
+                                            background: isPrivateRoomConnection ? "#000000" : "transparent",
                                         }}
                                     >
-                                        Searching for student
+                                        {/* Hide text if we are in a private room connection (waiting for stream) */}
+                                        {!isPrivateRoomConnection && "Searching for student"}
                                     </div>
                                 )}
                             </div>
 
-                            {/* TILE 2: Mentor */}
+                            {/* TILE 2: Mentor / Remote User (Always Right) */}
                             <div
                                 style={{
                                     overflow: "hidden",
@@ -10868,7 +11362,7 @@ Do not include markdown formatting or explanations.`
                                             alignSelf: "stretch",
                                             height: "100%",
                                             padding: 16,
-                                            background: "transparent",
+                                            background: isPrivateRoomConnection ? "#000000" : "transparent",
                                             overflow: "hidden",
                                             borderRadius: 28,
                                             flexDirection: "column",
@@ -10877,47 +11371,52 @@ Do not include markdown formatting or explanations.`
                                             display: "flex",
                                         }}
                                     >
-                                        <div
-                                            data-layer="Searching for mentor"
-                                            className="SearchingForMentor"
-                                            style={{
-                                                textAlign: "center",
-                                                justifyContent: "center",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                color: themeColors.text.primary,
-                                                fontSize: 15,
-                                                fontFamily: "Inter",
-                                                fontWeight: "400",
-                                                lineHeight: 1.4,
-                                                wordWrap: "break-word",
-                                            }}
-                                        >
-                                            Searching for mentor
-                                        </div>
-                                        <div
-                                            onClick={handleConnectWithAI}
-                                            data-layer="Or connect with AI"
-                                            className="OrConnectWithAi"
-                                            style={{
-                                                height: 44,
-                                                textAlign: "center",
-                                                justifyContent: "center",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                color: themeColors.text.secondary,
-                                                fontSize: 15,
-                                                fontFamily: "Inter",
-                                                fontWeight: "400",
-                                                lineHeight: 1.4,
-                                                wordWrap: "break-word",
-                                                cursor: "pointer",
-                                                width: "100%",
-                                                marginTop: -4,
-                                            }}
-                                        >
-                                            Or connect with AI
-                                        </div>
+                                        {/* Hide text if we are in a private room connection (waiting for stream) */}
+                                        {!isPrivateRoomConnection && (
+                                            <>
+                                                <div
+                                                    data-layer="Searching for mentor"
+                                                    className="SearchingForMentor"
+                                                    style={{
+                                                        textAlign: "center",
+                                                        justifyContent: "center",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        color: themeColors.text.primary,
+                                                        fontSize: 15,
+                                                        fontFamily: "Inter",
+                                                        fontWeight: "400",
+                                                        lineHeight: 1.4,
+                                                        wordWrap: "break-word",
+                                                    }}
+                                                >
+                                                    Searching for mentor
+                                                </div>
+                                                <div
+                                                    onClick={handleConnectWithAI}
+                                                    data-layer="Or connect with AI"
+                                                    className="OrConnectWithAi"
+                                                    style={{
+                                                        height: 44,
+                                                        textAlign: "center",
+                                                        justifyContent: "center",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        color: themeColors.text.secondary,
+                                                        fontSize: 15,
+                                                        fontFamily: "Inter",
+                                                        fontWeight: "400",
+                                                        lineHeight: 1.4,
+                                                        wordWrap: "break-word",
+                                                        cursor: "pointer",
+                                                        width: "100%",
+                                                        marginTop: -4,
+                                                    }}
+                                                >
+                                                    Or connect with AI
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -11006,17 +11505,22 @@ Do not include markdown formatting or explanations.`
                                     }}
                                 >
                                     {isDocOpen ? (
-                                        <DocEditor
-                                            content={docContent}
-                                            onChange={handleDocChange}
-                                            settings={docSettings}
-                                            onSettingsChange={setDocSettings}
-                                            themeColors={chatThemeColors}
-                                            isMobileLayout={isMobileLayout}
-                                            remoteCursor={remoteCursor}
-                                            onCursorMove={handleDocPointerMove}
-                                        />
-                                    ) : isWhiteboardOpen ? (
+                                        <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+                                            <DocEditor
+                                                content={docContent}
+                                                onChange={handleDocChange}
+                                                settings={docSettings}
+                                                onSettingsChange={setDocSettings}
+                                                themeColors={chatThemeColors}
+                                                isMobileLayout={isMobileLayout}
+                                                remoteCursor={remoteCursor}
+                                                onCursorMove={handleDocPointerMove}
+                                            />
+                                        </div>
+                                    ) : null}
+
+                                    {/* Persistent Whiteboard */}
+                                    {(isWhiteboardOpen || hasWhiteboardStarted) && (
                                         <div
                                             ref={whiteboardContainerRef}
                                             onPointerMove={
@@ -11038,16 +11542,22 @@ Do not include markdown formatting or explanations.`
                                             style={{
                                                 width: "100%",
                                                 height: "100%",
+                                                position: isWhiteboardOpen && !isDocOpen ? "relative" : "absolute",
+                                                top: 0,
+                                                left: 0,
+                                                zIndex: isWhiteboardOpen && !isDocOpen ? 0 : -1,
+                                                visibility: isWhiteboardOpen && !isDocOpen ? "visible" : "hidden",
+                                                pointerEvents: isWhiteboardOpen && !isDocOpen ? "auto" : "none",
                                                 background: "#FFF",
-                                                position: "relative",
-                                                zIndex: 0,
                                             }}
                                             onPointerDown={(e) =>
                                                 e.stopPropagation()
                                             }
                                         >
                                             <Tldraw
+                                                persistenceKey="framer-chatbot-whiteboard-v1"
                                                 onMount={(e) => {
+                                                    if (editor) return
                                                     log("Tldraw editor mounted")
                                                     setEditor(e)
                                                     e.setCurrentTool("draw")
@@ -11075,49 +11585,11 @@ Do not include markdown formatting or explanations.`
                                                 />
                                             )}
                                         </div>
-                                    ) : (
-                                        <>
-                                            {hasWhiteboardStarted && (
-                                                <div
-                                                    style={{
-                                                        width: "100%",
-                                                        height: "100%",
-                                                        background: "#FFF",
-                                                        position: "absolute",
-                                                        top: 0,
-                                                        left: 0,
-                                                        zIndex: -1,
-                                                        visibility: "hidden",
-                                                        pointerEvents: "none",
-                                                    }}
-                                                    onPointerDown={(e) =>
-                                                        e.stopPropagation()
-                                                    }
-                                                >
-                                                    <Tldraw
-                                                        onMount={(e) => {
-                                                            log(
-                                                                "Hidden Tldraw editor mounted"
-                                                            )
-                                                            setEditor(e)
-                                                            e.setCurrentTool("draw")
-                                                            const defaultColor =
-                                                                role ===
-                                                                "volunteer"
-                                                                    ? "red"
-                                                                    : "black"
-                                                            e.setStyleForNextShapes(
-                                                                DefaultColorStyle,
-                                                                defaultColor
-                                                            )
-                                                            e.setStyleForNextShapes(
-                                                                DefaultSizeStyle,
-                                                                "l"
-                                                            )
-                                                        }}
-                                                    />
-                                                </div>
-                                            )}
+                                    )}
+
+                                    {/* Video Player - Only when neither doc nor whiteboard is main */}
+                                    {(!isDocOpen && !isWhiteboardOpen) && (
+                                        <div style={{ position: "relative", width: "100%", height: "100%" }}>
                                             <VideoPlayer
                                                 stream={
                                                     remoteScreenStream ||
@@ -11138,7 +11610,7 @@ Do not include markdown formatting or explanations.`
                                                 }
                                                 themeColors={themeColors}
                                             />
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -11633,8 +12105,8 @@ addPropertyControls(OmegleMentorshipUI, {
     debugMode: {
         type: ControlType.Boolean,
         title: "Debug Mode",
-        defaultValue: false,
+        defaultValue: true,
         description:
-            "Enables an on-screen console overlay for bugs and issues.",
+            "Enables an on-screen console overlay with copy button for debugging.",
     },
 })
