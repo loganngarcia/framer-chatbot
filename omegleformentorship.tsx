@@ -18,26 +18,52 @@ const MODEL_OUTPUT_SAMPLE_RATE = 24000
 const INPUT_TARGET_SAMPLE_RATE = 16000
 
 // -----------------------------------------------------------------------------
-// Word List for Hash Generation
+// Three Letter Word List for Hash Generation
 // -----------------------------------------------------------------------------
 const THREE_LETTER_WORDS = [
-    "ant", "art", "ash", "bad", "bag", "bat", "bed", "bee", "big", "bin",
-    "bit", "box", "boy", "bug", "bus", "can", "cap", "car", "cat", "cow",
-    "cry", "cup", "cut", "dad", "day", "dog", "dry", "ear", "eat", "egg",
-    "end", "eye", "fan", "far", "fat", "few", "fit", "fix", "fly", "fog",
-    "for", "fox", "fun", "fur", "gap", "gas", "gem", "get", "gym", "hat",
-    "hen", "hot", "hug", "ice", "ink", "jam", "jar", "jaw", "jet", "job",
-    "joy", "key", "kid", "kit", "lab", "lap", "law", "lay", "leg", "let",
-    "lid", "lie", "lip", "log", "lot", "low", "mad", "man", "map", "mat",
-    "mix", "mom", "mud", "mug", "net", "new", "nut", "oar", "oil", "old",
-    "one", "owl", "pan", "paw", "pay", "pea", "pen", "pet", "pie", "pig",
-    "pin", "pit", "pot", "pro", "put", "rag", "ram", "rat", "ray", "red",
-    "rib", "rig", "rim", "rip", "rod", "row", "rub", "rug", "run", "sad",
-    "sea", "see", "set", "sew", "shy", "sin", "sip", "sir", "sit", "six",
-    "ski", "sky", "sly", "son", "spy", "sun", "tab", "tag", "tan", "tap",
-    "tax", "tea", "ten", "tie", "tin", "tip", "toe", "ton", "top", "toy",
-    "try", "tub", "two", "use", "van", "vet", "war", "way", "web", "wet",
-    "wig", "win", "wit", "wow", "yak", "yam", "yes", "yet", "zip", "zoo"
+    "ace", "act", "add", "age", "ago", "aid", "aim", "air", "all", "amp",
+    "ant", "ape", "apt", "arc", "arm", "art", "ash", "ask", "ate",
+    "axe", "bad", "bag", "ban", "bar", "bat", "bay", "bed", "bee", "bet",
+    "bib", "bid", "big", "bin", "bit", "bow", "box", "boy", "bud", "bug",
+    "bun", "bus", "cab", "can", "cap", "car", "cat", "cod", "cog", "cop",
+    "cot", "cow", "cry", "cub", "cue", "cup", "cut", "dad", "day", "den",
+    "did", "dig", "dim", "dip", "dog", "dot", "dry", "dug", "duo",
+    "dye", "ear", "eat", "egg", "ego", "elf", "elk", "elm", "end", "era",
+    "eve", "fan", "far", "fat", "fax", "fed", "fee", "few", "fig",
+    "fin", "fit", "fix", "fly", "fob", "fog", "for", "fox", "fry", "fun",
+    "fur", "gag", "gap", "gas", "gel", "gem", "get", "gig", "gin", "got",
+    "gum", "gut", "guy", "gym", "had", "ham", "has", "hat", "hay", "hem",
+    "hen", "her", "hid", "him", "hip", "his", "hit", "hog", "hop",
+    "hot", "how", "hub", "hug", "hum", "hut", "ice", "ill", "ink", "inn",
+    "ion", "ivy", "jab", "jam", "jar", "jaw", "jay", "jet", "jig", "job",
+    "jog", "joy", "jug", "keg", "key", "kid", "kin", "kit", "lab", "lad",
+    "lag", "lap", "law", "lay", "led", "leg", "let", "lid", "lie", "lip",
+    "lit", "lob", "log", "lot", "low", "lug", "mad", "man", "map", "mat",
+    "max", "men", "met", "mid", "mix", "mob", "mom", "mop", "mow", "mud",
+    "mug", "nab", "nap", "net", "new", "nil", "nip", "nod", "nor", "now",
+    "nun", "nut", "oak", "oar", "oat", "odd", "off", "oil", "old",
+    "orb", "ore", "our", "out", "owl", "own", "pad", "pal", "pan",
+    "par", "pat", "paw", "pay", "pea", "peg", "pen", "pep", "pet", "pie",
+    "pig", "pin", "pit", "pod", "pop", "pot", "pro", "pub", "pug", "pun",
+    "pup", "put", "rag", "ram", "ran", "rap", "rat", "raw", "ray", "red",
+    "rib", "rid", "rig", "rim", "rip", "rob", "rod", "rot", "row", "rub",
+    "rug", "run", "rut", "sad", "sag", "sap", "sat", "saw", "say", "sea",
+    "see", "set", "sew", "she", "shy", "sin", "sip", "sir", "sit",
+    "ski", "sky", "sly", "sob", "sod", "son", "sow", "soy", "spa", "spy",
+    "sub", "sum", "sun", "tab", "tag", "tan", "tap", "tar", "tax", "tea",
+    "ten", "the", "tie", "tin", "tip", "toe", "ton", "top", "tow", "toy",
+    "try", "tub", "tug", "urn", "use", "van", "vet", "via",
+    "vow", "wag", "war", "wax", "way", "web", "wed", "wet", "who", "wig",
+    "win", "wit", "won", "wow", "yak", "yam", "yap", "yes", "yet",
+    "you", "zap", "zip", "zoo", "moo", "boo", "goo", 
+    // Common names
+    "amy", "ana", "ann", "art", "ben", "bob", "cam", "dan", "deb",
+    "don", "eva", "fay", "flo", "gus", "hal", "ian", "jan", "jay",
+    "jim", "joe", "jon", "joy", "kai", "kay", "ken", "kim", "kit", "leo",
+    "lia", "mac", "max", "meg", "mia", "ned",
+    "pam", "pat", "peg", "pia", "ray", "rex", "rob", "rod",
+    "ron", "roy", "sal", "sam", "sue", "tad", "ted", "tim", "tom", "zac", 
+    "zoe"
 ]
 
 const generateLinkHash = () => {
@@ -1221,6 +1247,7 @@ interface DocEditorProps {
     isMobileLayout?: boolean
     remoteCursors?: Map<string, { x: number; y: number; color: string }>
     onCursorMove?: (x: number, y: number) => void
+    onClose?: () => void
 }
 
 const ToolbarButton = React.memo(
@@ -1357,6 +1384,7 @@ const DocEditor = React.memo(function DocEditor({
     isMobileLayout = false,
     remoteCursors,
     onCursorMove,
+    onClose,
 }: DocEditorProps) {
     const editorRef = React.useRef<HTMLDivElement>(null)
     const containerRef = React.useRef<HTMLDivElement>(null)
@@ -1392,6 +1420,8 @@ const DocEditor = React.memo(function DocEditor({
     >(null)
     const [isFontDecreaseHovered, setIsFontDecreaseHovered] = React.useState(false)
     const [isFontIncreaseHovered, setIsFontIncreaseHovered] = React.useState(false)
+    const [isDownloadHovered, setIsDownloadHovered] = React.useState(false)
+    const [isCloseHovered, setIsCloseHovered] = React.useState(false)
 
     // CSS Variables for performance
     const styleVariables = React.useMemo(
@@ -2348,6 +2378,7 @@ const DocEditor = React.memo(function DocEditor({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
+                    gap: 12,
                     paddingLeft: 12,
                     paddingRight: 12,
                 }}
@@ -2806,9 +2837,11 @@ const DocEditor = React.memo(function DocEditor({
                 </div>
 
                 {/* Download */}
-                <div style={{ position: "relative" }} ref={downloadMenuRef}>
-                    <div
-                        onClick={() => {
+                {/* Download and Close */}
+                <div data-layer="right" className="Right" style={{height: 40, maxWidth: 808.89, paddingLeft: 4, paddingRight: 4, background: themeColors.surface, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', display: 'inline-flex', flexShrink: 0, alignContent: 'center'}}>
+                  <div data-svg-wrapper data-layer="download button" className="DownloadButton"
+                       ref={downloadMenuRef}
+                       onClick={() => {
                             if (!showDownloadMenu && downloadMenuRef.current) {
                                 const rect = downloadMenuRef.current.getBoundingClientRect()
                                 setDownloadMenuPosition({
@@ -2817,56 +2850,49 @@ const DocEditor = React.memo(function DocEditor({
                                 })
                             }
                             setShowDownloadMenu(!showDownloadMenu)
-                        }}
-                        onPointerDown={(e) => e.preventDefault()}
-                        style={{
-                            height: 40,
-                            paddingLeft: 14,
-                            paddingRight: 14,
-                            background: "#0099FF",
-                            borderRadius: 28,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            gap: 8,
-                            display: "flex",
-                            cursor: "pointer",
-                            userSelect: "none",
-                        }}
-                    >
-                        <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 15 15"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                       }}
+                       onMouseEnter={() => setIsDownloadHovered(true)}
+                       onMouseLeave={() => setIsDownloadHovered(false)}
+                       style={{ cursor: 'pointer', position: 'relative' }}
+                  >
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {isDownloadHovered && (
+                        <Tooltip
+                            style={{
+                                top: "100%",
+                                left: "50%",
+                                transform: "translate(-50%, 8px)",
+                                zIndex: 100,
+                            }}
                         >
-                            <path
-                                d="M0.699219 10.3485V11.1839C0.699219 11.8512 0.96431 12.4912 1.43618 12.963C1.90804 13.4349 2.54803 13.7 3.21535 13.7H11.6024C12.2698 13.7 12.9097 13.4349 13.3816 12.963C13.8535 12.4912 14.1186 11.8512 14.1186 11.1839V10.3452M7.4089 0.699997V9.9258M7.4089 9.9258L10.3444 6.99032M7.4089 9.9258L4.47341 6.99032"
-                                stroke="white"
-                                strokeOpacity="0.95"
-                                strokeWidth="1.4"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                        {!isMobileLayout && (
-                            <div
-                                style={{
-                                    justifyContent: "center",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    color: "rgba(255, 255, 255, 0.95)",
-                                    fontSize: 14,
-                                    fontFamily: "Inter",
-                                    fontWeight: "600",
-                                    lineHeight: "19.32px",
-                                    wordWrap: "break-word",
-                                }}
-                            >
-                                Download
-                            </div>
-                        )}
-                    </div>
+                            Download
+                        </Tooltip>
+                    )}
+                  </div>
+                  <div data-svg-wrapper data-layer="close doceditor button" className="CloseDoceditorButton"
+                       onClick={() => onClose && onClose()}
+                       onMouseEnter={() => setIsCloseHovered(true)}
+                       onMouseLeave={() => setIsCloseHovered(false)}
+                       style={{ cursor: 'pointer', position: 'relative' }}
+                  >
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {isCloseHovered && (
+                        <Tooltip
+                            style={{
+                                top: "100%",
+                                left: "50%",
+                                transform: "translate(-50%, 8px)",
+                                zIndex: 100,
+                            }}
+                        >
+                            Collapse
+                        </Tooltip>
+                    )}
+                  </div>
                     {showDownloadMenu && createPortal(
                         <>
                             <div
@@ -3026,7 +3052,7 @@ const DocEditor = React.memo(function DocEditor({
                 .DocEditor a { color: var(--doc-accent); text-decoration: underline; cursor: pointer; }
             `}</style>
 
-            {Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
+            {remoteCursors && Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
                 cursor.x >= 0 &&
                 cursor.x <= 1 &&
                 cursor.y >= 0 && (
@@ -11935,6 +11961,7 @@ Do not include markdown formatting or explanations.`
                                                 isMobileLayout={isMobileLayout}
                                                 remoteCursors={remoteCursors}
                                                 onCursorMove={handleDocPointerMove}
+                                                onClose={() => setIsDocOpen(false)}
                                             />
                                         </div>
                                     ) : null}
@@ -12547,7 +12574,7 @@ addPropertyControls(OmegleMentorshipUI, {
     debugMode: {
         type: ControlType.Boolean,
         title: "Debug Mode",
-        defaultValue: true,
+        defaultValue: false,
         description:
             "Enables an on-screen console overlay with copy button for debugging.",
     },
