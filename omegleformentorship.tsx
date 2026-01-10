@@ -8036,7 +8036,19 @@ Do not include markdown formatting or explanations.`
         return []
     })
 
-    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<string[]>([])
+    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<string[]>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("ai_suggestions")
+            return saved ? JSON.parse(saved) : []
+        }
+        return []
+    })
+
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("ai_suggestions", JSON.stringify(aiGeneratedSuggestions))
+        }
+    }, [aiGeneratedSuggestions])
 
     // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
     React.useEffect(() => {
@@ -8315,6 +8327,13 @@ Do not include markdown formatting or explanations.`
     const hasSnappedForMessages = React.useRef(false)
     const chatHeightBeforeOverlay = React.useRef<number | null>(null)
     const isMobileLayout = containerSize.width < 768
+
+    const peerMetadataRef = React.useRef<Map<string, { isMobile: boolean }>>(new Map())
+    const isMobileLayoutRef = React.useRef(isMobileLayout)
+
+    React.useEffect(() => {
+        isMobileLayoutRef.current = isMobileLayout
+    }, [isMobileLayout])
 
     // --- MOBILE INPUT RESIZING ---
     const [mobileInputHeight, setMobileInputHeight] = React.useState(80)
@@ -10084,6 +10103,12 @@ Do not include markdown formatting or explanations.`
             // This ensures late joiners receive the current state from whoever they connect to.
             
             if (conn.open) {
+                // Send metadata
+                conn.send({
+                    type: "peer-metadata",
+                    payload: { isMobile: isMobileLayoutRef.current },
+                })
+
                 // 1. Sync Document
                 if (isDocOpenRef.current) {
                     log("Syncing document state to new peer...")
@@ -10135,6 +10160,12 @@ Do not include markdown formatting or explanations.`
             if (data.type === "REPORT_VIOLATION") {
                 log("Received violation report")
                 enforceBan()
+                return
+            }
+
+            if (data.type === "peer-metadata") {
+                const { isMobile } = data.payload
+                peerMetadataRef.current.set(conn.peer, { isMobile })
                 return
             }
 
@@ -10327,11 +10358,15 @@ Do not include markdown formatting or explanations.`
 
         setAiGeneratedSuggestions([])
 
-        const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiText}"\n\nSuggest three helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
+        const isAnyMobile = isMobileLayoutRef.current || Array.from(peerMetadataRef.current.values()).some((p: any) => p.isMobile)
+        const count = isAnyMobile ? 5 : 3
+        const countWord = isAnyMobile ? "five" : "three"
+
+        const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiText}"\n\nSuggest ${countWord} helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
 
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -10362,7 +10397,7 @@ Do not include markdown formatting or explanations.`
                         const suggestionsArray = JSON.parse(jsonMatch[0])
                         if (Array.isArray(suggestionsArray) && suggestionsArray.every((s) => typeof s === "string")) {
                             console.log("Generated suggestions:", suggestionsArray)
-                            const finalSuggestions = suggestionsArray.slice(0, 3).filter((s) => s.trim() !== "")
+                            const finalSuggestions = suggestionsArray.slice(0, count).filter((s) => s.trim() !== "")
                             setAiGeneratedSuggestions(finalSuggestions)
                             
                             // Broadcast suggestions to peers so everyone sees them
@@ -12069,6 +12104,7 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         <ChatInput
+                            hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
                             value={inputText}
                             onChange={(e) => {
                                 const newValue = e.target.value
@@ -12120,7 +12156,6 @@ Do not include markdown formatting or explanations.`
                             role={role}
                             hasMessages={messages.length > 0}
                             onClearMessages={handleClearMessages}
-                            hideGradient={true}
                             rootStyle={{ pointerEvents: "none" }}
                         />
                     </div>
@@ -12163,7 +12198,7 @@ Do not include markdown formatting or explanations.`
                             flex: 1,
                             width: "100%",
                             padding: "0 24px",
-                            paddingBottom: 90,
+                            paddingBottom: 140,
                             overflowY: "auto",
                             overflowX: "hidden",
                             display: "flex",
@@ -12229,71 +12264,6 @@ Do not include markdown formatting or explanations.`
                                 </div>
                             )}
 
-                        {aiGeneratedSuggestions.length > 0 && !isLoading && (
-                            <div
-                                data-layer="ai suggested replies"
-                                className="AiSuggestedReplies"
-                                style={{
-                                    width: "100%",
-                                    maxWidth: 336,
-                                    flexDirection: "column",
-                                    justifyContent: "center",
-                                    alignItems: "flex-end",
-                                    gap: 8,
-                                    display: "flex", 
-                                    alignSelf: "flex-end",
-                                    marginTop: 12,
-                                    marginRight: 4,
-                                }}
-                            >
-                                {aiGeneratedSuggestions.map((suggestion, index) => (
-                                    <div
-                                        key={index}
-                                        onClick={() => handleSendMessage(suggestion)}
-                                        className={`Suggestion${index + 1}`}
-                                        style={{
-                                            maxWidth: 380,
-                                            paddingLeft: 12,
-                                            paddingRight: 12,
-                                            paddingTop: 8,
-                                            paddingBottom: 8,
-                                            overflow: "hidden",
-                                            borderRadius: 20,
-                                            outline: `1px ${themeColors.border.subtle} solid`,
-                                            outlineOffset: "-1px",
-                                            justifyContent: "flex-start",
-                                            alignItems: "center",
-                                            gap: 8,
-                                            display: "inline-flex",
-                                            cursor: "pointer",
-                                            background: "transparent",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = themeColors.state.hoverSubtle
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = "transparent"
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                justifyContent: "center",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                color: themeColors.text.secondary,
-                                                fontSize: 15,
-                                                fontFamily: "Inter",
-                                                fontWeight: "400",
-                                                lineHeight: 1.5,
-                                                wordWrap: "break-word",
-                                            }}
-                                        >
-                                            {suggestion}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                         <div />
                     </div>
 
@@ -12306,14 +12276,105 @@ Do not include markdown formatting or explanations.`
                             right: 0,
                             width: "100%",
                             display: "flex",
-                            justifyContent: "center",
+                            flexDirection: "column",
+                            justifyContent: "flex-end",
+                            alignItems: "center",
                         zIndex: 1000,
                         pointerEvents: "none",
-                            paddingBottom: "env(safe-area-inset-bottom)",
+                            paddingTop: aiGeneratedSuggestions.length > 0 ? 36 : 0,
                             touchAction: "none",
                         }}
                     >
+                        {aiGeneratedSuggestions.length > 0 && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 36px)`,
+                                    pointerEvents: "none",
+                                    zIndex: -1,
+                                }}
+                            />
+                        )}
+                        {aiGeneratedSuggestions.length > 0 && (
+                            <div
+                                data-layer="ai suggested replies"
+                                className="AiSuggestedReplies"
+                                style={{
+                                    width: "100%",
+                                    maxWidth: 728,
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    justifyContent: "flex-start",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    paddingLeft: isMobileLayout ? 16 : 24,
+                                    paddingRight: isMobileLayout ? 16 : 24,
+                                    paddingBottom: 4,
+                                    paddingTop: 1,
+                                    overflowX: "auto",
+                                    pointerEvents: "auto",
+                                    whiteSpace: "nowrap",
+                                    scrollbarWidth: "none",
+                                    msOverflowStyle: "none",
+                                }}
+                            >
+                                {aiGeneratedSuggestions.slice(0, isMobileLayout ? 5 : 3).map((suggestion, index) => (
+                                    <div
+                                        key={index}
+                                        onClick={() => handleSendMessage(suggestion)}
+                                        className={`Suggestion${index + 1}`}
+                                        style={{
+                                            maxWidth: 380,
+                                            paddingLeft: 12,
+                                            paddingRight: 12,
+                                            paddingTop: 8,
+                                            paddingBottom: 8,
+                                            overflow: 'hidden',
+                                            borderRadius: 24,
+                                            outline: '1px rgba(255, 255, 255, 0.20) solid',
+                                            outlineOffset: '-0.33px',
+                                            justifyContent: 'flex-start',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            display: 'inline-flex',
+                                            cursor: "pointer",
+                                            flexShrink: 0,
+                                            background: (isDocOpen || isWhiteboardOpen) ? themeColors.background : chatThemeColors.background,
+                                            color: 'rgba(255, 255, 255, 0.65)',
+                                            transition: "background-color 0.2s ease",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = "#2B2B2B"
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = (isDocOpen || isWhiteboardOpen) ? themeColors.background : chatThemeColors.background
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                justifyContent: 'center',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                color: 'rgba(255, 255, 255, 0.65)',
+                                                fontSize: 15,
+                                                fontFamily: 'Inter',
+                                                fontWeight: '400',
+                                                lineHeight: "22.50px",
+                                                wordWrap: 'break-word',
+                                            }}
+                                        >
+                                            {suggestion}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <ChatInput
+                            hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
                             value={inputText}
                             onChange={(e) => {
                                 const newValue = e.target.value
