@@ -323,7 +323,7 @@ const darkColors = {
     background: "#212121",
     surface: "#303030",
     surfaceHighlight: "#3D3D3D",
-    surfaceMenu: "#353535",
+    surfaceMenu: "#353535", 
     surfaceModal: "#1E1E1E",
     card: "#2E2E2E",
 
@@ -3124,6 +3124,8 @@ const ChatInput = React.memo(function ChatInput({
     }, [isDocOpen, isWhiteboardOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
+    const [showAddPeopleOverlay, setShowAddPeopleOverlay] = React.useState(false)
+    const [hasCopiedLink, setHasCopiedLink] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
     const menuRef = React.useRef<HTMLDivElement>(null)
     const [canShareScreen, setCanShareScreen] = React.useState(false)
@@ -3430,10 +3432,34 @@ const ChatInput = React.memo(function ChatInput({
                 id: "new_chat",
                 label: "New chat",
                 icon: (
-                    <div data-svg-wrapper data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons." style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16 }} className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M14.7498 8.00011C14.7498 11.1823 14.7498 12.773 13.7613 13.7615C12.7728 14.75 11.1813 14.75 7.99989 14.75C4.81769 14.75 3.22697 14.75 2.23848 13.7615C1.25 12.773 1.25 11.1816 1.25 8.00011C1.25 4.81792 1.25 3.22719 2.23848 2.23871C3.22697 1.25023 4.81844 1.25023 7.99989 1.25023M6.14967 7.36262C5.89372 7.61895 5.74995 7.96637 5.74992 8.32861V10.2501H7.68339C8.04564 10.2501 8.39363 10.1061 8.65013 9.84958L14.35 4.14668C14.477 4.01979 14.5776 3.86913 14.6463 3.70332C14.715 3.53751 14.7504 3.3598 14.7504 3.18032C14.7504 3.00084 14.715 2.82313 14.6463 2.65732C14.5776 2.49151 14.477 2.34085 14.35 2.21396L13.7868 1.65072C13.6599 1.52369 13.5092 1.42291 13.3433 1.35415C13.1774 1.28539 12.9996 1.25 12.8201 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 11.9802 1.52369 11.8533 1.65072L6.14967 7.36262Z" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                    <div
+                        data-svg-wrapper
+                        data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 16,
+                            height: 16,
+                        }}
+                        className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                    >
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M14.7498 8.00011C14.7498 11.1823 14.7498 12.773 13.7613 13.7615C12.7728 14.75 11.1813 14.75 7.99989 14.75C4.81769 14.75 3.22697 14.75 2.23848 13.7615C1.25 12.773 1.25 11.1816 1.25 8.00011C1.25 4.81792 1.25 3.22719 2.23848 2.23871C3.22697 1.25023 4.81844 1.25023 7.99989 1.25023M6.14967 7.36262C5.89372 7.61895 5.74995 7.96637 5.74992 8.32861V10.2501H7.68339C8.04564 10.2501 8.39363 10.1061 8.65013 9.84958L14.35 4.14668C14.477 4.01979 14.5776 3.86913 14.6463 3.70332C14.715 3.53751 14.7504 3.3598 14.7504 3.18032C14.7504 3.00084 14.715 2.82313 14.6463 2.65732C14.5776 2.49151 14.477 2.34085 14.35 2.21396L13.7868 1.65072C13.6599 1.52369 13.5092 1.42291 13.3433 1.35415C13.1774 1.28539 12.9996 1.25 12.8201 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 11.9802 1.52369 11.8533 1.65072L6.14967 7.36262Z"
+                                stroke={themeColors.text.primary}
+                                strokeOpacity="0.95"
+                                strokeWidth="1.2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
                     </div>
                 ),
                 onClick: () => {
@@ -3445,6 +3471,66 @@ const ChatInput = React.memo(function ChatInput({
                 hasSeparator: true,
             })
         }
+
+        items.push({
+            id: "add_people",
+            label: "Add people",
+            icon: (
+                <div
+                    data-svg-wrapper
+                    data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
+                    className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 16,
+                        height: 16,
+                    }}
+                >
+                    <svg
+                        width="16"
+                        height="17"
+                        viewBox="0 0 16 17"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M1.34961 15.6C1.58562 10.9628 5.56331 8.89799 9.13135 9.40568M9.275 12.8857H14.649M12.0976 10.226V15.6M11.3137 3.84578C11.3137 2.0779 9.83576 0.599976 8.06787 0.599976C6.29999 0.599976 4.82207 2.0779 4.82207 3.84578C4.82207 5.61367 6.29999 7.09159 8.06787 7.09159C9.83576 7.09159 11.3137 5.61367 11.3137 3.84578Z"
+                            stroke={themeColors.text.primary}
+                            strokeOpacity="0.95"
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                </div>
+            ),
+            onClick: () => {
+                if (!isMobileLayout) {
+                    setShowAddPeopleOverlay(true)
+                    setShowMenu(false)
+                    return
+                }
+
+                const url = typeof window !== "undefined" ? window.location.href : ""
+                if (typeof navigator !== "undefined") {
+                    navigator.clipboard.writeText(url).catch(console.error)
+                    // @ts-ignore
+                    if (navigator.share) {
+                        // @ts-ignore
+                        navigator.share({
+                            title: document.title,
+                            url: url,
+                        }).catch(console.error)
+                    }
+                }
+                setShowMenu(false)
+            },
+            className: "AddPeople",
+            isDestructive: false,
+            hasSeparator: !showNewChat,
+        })
 
         if (showReport) {
             items.push({
@@ -3474,7 +3560,7 @@ const ChatInput = React.memo(function ChatInput({
                 },
                 className: "Report",
                 isDestructive: true,
-                hasSeparator: !showNewChat,
+                hasSeparator: false,
             })
         }
 
@@ -3494,6 +3580,7 @@ const ChatInput = React.memo(function ChatInput({
         themeColors,
         role,
         hasMessages,
+        isMobileLayout,
     ])
 
     return (
@@ -3529,144 +3616,107 @@ const ChatInput = React.memo(function ChatInput({
                     color: ${themeColors.text.secondary};
                 }
             `}</style>
-            {showMenu && (
-                <>
-                    {isMobileLayout && (
-                        <div
-                            style={{
-                                position: "fixed",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                background: "rgba(0, 0, 0, 0.7)",
-                                zIndex: 1004,
-                                pointerEvents: "auto",
-                            }}
-                            onClick={() => setShowMenu(false)}
-                        />
-                    )}
-                    <div
-                        ref={menuRef}
+
+            {showAddPeopleOverlay && !isMobileLayout && (
+                <div 
+                    data-layer="add-people-overlay" 
+                    className="AddPeopleOverlay" 
+                    style={{
+                        alignSelf: 'stretch', 
+                        maxHeight: 384, 
+                        paddingTop: 14, 
+                        paddingBottom: 14, 
+                        paddingLeft: 20, 
+                        paddingRight: 16, 
+                        background: themeColors === lightColors ? themeColors.background : themeColors.surface,
+                        outline: isDocOpen || isWhiteboardOpen ? `0.33px ${themeColors.border.subtle} solid` : "none",
+                        outlineOffset: isDocOpen || isWhiteboardOpen ? "-0.33px" : 0,
+                        overflow: 'hidden', 
+                        borderRadius: 28, 
+                        justifyContent: 'flex-start', 
+                        alignItems: 'center', 
+                        gap: 4, 
+                        display: 'inline-flex', 
+                        marginBottom: 0
+                    }}
+                >
+                  <div data-layer="text-content" className="TextContent" style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
+                    <div data-layer="title" className="Title" style={{alignSelf: 'stretch', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>Add people</div>
+                    <div data-layer="description" className="Description" style={{alignSelf: 'stretch', color: themeColors.text.secondary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>Share ideas, learn together, and have fun</div>
+                  </div>
+                  <div
+                        data-layer="copy-link-button"
+                        className="CopyLinkButton"
+                        onClick={() => {
+                            const url = typeof window !== "undefined" ? window.location.href : ""
+                            if (typeof navigator !== "undefined") {
+                                navigator.clipboard.writeText(url).then(() => {
+                                    setHasCopiedLink(true)
+                                    setTimeout(() => setHasCopiedLink(false), 2000)
+                                }).catch(console.error)
+                                // @ts-ignore
+                                if (navigator.share) {
+                                    // @ts-ignore
+                                    navigator.share({
+                                        title: document.title,
+                                        url: url,
+                                    }).catch(console.error)
+                                }
+                            }
+                        }}
                         style={{
-                            position: isMobileLayout ? "fixed" : "absolute",
-                            bottom: isMobileLayout ? 0 : "100%",
-                            left: isMobileLayout ? 0 : 28,
-                            right: isMobileLayout ? 0 : "auto",
-                            marginBottom: isMobileLayout ? 0 : -28,
-                            zIndex: isMobileLayout ? 1005 : 100,
-                            pointerEvents: "auto",
+                            height: 44,
+                            width: 144,
+                            paddingLeft: 20,
+                            paddingRight: 20,
+                            borderRadius: 28,
+                            outline: themeColors === lightColors ? `1px ${themeColors.border.subtle} solid` : '1px rgba(255, 255, 255, 0.20) solid',
+                            outlineOffset: '-1px',
+                            justifyContent: 'flex-start',
+                            alignItems: 'center',
+                            gap: 8,
+                            display: 'flex',
+                            cursor: "pointer",
+                            transition: "background 0.2s ease",
+                            backgroundColor: "transparent",
+                            boxSizing: "border-box"
+                        }}
+                        onMouseEnter={(e) => {
+                             e.currentTarget.style.backgroundColor = themeColors === lightColors ? "rgba(0, 0, 0, 0.04)" : "rgba(255, 255, 255, 0.08)"
+                        }}
+                        onMouseLeave={(e) => {
+                             e.currentTarget.style.backgroundColor = "transparent"
                         }}
                     >
-                        <div
-                            data-layer="conversation actions"
-                            className="ConversationActions"
-                            onMouseLeave={() => setSelectedMenuIndex(-1)}
-                            style={{
-                                width: isMobileLayout ? "auto" : 196,
-                                padding: 10,
-                                background: themeColors.surfaceMenu,
-                                boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
-                                borderRadius: isMobileLayout
-                                    ? "36px 36px 0px 0px"
-                                    : 28,
-                                outline: `0.33px ${themeColors.border.subtle} solid`,
-                                outlineOffset: "-0.33px",
-                                flexDirection: "column",
-                                justifyContent: "flex-start",
-                                alignItems: "flex-start",
-                                gap: 4,
-                                display: "flex",
-                            }}
-                        >
-                            {menuItems.map((item, index) => (
-                                <React.Fragment key={item.id}>
-                                    {item.hasSeparator && (
-                                        <div
-                                            data-layer="separator"
-                                            className="Separator"
-                                            style={{
-                                                alignSelf: "stretch",
-                                                marginLeft: 4,
-                                                marginRight: 4,
-                                                marginTop: 2,
-                                                marginBottom: 2,
-                                                height: 1,
-                                                position: "relative",
-                                                background:
-                                                    themeColors.border.subtle,
-                                                borderRadius: 4,
-                                            }}
-                                        />
-                                    )}
-                                    <div
-                                        className={item.className}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            item.onClick()
-                                        }}
-                                        style={{
-                                            ...localStyles.menuItem,
-                                            height: isMobileLayout ? 44 : 36,
-                                            transition: "none",
-                                            ...(index === selectedMenuIndex
-                                                ? item.isDestructive
-                                                    ? localStyles.menuItemDestructiveHover
-                                                    : localStyles.menuItemHover
-                                                : {}),
-                                        }}
-                                        onMouseEnter={() => {
-                                            if (isMobileLayout) return
-                                            setSelectedMenuIndex(index)
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            // Handled by parent container
-                                        }}
-                                    >
-                                        <div
-                                            data-svg-wrapper
-                                            className="Icon"
-                                            style={{
-                                                width: 15,
-                                                display: "flex",
-                                                justifyContent: "center",
-                                            }}
-                                        >
-                                            {item.icon}
-                                        </div>
-                                        <div
-                                            className="Label"
-                                            style={{
-                                                flex: "1 1 0",
-                                                justifyContent: "center",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                color: item.isDestructive
-                                                    ? "#FB6A6A"
-                                                    : themeColors.text.primary,
-                                                fontSize: 14,
-                                                fontFamily: "Inter",
-                                                fontWeight: "400",
-                                                lineHeight: "19.32px",
-                                                wordWrap: "break-word",
-                                            }}
-                                        >
-                                            {item.label}
-                                        </div>
-                                    </div>
-                                </React.Fragment>
-                            ))}
-                        </div>
+                    <div data-layer="link-text" className="LinkText" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 14, fontFamily: 'Inter', fontWeight: '500', lineHeight: "19.32px", flex: 1, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", textAlign: "left", alignItems: "flex-start"}}>{hasCopiedLink ? "Copied link" : ((typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : "tom-cat-fin")}</div>
+                    <div data-svg-wrapper data-layer="copy-icon" className="CopyIcon">
+                        {hasCopiedLink ? (
+                            <div data-svg-wrapper data-layer="checkmark-icon" className="CheckmarkIcon">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" clipRule="evenodd" d="M12.6256 1.57762C13.0167 1.84429 13.1177 2.37754 12.8509 2.76866L6.42242 12.1971C6.27868 12.4081 6.04836 12.5439 5.79431 12.5677C5.54015 12.5915 5.28864 12.5009 5.10816 12.3204L1.25105 8.46328C0.916318 8.12857 0.916318 7.58583 1.25105 7.25112C1.58578 6.91641 2.12849 6.91641 2.46323 7.25112L5.58884 10.3768L11.4346 1.80295C11.7013 1.41183 12.2345 1.31095 12.6256 1.57762Z" fill={themeColors.text.secondary} fillOpacity="1"/>
+                                </svg>
+                            </div>
+                        ) : (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z" fill={themeColors.text.secondary} fillOpacity="1"/>
+                            </svg>
+                        )}
                     </div>
-                </>
+                  </div>
+                  <div data-svg-wrapper data-layer="close-button" className="CloseButton" onClick={() => setShowAddPeopleOverlay(false)} style={{cursor: "pointer"}}>
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.3182 23.3033L17.9994 18.9844L13.6805 23.3033C13.4087 23.5751 12.9679 23.5752 12.6961 23.3033C12.4242 23.0315 12.4242 22.5907 12.6961 22.3188L17.0149 18L12.6961 13.6812C12.4242 13.4093 12.4242 12.9685 12.6961 12.6967C12.9679 12.4248 13.4087 12.4249 13.6805 12.6967L17.9994 17.0155L22.3182 12.6967L22.4274 12.6078C22.6976 12.4293 23.0648 12.4588 23.3027 12.6967C23.5406 12.9346 23.5701 13.3018 23.3916 13.572L23.3027 13.6811L18.9838 18L23.3027 22.3189C23.5745 22.5907 23.5745 23.0314 23.3027 23.3033C23.0308 23.5751 22.5901 23.5752 22.3182 23.3033Z" fill={themeColors.text.secondary} fillOpacity="1"/>
+                    </svg>
+                  </div>
+                </div>
             )}
 
             <div
-                data-layer="overlay"
-                className="Overlay"
+                data-layer="bottom-controls-container"
+                className="BottomControlsContainer"
                 style={{
                     width: "100%",
-                    padding: "24px 0 16px 0",
+                    padding: "10px 0 16px 0",
                     background: showGradient
                         ? isDocOpen || isWhiteboardOpen
                             ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)`
@@ -3817,7 +3867,7 @@ const ChatInput = React.memo(function ChatInput({
                             width: "100%",
                         }}
                     >
-                        {/* UPLOAD ICON (Now toggles Menu) */}
+                        {/* UPLOAD ICON (the button to open the + menu) */}
                         <div
                             id="upload-trigger-btn"
                             data-svg-wrapper
@@ -3826,11 +3876,16 @@ const ChatInput = React.memo(function ChatInput({
                             onClick={(e) => {
                                 e.stopPropagation()
                                 if (attachments.length < 10) {
-                                    setShowMenu((prev) => !prev)
+                                    const nextState = !showMenu
+                                    setShowMenu(nextState)
+                                    // Hide tooltip if menu is opening
+                                    if (nextState) {
+                                        setIsAddFilesTooltipHovered(false)
+                                    }
                                 }
                             }}
                             onMouseEnter={() =>
-                                isHoverCapable() &&
+                                !showMenu && isHoverCapable() &&
                                 setIsAddFilesTooltipHovered(true)
                             }
                             onMouseLeave={() =>
@@ -3841,7 +3896,6 @@ const ChatInput = React.memo(function ChatInput({
                                     attachments.length >= 10
                                         ? "not-allowed"
                                         : "pointer",
-                                opacity: attachments.length >= 10 ? 0.3 : 0.95,
                                 pointerEvents:
                                     attachments.length >= 10 ? "none" : "auto",
                                 width: 36,
@@ -3851,8 +3905,140 @@ const ChatInput = React.memo(function ChatInput({
                                 justifyContent: "center",
                                 marginBottom: 0, // Aligned with send button
                                 position: "relative",
+                                zIndex: 1,
                             }}
                         >
+            {showMenu && (
+                <>
+                    {isMobileLayout && (
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "rgba(0, 0, 0, 0.7)",
+                                zIndex: 1004,
+                                pointerEvents: "auto",
+                            }}
+                            onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                        />
+                    )}
+                    <div
+                        ref={menuRef}
+                        style={{
+                            position: isMobileLayout ? "fixed" : "absolute",
+                            bottom: isMobileLayout ? 0 : "calc(100% + 4px)",
+                            left: isMobileLayout ? 0 : "calc(100% - 40px)",
+                            right: isMobileLayout ? 0 : "auto",
+                            zIndex: 2000, // Force very high z-index
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        <div
+                            data-layer="conversation actions"
+                            className="ConversationActions"
+                            onMouseLeave={() => setSelectedMenuIndex(-1)}
+                            style={{
+                                width: isMobileLayout ? "auto" : 196,
+                                padding: 10,
+                                background: themeColors.surfaceMenu,
+                                boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                                borderRadius: isMobileLayout
+                                    ? "36px 36px 0px 0px"
+                                    : 28,
+                                outline: `0.33px ${themeColors.border.subtle} solid`,
+                                outlineOffset: "-0.33px",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: 4,
+                                display: "flex",
+                            }}
+                        >
+                            {menuItems.map((item, index) => (
+                                <React.Fragment key={item.id}>
+                                    {item.hasSeparator && (
+                                        <div
+                                            data-layer="separator"
+                                            className="Separator"
+                                            style={{
+                                                alignSelf: "stretch",
+                                                marginLeft: 4,
+                                                marginRight: 4,
+                                                marginTop: 2,
+                                                marginBottom: 2,
+                                                height: 1,
+                                                position: "relative",
+                                                background:
+                                                    themeColors.border.subtle,
+                                                borderRadius: 4,
+                                            }}
+                                        />
+                                    )}
+                                    <div
+                                        className={item.className}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            item.onClick()
+                                        }}
+                                        style={{
+                                            ...localStyles.menuItem,
+                                            height: isMobileLayout ? 44 : 36,
+                                            transition: "none",
+                                            ...(index === selectedMenuIndex
+                                                ? item.isDestructive
+                                                    ? localStyles.menuItemDestructiveHover
+                                                    : localStyles.menuItemHover
+                                                : {}),
+                                        }}
+                                        onMouseEnter={() => {
+                                            if (isMobileLayout) return
+                                            setSelectedMenuIndex(index)
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            // Handled by parent container
+                                        }}
+                                    >
+                                        <div
+                                            data-svg-wrapper
+                                            className="Icon"
+                                            style={{
+                                                width: 15,
+                                                display: "flex",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            {item.icon}
+                                        </div>
+                                        <div
+                                            className="Label"
+                                            style={{
+                                                flex: "1 1 0",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: item.isDestructive
+                                                    ? "#FB6A6A"
+                                                    : themeColors.text.primary,
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: "19.32px",
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            {item.label}
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                </>
+            )}
+                            {/* Tooltip */}
                             {!showMenu && isAddFilesTooltipHovered && (
                                 <Tooltip
                                     style={{
@@ -3866,21 +4052,23 @@ const ChatInput = React.memo(function ChatInput({
                                     Add files and more
                                 </Tooltip>
                             )}
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                            >
-                                <path
-                                    d="M12 5V19M5 12H19"
-                                    stroke={themeColors.text.primary}
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
+                            <div style={{ opacity: attachments.length >= 10 ? 0.3 : 0.95, display: "flex" }}>
+                                <svg
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path
+                                        d="M12 5V19M5 12H19"
+                                        stroke={themeColors.text.primary}
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
+                            </div>
                         </div>
 
                         {/* TEXT INPUT */}
@@ -4077,6 +4265,7 @@ const ChatInput = React.memo(function ChatInput({
                                     height: 36,
                                     display: "block",
                                     position: "relative",
+                                    zIndex: 0, // Force lowest z-index
                                 }}
                             >
                                 {isAiTooltipHovered && (
