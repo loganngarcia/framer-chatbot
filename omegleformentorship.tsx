@@ -5392,6 +5392,12 @@ const MessageBubble = React.memo(
         previousMsg,
         copiedMessageId,
         onCopy,
+        showDocButton,
+        showWhiteboardButton,
+        onToggleDoc,
+        onToggleWhiteboard,
+        isDocOpen,
+        isWhiteboardOpen,
     }: {
         msg: Message
         isMobileLayout: boolean
@@ -5402,6 +5408,12 @@ const MessageBubble = React.memo(
         previousMsg?: Message
         copiedMessageId?: string | null
         onCopy?: (msgId: string) => void
+        showDocButton?: boolean
+        showWhiteboardButton?: boolean
+        onToggleDoc?: () => void
+        onToggleWhiteboard?: () => void
+        isDocOpen?: boolean
+        isWhiteboardOpen?: boolean
     }) => {
         // Memoize base styles to avoid recreation
         const baseTextStyle = React.useMemo(
@@ -5428,6 +5440,9 @@ const MessageBubble = React.memo(
         const [isDislikeHovered, setIsDislikeHovered] = React.useState(false)
         const [isDislikeActive, setIsDislikeActive] = React.useState(false)
         const isSharing = React.useRef(false)
+
+    const [isDocHovered, setIsDocHovered] = React.useState(false)
+    const [isWhiteboardHovered, setIsWhiteboardHovered] = React.useState(false)
 
         const actionButtonBaseStyle: React.CSSProperties = {
             width: 28,
@@ -6113,6 +6128,77 @@ const MessageBubble = React.memo(
                                 msg.text,
                                 baseTextStyle,
                                 linkStyle
+                            )}
+                        </div>
+                    )}
+
+                    {/* Tool Buttons */}
+                    {(showDocButton || showWhiteboardButton) && (
+                        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                            {showDocButton && (
+                                <div 
+                                    onClick={onToggleDoc}
+                                    data-layer="notes" 
+                                    className="Notes" 
+                                    onMouseEnter={() => setIsDocHovered(true)}
+                                    onMouseLeave={() => setIsDocHovered(false)}
+                                    style={{
+                                        height: 36, 
+                                        paddingLeft: 12, 
+                                        paddingRight: 12, 
+                                        paddingTop: 8, 
+                                        paddingBottom: 8, 
+                                        borderRadius: 28, 
+                                        outline: themeColors.background === "#FFFFFF" ? '1px solid rgba(0, 0, 0, 0.1)' : '0.33px rgba(255, 255, 255, 0.20) solid', 
+                                        outlineOffset: '-0.33px', 
+                                        justifyContent: 'flex-start', 
+                                        alignItems: 'center', 
+                                        gap: 8, 
+                                        display: 'inline-flex',
+                                        cursor: 'pointer',
+                                        background: isDocHovered ? (themeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)") : "transparent"
+                                    }}
+                                >
+                                    <div data-svg-wrapper style={{display: "flex", opacity: 0.65}}>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d={isDocOpen ? "M14 2L2 14M2 2L14 14" : "M0.75 13.2011L8.63044 13.2007M0.75 7.84243H15.25M0.75 2.79895H15.25"} stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <div style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', opacity: 0.65}}>{isDocOpen ? "Close" : "Notes"}</div>
+                                </div>
+                            )}
+
+                            {showWhiteboardButton && (
+                                <div 
+                                    onClick={onToggleWhiteboard}
+                                    data-layer="whiteboard" 
+                                    className="Whiteboard" 
+                                    onMouseEnter={() => setIsWhiteboardHovered(true)}
+                                    onMouseLeave={() => setIsWhiteboardHovered(false)}
+                                    style={{
+                                        height: 36, 
+                                        paddingLeft: 12, 
+                                        paddingRight: 12, 
+                                        paddingTop: 8, 
+                                        paddingBottom: 8, 
+                                        borderRadius: 28, 
+                                        outline: themeColors.background === "#FFFFFF" ? '1px solid rgba(0, 0, 0, 0.1)' : '0.33px rgba(255, 255, 255, 0.20) solid', 
+                                        outlineOffset: '-0.33px', 
+                                        justifyContent: 'flex-start', 
+                                        alignItems: 'center', 
+                                        gap: 8, 
+                                        display: 'inline-flex',
+                                        cursor: 'pointer',
+                                        background: isWhiteboardHovered ? (themeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)") : "transparent"
+                                    }}
+                                >
+                                    <div data-svg-wrapper style={{display: "flex", opacity: 0.65}}>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d={isWhiteboardOpen ? "M14 2L2 14M2 2L14 14" : "M7.91819 13.088C7.53422 13.4723 5.26158 15.3377 4.6271 15.2468L1.23792 14.759L0.75324 11.3917C0.661952 10.7575 2.52717 8.48441 2.91112 8.10046M7.91819 13.088L14.7683 6.23491C15.1527 5.85056 15.3172 5.27793 15.2258 4.643C15.1344 4.00806 14.7946 3.36283 14.281 2.84923L13.1525 1.72002C12.8981 1.4655 12.6086 1.251 12.3007 1.08877C11.9927 0.92655 11.6722 0.819785 11.3576 0.774584C11.0431 0.729383 10.7405 0.746632 10.4673 0.825345C10.194 0.904058 9.95547 1.04269 9.76523 1.23332L2.91112 8.10046M7.91819 13.088L2.91112 8.10046"} stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <div style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', opacity: 0.65}}>{isWhiteboardOpen ? "Close" : "Whiteboard"}</div>
+                                </div>
                             )}
                         </div>
                     )}
@@ -10903,7 +10989,7 @@ Do not include markdown formatting or explanations.`
                         }
 
                         if (!accumulatedText) {
-                            accumulatedText = "I've updated the whiteboard."
+                            accumulatedText = "Look at the whiteboard."
                             setMessages((prev) => {
                                 const newArr = [...prev]
                                 if (
@@ -12045,6 +12131,21 @@ Do not include markdown formatting or explanations.`
 
     // 2. Chat Renderer
     const renderChatSection = (isSidebar: boolean) => {
+        // --- Calculate Last Tool Calls ---
+        let lastDocCallIdx = -1
+        let lastWhiteboardCallIdx = -1
+
+        messages.forEach((msg, idx) => {
+            if (msg.functionCall) {
+                if (msg.functionCall.name === "update_doc") {
+                    lastDocCallIdx = idx
+                }
+                if (msg.functionCall.name === "update_whiteboard") {
+                    lastWhiteboardCallIdx = idx
+                }
+            }
+        })
+
         return (
             <div
                 style={{
@@ -12088,6 +12189,12 @@ Do not include markdown formatting or explanations.`
                                 }
                                 copiedMessageId={copiedMessageId}
                                 onCopy={handleCopyMessage}
+                                showDocButton={idx === lastDocCallIdx}
+                                showWhiteboardButton={idx === lastWhiteboardCallIdx}
+                                onToggleDoc={() => setIsDocOpen((prev) => !prev)}
+                                onToggleWhiteboard={() => setIsWhiteboardOpen((prev) => !prev)}
+                                isDocOpen={isDocOpen}
+                                isWhiteboardOpen={isWhiteboardOpen}
                             />
                         ))}
                         {isLoading &&
