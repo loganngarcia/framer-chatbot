@@ -12206,6 +12206,7 @@ Do not include markdown formatting or explanations.`
                             gap: 16,
                             overscrollBehavior: "contain",
                             WebkitOverflowScrolling: "touch",
+                            touchAction: "pan-y",
                         position: "relative",
                         }}
                     >
@@ -12282,7 +12283,7 @@ Do not include markdown formatting or explanations.`
                         zIndex: 1000,
                         pointerEvents: "none",
                             paddingTop: aiGeneratedSuggestions.length > 0 ? 36 : 0,
-                            touchAction: "none",
+                            // touchAction: "none", // Removed to fix mobile tap accuracy issues
                         }}
                     >
                         {aiGeneratedSuggestions.length > 0 && (
@@ -12346,6 +12347,7 @@ Do not include markdown formatting or explanations.`
                                             background: (isDocOpen || isWhiteboardOpen) ? themeColors.background : chatThemeColors.background,
                                             color: 'rgba(255, 255, 255, 0.65)',
                                             transition: "background-color 0.2s ease",
+                                            pointerEvents: "auto",
                                         }}
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.backgroundColor = "#2B2B2B"
@@ -12776,7 +12778,7 @@ Do not include markdown formatting or explanations.`
                 left: 0,
                 right: 0,
                 bottom: 0,
-                touchAction: "none",
+                // touchAction: "none", // Removed to fix mobile tap accuracy issues
             }}
         >
             {/* BAN BANNER */}
