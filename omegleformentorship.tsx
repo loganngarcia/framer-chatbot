@@ -12744,7 +12744,7 @@ Do not include markdown formatting or explanations.`
                         <div style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.2)" }} />
                         {isDragBarHovered && !isDragging.current && (
                             <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 4px)", whiteSpace: "nowrap" }}>
-                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to expand chat" : "Click to hide chat"}
+                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to show chat" : "Click to hide chat"}
                             </Tooltip>
                         )}
                     </div>
