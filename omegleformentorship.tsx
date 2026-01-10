@@ -380,41 +380,6 @@ const darkColors = {
     },
 }
 
-const lightColors = {
-    background: "#FFFFFF",
-    surface: "#f6f6f6",
-    surfaceHighlight: "#E2E8F0",
-    surfaceMenu: "#f6f6f6",
-    surfaceModal: "#FFFFFF",
-    card: "#FFFFFF",
-
-    text: {
-        primary: "rgba(0, 0, 0, 0.95)",
-        secondary: "rgba(0, 0, 0, 0.65)",
-        tertiary: "rgba(0, 0, 0, 0.45)",
-        link: "#0099FF",
-    },
-
-    border: {
-        subtle: "rgba(0, 0, 0, 0.1)",
-    },
-
-    state: {
-        hover: "rgba(0, 0, 0, 0.05)",
-        hoverSubtle: "rgba(0, 0, 0, 0.04)",
-        destructive: "#EF4444", // Red
-        accent: "#0EA5E9", // Sky Blue
-        overlay: "rgba(255, 255, 255, 0.8)",
-    },
-
-    file: {
-        pdf: "#EA4335",
-        excel: "#34A853",
-        ppt: "#FBBC04",
-        default: "#4285F4",
-    },
-}
-
 const pureBlackColors = {
     ...darkColors,
     background: "#141414",
@@ -1173,10 +1138,7 @@ const VideoPlayer = React.memo(function VideoPlayer({
     // Use theme surface color for placeholder background, black for video
     const containerBackground =
         !stream && placeholder ? themeColors.surface : "#000"
-    const isLightMode = themeColors.background === "#FFFFFF"
-    const placeholderTextColor = isLightMode
-        ? "rgba(0, 0, 0, 0.45)"
-        : "rgba(255, 255, 255, 0.45)"
+    const placeholderTextColor = "rgba(255, 255, 255, 0.45)"
 
     return (
         <div
@@ -1380,7 +1342,7 @@ const DocEditor = React.memo(function DocEditor({
     onChange,
     settings,
     onSettingsChange,
-    themeColors = lightColors,
+    themeColors = darkColors,
     isMobileLayout = false,
     remoteCursors,
     onCursorMove,
@@ -3099,6 +3061,8 @@ interface ChatInputProps {
     role?: string | null
     hasMessages?: boolean
     onClearMessages?: () => void
+    hideGradient?: boolean
+    rootStyle?: React.CSSProperties
 }
 
 const ChatInput = React.memo(function ChatInput({
@@ -3131,6 +3095,8 @@ const ChatInput = React.memo(function ChatInput({
     role,
     hasMessages = false,
     onClearMessages,
+    hideGradient = false,
+    rootStyle,
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
@@ -3141,13 +3107,13 @@ const ChatInput = React.memo(function ChatInput({
     const [showGradient, setShowGradient] = React.useState(true)
 
     // Handle gradient animation when transitioning into/out of doc editor
-    React.useEffect(() => {
-        setShowGradient(false) // Instantly hide gradient
-        const timeout = setTimeout(() => {
-            setShowGradient(true) // Show gradient after 0.2s
-        }, 200)
-        return () => clearTimeout(timeout)
-    }, [isDocOpen, isWhiteboardOpen])
+    // React.useEffect(() => {
+    //     setShowGradient(false) // Instantly hide gradient
+    //     const timeout = setTimeout(() => {
+    //         setShowGradient(true) // Show gradient after 0.2s
+    //     }, 200)
+    //     return () => clearTimeout(timeout)
+    // }, [isDocOpen, isWhiteboardOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
     const [showAddPeopleOverlay, setShowAddPeopleOverlay] = React.useState(false)
@@ -3625,6 +3591,7 @@ const ChatInput = React.memo(function ChatInput({
                 paddingRight: isMobileLayout ? 16 : 24,
                 boxSizing: "border-box",
                 pointerEvents: "auto",
+                ...rootStyle,
             }}
         >
             {/* CONVERSATION QUICK ACTIONS MENU */}
@@ -3654,7 +3621,7 @@ const ChatInput = React.memo(function ChatInput({
                         paddingBottom: 14, 
                         paddingLeft: 20, 
                         paddingRight: 16, 
-                        background: themeColors === lightColors ? themeColors.background : themeColors.surface,
+                        background: themeColors.surface,
                         outline: isDocOpen || isWhiteboardOpen ? `0.33px ${themeColors.border.subtle} solid` : "none",
                         outlineOffset: isDocOpen || isWhiteboardOpen ? "-0.33px" : 0,
                         overflow: 'hidden', 
@@ -3696,7 +3663,7 @@ const ChatInput = React.memo(function ChatInput({
                             paddingLeft: 20,
                             paddingRight: 20,
                             borderRadius: 28,
-                            outline: themeColors === lightColors ? `1px ${themeColors.border.subtle} solid` : '1px rgba(255, 255, 255, 0.20) solid',
+                            outline: '1px rgba(255, 255, 255, 0.20) solid',
                             outlineOffset: '-1px',
                             justifyContent: 'flex-start',
                             alignItems: 'center',
@@ -3708,7 +3675,7 @@ const ChatInput = React.memo(function ChatInput({
                             boxSizing: "border-box"
                         }}
                         onMouseEnter={(e) => {
-                             e.currentTarget.style.backgroundColor = themeColors === lightColors ? "rgba(0, 0, 0, 0.04)" : "rgba(255, 255, 255, 0.08)"
+                             e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"
                         }}
                         onMouseLeave={(e) => {
                              e.currentTarget.style.backgroundColor = "transparent"
@@ -3743,16 +3710,13 @@ const ChatInput = React.memo(function ChatInput({
                 style={{
                     width: "100%",
                     padding: "10px 0 16px 0",
-                    background: showGradient
-                        ? isDocOpen || isWhiteboardOpen
-                            ? `linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, ${themeColors.background} 35%)`
-                            : `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`
+                    background: (!hideGradient && showGradient)
+                        ? `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`
                         : "transparent",
                     justifyContent: "center",
                     alignItems: "flex-end",
                     gap: 10,
-                    display: "flex",
-                    transition: showGradient ? "background 0.2s ease" : "none",
+                    display: "flex"
                 }}
             >
                 {/* INPUT BOX */}
@@ -3764,10 +3728,7 @@ const ChatInput = React.memo(function ChatInput({
                         minHeight: 56,
                         maxHeight: 384,
                         padding: 10,
-                        background:
-                            themeColors === lightColors
-                                ? themeColors.background
-                                : themeColors.surface,
+                        background: themeColors.surface,
                         outline:
                             isDocOpen || isWhiteboardOpen
                                 ? `0.33px ${themeColors.border.subtle} solid`
@@ -4424,7 +4385,6 @@ function DebugConsole({ logs }: { logs: string[] }) {
                 zIndex: 9999,
                 pointerEvents: "auto",
                 borderRadius: 28,
-                border: "1px solid rgba(255,255,255,0.2)",
                 display: "flex",
                 flexDirection: "column",
             }}
@@ -4434,7 +4394,6 @@ function DebugConsole({ logs }: { logs: string[] }) {
                 justifyContent: "space-between", 
                 alignItems: "center",
                 marginBottom: 8,
-                borderBottom: "1px solid rgba(255,255,255,0.2)",
                 paddingBottom: 8,
             }}>
                 <div style={{ color: "#fff", fontWeight: "bold" }}>🔍 Debug Console</div>
@@ -6264,7 +6223,6 @@ const RoleSelectionButton = React.memo(
             ? "I'm a student looking for a mentor"
             : "I want to offer free advice"
         const textColor = isStudent ? "white" : colors.text.primary
-        const isLightMode = colors.background === "#FFFFFF"
 
         if (isCompact) {
             return (
@@ -6277,9 +6235,7 @@ const RoleSelectionButton = React.memo(
                         width: "100%",
                         background: isStudent
                             ? colors.state.accent
-                            : isLightMode
-                              ? colors.surface
-                              : undefined, // Light mode: use surface color for volunteer tile
+                            : undefined, // Dark mode: use surface color logic handled by parent or default transparent
                         color: textColor,
                         fontSize: 15,
                         fontWeight: 600,
@@ -6419,7 +6375,7 @@ export default function OmegleMentorshipUI(props: Props) {
         geminiApiKey,
         systemPrompt,
         accentColor,
-        model = "gemini-2.5-flash-lite",
+        model = "gemini-3-flash-preview",
         debugMode = false,
     } = props
 
@@ -6492,19 +6448,18 @@ export default function OmegleMentorshipUI(props: Props) {
     const [pendingPeerIds, setPendingPeerIds] = React.useState<Set<string>>(new Set())
 
     // --- THEME LOGIC ---
-    const isLightMode = false // Always dark mode for shell, DocEditor handles its own light theme
+    // Always dark mode for shell
     
-    // Determine base theme (default dark or light)
-    const baseTheme = isLightMode ? lightColors : darkColors
+    // Determine base theme (default dark)
+    const baseTheme = darkColors
     const themeColors = baseTheme
     
     // Determine Chat/Doc theme:
     // 1. Doc Open -> Pure Black
-    // 2. Whiteboard Open (and no Doc) -> Light
-    // 3. Default -> Base Theme (Dark)
+    // 2. Default -> Base Theme (Dark)
     const chatThemeColors = isDocOpen 
         ? pureBlackColors 
-        : (isWhiteboardOpen ? lightColors : themeColors)
+        : themeColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(
@@ -6535,6 +6490,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const lastCursorUpdate = React.useRef(0)
     const [editor, setEditor] = React.useState<any>(null)
     const editorRef = React.useRef<any>(null)
+    const pendingWhiteboardUpdates = React.useRef<any[]>([])
     React.useEffect(() => {
         editorRef.current = editor
     }, [editor])
@@ -8273,6 +8229,24 @@ Do not include markdown formatting or explanations.`
     const hasSnappedForMessages = React.useRef(false)
     const chatHeightBeforeOverlay = React.useRef<number | null>(null)
     const isMobileLayout = containerSize.width < 768
+
+    // --- MOBILE INPUT RESIZING ---
+    const [mobileInputHeight, setMobileInputHeight] = React.useState(80)
+    const mobileInputRef = React.useRef<HTMLDivElement>(null)
+
+    React.useEffect(() => {
+        if (!isMobileLayout || !mobileInputRef.current) return
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                if (entry.target === mobileInputRef.current) {
+                    setMobileInputHeight(entry.contentRect.height)
+                }
+            }
+        })
+        observer.observe(mobileInputRef.current)
+        return () => observer.disconnect()
+    }, [isMobileLayout, isWhiteboardOpen, isDocOpen])
+
     const [sharedScreenSize, setSharedScreenSize] = React.useState<{
         width: number
         height: number
@@ -8361,6 +8335,14 @@ Do not include markdown formatting or explanations.`
             _isDocOpen: boolean,
             _sharedScreenSize: { width: number; height: number } | null
         ) => {
+            // Calculate target ratio based on number of participants (re-using logic from renderTilesSection conceptually)
+            // Ideally we'd pass this in, but we can access the state directly since this is inside the component.
+            // Note: We need to add these to the dependency array.
+            const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
+            const isMultiParty = numTiles > 2
+            const isContentOpen = _isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen || _isDocOpen
+            const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
+
             // 1. Calculate Min Height (Max Video Height Constraint)
             let minHeight = MIN_CHAT_HEIGHT
 
@@ -8370,7 +8352,6 @@ Do not include markdown formatting or explanations.`
                 !_isWhiteboardOpen &&
                 !_isDocOpen
             ) {
-                const targetRatio = 1.55
                 let maxVideoHeightNeeded = 0
 
                 if (_isMobileLayout) {
@@ -8447,18 +8428,27 @@ Do not include markdown formatting or explanations.`
                 let topRowHeight = 140
                 if (_isMobileLayout) {
                     const availableW = Math.max(0, cWidth - 32)
+                    
+                    // We calculate the minimum video section height based on aspect ratio
+                    // to ensure videos are not squashed beyond their target ratio.
+                    // However, we allow the user to drag significantly higher than this default
+                    // to enable minimizing the video view if desired.
+                    
+                    // Default height assumption (2x2 grid approximation)
+                    // If we use targetRatio here, we get a more accurate 'ideal' height.
                     const tileW = (availableW - 8) / 2
-                    topRowHeight = tileW / (4 / 3)
+                    topRowHeight = tileW / targetRatio
                 }
 
                 const chromeHeight = 24 + 16 + topRowHeight + 8
-                const minVideoHeight = 200
-                maxHeight = cHeight - chromeHeight - minVideoHeight
+                const minVideoHeight = 0 
+                
+                maxHeight = cHeight - chromeHeight - minVideoHeight 
             }
 
             return { minHeight, maxHeight }
         },
-        []
+        [remoteStreams, pendingPeerIds]
     )
 
     // --- EFFECT: RESPONSIVE LAYOUT ENGINE ---
@@ -8633,14 +8623,33 @@ Do not include markdown formatting or explanations.`
     // Save previous height and restore when closing
     React.useEffect(() => {
         if (isDocOpen || isWhiteboardOpen) {
-            // Store current height before minimizing
+            // Calculate proper initial height based on constraints
+            const containerHeight = containerRef.current?.clientHeight || window.innerHeight
+            const containerWidth = containerRef.current?.clientWidth || window.innerWidth
+            
+            const isSidebarMode = !isMobileLayout && (isWhiteboardOpen || isDocOpen)
+            const effectiveWidth = isSidebarMode ? 400 : containerWidth
+            const effectiveMobile = isSidebarMode || isMobileLayout
+
+            const { maxHeight } = calculateHeightConstraints(
+                effectiveWidth,
+                containerHeight,
+                effectiveMobile,
+                isScreenSharing,
+                remoteScreenStream,
+                isWhiteboardOpen,
+                isDocOpen,
+                sharedScreenSize
+            )
+
+            // Store current height before maximizing
             if (chatHeightBeforeOverlay.current === null) {
                 setChatHeight((prev) => {
                     chatHeightBeforeOverlay.current = prev
-                    return MIN_CHAT_HEIGHT
+                    return maxHeight
                 })
             } else {
-                setChatHeight(MIN_CHAT_HEIGHT)
+                setChatHeight(maxHeight)
             }
         } else {
             // Restore previous height when closing
@@ -8649,7 +8658,7 @@ Do not include markdown formatting or explanations.`
                 chatHeightBeforeOverlay.current = null
             }
         }
-    }, [isDocOpen, isWhiteboardOpen])
+    }, [isDocOpen, isWhiteboardOpen, calculateHeightConstraints, isMobileLayout, isScreenSharing, remoteScreenStream, sharedScreenSize])
 
     const handleRoleSelect = React.useCallback(
         (selectedRole: "student" | "volunteer") => {
@@ -8803,7 +8812,10 @@ Do not include markdown formatting or explanations.`
                 if (willBeOpen) {
                     broadcastData({ type: "doc-start" })
                 } else {
+                    // On mobile, we only close locally. On desktop, we stop the session for everyone.
+                    if (!isMobileLayout) {
                     broadcastData({ type: "doc-stop" })
+                    }
                 }
             }
 
@@ -8811,19 +8823,24 @@ Do not include markdown formatting or explanations.`
                 if (isWhiteboardOpen) {
                     setIsWhiteboardOpen(false)
                     // Notify peer to close whiteboard
+                    if (!isMobileLayout) {
                     broadcastData({ type: "tldraw-stop" })
+                    }
                 }
                 if (isScreenSharing) stopLocalScreenShare()
             }
             return willBeOpen
         })
-    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare])
+    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isMobileLayout])
 
     const toggleWhiteboard = React.useCallback(() => {
         if (isWhiteboardOpen) {
             log("Stopping whiteboard...")
             setIsWhiteboardOpen(false)
+            // On mobile, we only close locally. On desktop, we stop the session for everyone.
+            if (!isMobileLayout) {
             broadcastData({ type: "tldraw-stop" })
+            }
         } else {
             log("Starting whiteboard...")
             if (isDocOpen) setIsDocOpen(false)
@@ -8852,7 +8869,7 @@ Do not include markdown formatting or explanations.`
                 )
             }
         }
-    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isDocOpen])
+    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isDocOpen, isMobileLayout])
 
     // Reset whiteboard tool and color when opened
     React.useEffect(() => {
@@ -10228,7 +10245,7 @@ Do not include markdown formatting or explanations.`
 
         try {
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -10435,9 +10452,48 @@ Do not include markdown formatting or explanations.`
                                     required: ["content"],
                                 },
                             },
+                            {
+                                name: "update_whiteboard",
+                                description:
+                                    "Updates the tldraw whiteboard canvas. Use this to draw diagrams, flowcharts, mind maps, or visual notes. You can add, update, or remove shapes.",
+                                parameters: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        added: {
+                                            type: "ARRAY",
+                                            description:
+                                                "Array of shape records to add. Each record must have 'id', 'type', 'typeName'='shape', 'x', 'y', and 'props'. Common types: 'geo', 'text', 'arrow', 'draw'.",
+                                            items: {
+                                                type: "OBJECT",
+                                            },
+                                        },
+                                        updated: {
+                                            type: "ARRAY",
+                                            description:
+                                                "Array of shape records to update. Must include 'id' and the fields to change.",
+                                            items: {
+                                                type: "OBJECT",
+                                            },
+                                        },
+                                        removed: {
+                                            type: "ARRAY",
+                                            description: "Array of shape IDs to remove.",
+                                            items: {
+                                                type: "STRING",
+                                            },
+                                        },
+                                    },
+                                    required: [],
+                                },
+                            },
                         ],
                     },
                 ]
+
+                // Detect if user intends to use whiteboard
+                const userText = userContent?.[0]?.parts?.[0]?.text || ""
+                const isWhiteboardIntent = /draw|whiteboard|diagram|chart|mind map|flowchart/i.test(userText)
+                const useThinking = isWhiteboardOpen || isWhiteboardIntent
 
                 const payload: any = {
                     contents: [
@@ -10446,12 +10502,22 @@ Do not include markdown formatting or explanations.`
                     ],
                     tools: tools,
                     generationConfig: {
-                        temperature: 0.7,
+                        temperature: 1.0,
                         maxOutputTokens: 2048,
-                        thinkingConfig: {
-                            thinkingBudget: 0,
-                        },
+                        ...(useThinking ? {
+                            thinkingConfig: {
+                                includeThoughts: false, 
+                            }
+                        } : {
+                            thinkingConfig: {
+                                thinkingBudget: 0,
+                            }
+                        })
                     },
+                }
+
+                if (debugMode) {
+                    // console.log("[Gemini] Thinking Mode:", useThinking ? "ENABLED" : "DISABLED", { isWhiteboardOpen, isWhiteboardIntent })
                 }
 
                 const currentSystemPrompt = getSystemPromptWithContext()
@@ -10462,7 +10528,10 @@ Do not include markdown formatting or explanations.`
                             {
                                 text:
                                     currentSystemPrompt +
-                                    " If the user asks to create, make, edit the document or take notes, use the update_doc tool.",
+                                    " If the user asks to create, make, edit the document or take notes, use the update_doc tool." +
+                                    " If the user asks to draw, diagram, or visualize something, use the update_whiteboard tool." +
+                                    " For whiteboard shapes, use valid tldraw JSON records. Use 'geo' type for shapes (props: { w, h, geo: 'rectangle'|'ellipse' }), 'text' for labels, 'arrow' for connections (props: { start, end })." +
+                                    " Ensure x, y coordinates are within a reasonable range (e.g., 0-1000).",
                             },
                         ],
                     }
@@ -10622,6 +10691,234 @@ Do not include markdown formatting or explanations.`
                                             response: {
                                                 content:
                                                     "Document updated successfully.",
+                                            },
+                                        },
+                                    }
+                                }
+                                return newArr
+                            })
+                        }
+                    } else if (accumulatedFunctionCall.name === "update_whiteboard") {
+                        const args = accumulatedFunctionCall.args as any
+                        console.log("AI Whiteboard Update:", args) // Debug logging
+
+                        const added = args.added || []
+                        const updated = args.updated || []
+                        const removed = args.removed || []
+
+                        // Auto-open whiteboard
+                        if (!isWhiteboardOpen && !hasWhiteboardStarted) {
+                            setHasWhiteboardStarted(true)
+                            setIsWhiteboardOpen(true)
+                            setIsDocOpen(false)
+                            // Broadcast open event
+                            if (dataConnectionsRef.current.size > 0) {
+                                broadcastData({ type: "tldraw-start" })
+                            }
+                        }
+
+                        // Helper to ensure valid shape IDs
+                        const sanitizeId = (id: string) => 
+                            id.startsWith("shape:") ? id : `shape:${id}`
+
+                        // Validate shape record
+                        const validateShape = (s: any) => {
+                            try {
+                                if (!s || typeof s !== 'object') return null;
+                                
+                                // Ensure required base fields
+                                const sanitized = {
+                                    ...s,
+                                    id: s.id ? sanitizeId(s.id) : `shape:${Math.random().toString(36).substr(2, 9)}`,
+                                    x: Number(s.x) || 0,
+                                    y: Number(s.y) || 0,
+                                    rotation: Number(s.rotation) || 0,
+                                    isLocked: Boolean(s.isLocked),
+                                    opacity: Number(s.opacity) || 1,
+                                    typeName: 'shape', // Tldraw v2 requirement
+                                    parentId: 'page:page', // Default to current page
+                                    index: s.index || 'a1', // Tldraw index string
+                                }
+
+                                // If type is missing, infer or drop
+                                if (!sanitized.type) {
+                                    if (s.geo) sanitized.type = 'geo';
+                                    else if (s.text) sanitized.type = 'text';
+                                    else return null; // Can't determine type
+                                }
+
+                                // Ensure props object exists
+                                if (!sanitized.props || typeof sanitized.props !== 'object') {
+                                    sanitized.props = {};
+                                }
+
+                                // Type-specific defaults AND strict whitelisting to prevent crashes
+                                if (sanitized.type === 'geo') {
+                                    const validGeoProps = ['w', 'h', 'geo', 'color', 'size', 'fill', 'dash', 'labelColor', 'font', 'align', 'verticalAlign', 'growY', 'url']
+                                    sanitized.props = {
+                                        w: 100, h: 100,
+                                        geo: 'rectangle',
+                                        color: 'black',
+                                        size: 'm',
+                                        fill: 'none',
+                                        dash: 'draw',
+                                        ...sanitized.props
+                                    }
+                                    // Remove unknown properties
+                                    Object.keys(sanitized.props).forEach(key => {
+                                        if (!validGeoProps.includes(key)) delete sanitized.props[key]
+                                    })
+                                } else if (sanitized.type === 'text') {
+                                    const validTextProps = ['text', 'color', 'size', 'font', 'align', 'autoSize', 'scale', 'w', 'h']
+                                    sanitized.props = {
+                                        text: 'Text',
+                                        color: 'black',
+                                        size: 'm',
+                                        font: 'draw',
+                                        align: 'start',
+                                        autoSize: true,
+                                        scale: 1,
+                                        ...sanitized.props
+                                    }
+                                    if (sanitized.props.textAlign) {
+                                        sanitized.props.align = sanitized.props.textAlign === 'left' ? 'start' : 
+                                                              sanitized.props.textAlign === 'right' ? 'end' : 
+                                                              sanitized.props.textAlign === 'center' ? 'middle' : 'start'
+                                    }
+                                    Object.keys(sanitized.props).forEach(key => {
+                                        if (!validTextProps.includes(key)) delete sanitized.props[key]
+                                    })
+                                } else if (sanitized.type === 'arrow') {
+                                    const validArrowProps = ['arrowheadStart', 'arrowheadEnd', 'color', 'size', 'fill', 'dash', 'labelColor', 'font', 'start', 'end', 'bend', 'isPrecise']
+                                     sanitized.props = {
+                                        arrowheadStart: 'none',
+                                        arrowheadEnd: 'arrow',
+                                        color: 'black',
+                                        size: 'm',
+                                        ...sanitized.props
+                                    }
+                                    if (sanitized.props.start && !sanitized.props.start.type) sanitized.props.start = { type: 'point', x: 0, y: 0 }
+                                    if (sanitized.props.end && !sanitized.props.end.type) sanitized.props.end = { type: 'point', x: 100, y: 100 }
+                                    
+                                    Object.keys(sanitized.props).forEach(key => {
+                                        if (!validArrowProps.includes(key)) delete sanitized.props[key]
+                                    })
+                                }
+
+                                return sanitized;
+                            } catch (e) {
+                                console.error("Invalid shape record from AI", s, e);
+                                return null;
+                            }
+                        }
+                        
+                        // Sanitize inputs
+                        const sanitizedAdded = added.map(validateShape).filter(Boolean)
+                        const sanitizedUpdated = updated.map((s: any) => ({
+                            id: sanitizeId(s.id),
+                            ...s,
+                            // Only include valid updates props if present
+                            ...(s.props ? { props: s.props } : {}),
+                            ...(s.x !== undefined ? { x: Number(s.x) } : {}),
+                            ...(s.y !== undefined ? { y: Number(s.y) } : {})
+                        }))
+                        const sanitizedRemoved = removed.map((id: string) => sanitizeId(id))
+
+                        if (debugMode) {
+                            console.log("[Gemini Whiteboard] Raw:", { added, updated, removed })
+                            console.log("[Gemini Whiteboard] Sanitized:", { sanitizedAdded, sanitizedUpdated, sanitizedRemoved })
+                        }
+
+                        const changes = { 
+                            added: sanitizedAdded, 
+                            updated: sanitizedUpdated, 
+                            removed: sanitizedRemoved 
+                        }
+
+                        // Apply changes locally using high-level editor APIs
+                        if (editorRef.current) {
+                            if (debugMode) console.log("Applying changes to editor", changes)
+                            try {
+                                editorRef.current.batch(() => {
+                                    // Handle Added shapes
+                                    if (sanitizedAdded.length > 0) {
+                                        const shapesToCreate: any[] = []
+                                        const shapesToUpdate: any[] = []
+                                        
+                                        sanitizedAdded.forEach(s => {
+                                            // Check if shape already exists
+                                            if (editorRef.current.getShape(s.id)) {
+                                                // If exists, treat as update
+                                                shapesToUpdate.push(s)
+                                            } else {
+                                                shapesToCreate.push(s)
+                                            }
+                                        })
+
+                                        if (shapesToCreate.length > 0)
+                                            editorRef.current.createShapes(shapesToCreate)
+                                        if (shapesToUpdate.length > 0)
+                                            editorRef.current.updateShapes(shapesToUpdate)
+                                    }
+
+                                    // Handle Updated shapes
+                                    if (sanitizedUpdated.length > 0) {
+                                        // Only update existing shapes
+                                        const validUpdates = sanitizedUpdated.filter(s => !!editorRef.current.getShape(s.id))
+                                        if (validUpdates.length > 0)
+                                            editorRef.current.updateShapes(validUpdates)
+                                    }
+
+                                    // Handle Removed shapes
+                                    if (sanitizedRemoved.length > 0) {
+                                         // Only remove existing shapes
+                                        const validRemovals = sanitizedRemoved.filter(id => !!editorRef.current.getShape(id))
+                                        if (validRemovals.length > 0)
+                                            editorRef.current.deleteShapes(validRemovals)
+                                    }
+                                })
+                            } catch (e) {
+                                console.error(
+                                    "Error applying AI whiteboard updates",
+                                    e
+                                )
+                                // Fallback: Try one by one if batch fails
+                                try {
+                                     if (sanitizedAdded.length > 0)
+                                        sanitizedAdded.forEach(s => {
+                                            try { 
+                                                if (editorRef.current.getShape(s.id)) {
+                                                    editorRef.current.updateShapes([s])
+                                                } else {
+                                                    editorRef.current.createShapes([s])
+                                                }
+                                            } catch (err) { console.error("Failed to process shape", s, err) }
+                                        })
+                                } catch (retryErr) { console.error("Retry failed", retryErr) }
+                            }
+                        } else {
+                            if (debugMode) console.log("Queueing changes (editor not ready)", changes)
+                            // Queue updates if editor not ready
+                            pendingWhiteboardUpdates.current.push(changes)
+                        }
+
+                        if (!accumulatedText) {
+                            accumulatedText = "I've updated the whiteboard."
+                            setMessages((prev) => {
+                                const newArr = [...prev]
+                                if (
+                                    newArr.length > 0 &&
+                                    newArr[newArr.length - 1].role === "model"
+                                ) {
+                                    newArr[newArr.length - 1] = {
+                                        ...newArr[newArr.length - 1],
+                                        text: accumulatedText,
+                                        functionCall: accumulatedFunctionCall,
+                                        functionResponse: {
+                                            name: "update_whiteboard",
+                                            response: {
+                                                result:
+                                                    "Whiteboard updated successfully",
                                             },
                                         },
                                     }
@@ -10944,15 +11241,24 @@ Do not include markdown formatting or explanations.`
             if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
             rafRef.current = requestAnimationFrame(() => {
-                const containerHeight =
+                let containerHeight =
                     containerRef.current?.clientHeight || window.innerHeight
-                const containerWidth =
+                let containerWidth =
                     containerRef.current?.clientWidth || window.innerWidth
+
+                const isToolOpen = isWhiteboardOpen || isDocOpen
+                const isSidebarMode = !isMobileLayout && isToolOpen
+                let effectiveIsMobile = isMobileLayout
+
+                if (isSidebarMode) {
+                    containerWidth = 400
+                    effectiveIsMobile = true
+                }
 
                 const { minHeight, maxHeight } = calculateHeightConstraints(
                     containerWidth,
                     containerHeight,
-                    isMobileLayout,
+                    effectiveIsMobile,
                     isScreenSharing,
                     remoteScreenStream,
                     isWhiteboardOpen,
@@ -11042,15 +11348,24 @@ Do not include markdown formatting or explanations.`
 
         // Handle Click Toggle Logic
         if (!hasDragged.current && dragMode.current === "vertical") {
-            const containerHeight =
+            let containerHeight =
                 containerRef.current?.clientHeight || window.innerHeight
-            const containerWidth =
+            let containerWidth =
                 containerRef.current?.clientWidth || window.innerWidth
+
+            const isToolOpen = isWhiteboardOpen || isDocOpen
+            const isSidebarMode = !isMobileLayout && isToolOpen
+            let effectiveIsMobile = isMobileLayout
+
+            if (isSidebarMode) {
+                containerWidth = 400
+                effectiveIsMobile = true
+            }
 
             const { minHeight, maxHeight } = calculateHeightConstraints(
                 containerWidth,
                 containerHeight,
-                isMobileLayout,
+                effectiveIsMobile,
                 isScreenSharing,
                 remoteScreenStream,
                 isWhiteboardOpen,
@@ -11209,14 +11524,19 @@ Do not include markdown formatting or explanations.`
     const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
     const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
 
+    // Sidebar Logic Definition (Hoist for layout calc)
+    const isToolOpen = isWhiteboardOpen || isDocOpen
+    const isSidebarMode = !isMobileLayout && isToolOpen
+    const isMobileToolMode = isMobileLayout && isToolOpen
+
     let finalWidth = 0
     let finalHeight = 0
-    let shouldUseHorizontalLayout = !isMobileLayout
+    let shouldUseHorizontalLayout = !isMobileLayout && !isSidebarMode
 
-    if (isMobileLayout) {
-        // MOBILE LOGIC
+    if (isMobileLayout || isSidebarMode) {
+        // MOBILE / SIDEBAR LOGIC
         // "if 3 tiles then side-by-side horizontal. if 4 tiles, its a 2x2 grid."
-        const availableWidth = containerSize.width - 32 // 16px padding on each side
+        const availableWidth = (isSidebarMode ? 400 : containerSize.width) - 32 // 16px padding on each side
         
         if (numTiles === 4) {
             // 2x2 Grid
@@ -11396,24 +11716,6 @@ Do not include markdown formatting or explanations.`
             100% { opacity: 0.5; transform: scale(0.85); }
         }
 
-        /* Tldraw Whiteboard Overrides */
-        .tl-container {
-            background-color: #FFFFFF !important;
-        }
-        .tl-background {
-            background-color: #FFFFFF !important;
-            fill: #FFFFFF !important;
-        }
-        .tl-grid {
-            opacity: 0.15 !important;
-        }
-        /* Force light theme variables */
-        .tl-theme__dark, .tl-theme__light {
-            --color-background: #FFFFFF !important;
-            --color-text: #000000 !important;
-            --color-text-main: #000000 !important;
-            --color-panel: #FFFFFF !important;
-        }
     `,
         [accentColor, chatThemeColors]
     )
@@ -11440,516 +11742,71 @@ Do not include markdown formatting or explanations.`
         []
     )
 
+    // --- LAYOUT HELPERS ---
+
+    // 1. Tool Renderer (Whiteboard / Doc)
+    const renderActiveTool = (isOverlay: boolean) => {
     return (
         <div
-            ref={containerRef}
             style={{
                 width: "100%",
                 height: "100%",
-                // Dynamic height via visualViewport listener: this ensures the UI resizes
-                // when the mobile keyboard opens, rather than being pushed up/off-screen.
-                background: themeColors.background,
-                color: themeColors.text.primary,
-                transition: "background 0.2s, color 0.2s",
-                fontFamily: "Inter, sans-serif",
+                position: "relative",
+                background: isWhiteboardOpen && isMobileLayout ? "#F9FAFC" : chatThemeColors.background,
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
-                // Fixed positioning ensures the app layer stays anchored to the viewport
-                // preventing body scroll or shifting when keyboard interacts
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                // touch-action: none prevents the browser from handling touch gestures like
-                // panning or zooming, stopping the "rubber band" scroll effect on iOS
-                touchAction: "none",
+                borderRadius: isMobileLayout ? "28px 28px 0 0" : "0 28px 28px 0",
+                border: "none",
+                paddingBottom: isMobileLayout ? mobileInputHeight : 0,
             }}
         >
-            {/* BAN BANNER (Top of screen) */}
-            {isBanned && (
+                {/* 
+                  Standard Topbar (hidden for both Doc and Whiteboard on mobile) 
+                  Only show this bar if it's an overlay AND NOT a Doc/Whiteboard tool on mobile
+                  Wait, isOverlay is ONLY true for mobile tools or non-sidebar mode.
+                  
+                  If we are on mobile, isMobileLayout=true. 
+                  If Doc is open, we hide it.
+                  If Whiteboard is open, we hide it (since we added custom buttons).
+                */}
+                {isOverlay && !isMobileLayout && (
                 <div
                     style={{
-                        width: "100%",
-                        background: "transparent",
-                        color: "rgba(160, 160, 160, 1)", // 65% grey text (approx)
-                        padding: "12px 16px",
-                        textAlign: "center",
-                        fontSize: 14,
-                        fontWeight: 500,
-                        zIndex: 2000,
-                        flexShrink: 0,
-                    }}
-                >
-                    You are temporarily banned. Please review the{" "}
-                    <a
-                        href="https://curastem.org/code-of-conduct"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                            color: "rgba(160, 160, 160, 1)",
-                            textDecoration: "underline",
-                            fontWeight: 700,
+                            height: 56,
+                        display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "0 16px",
+                            background: themeColors.background,
+                                          flexShrink: 0,
                         }}
                     >
-                        code of conduct
-                    </a>
-                    .
-                </div>
-            )}
-
-            {/* Hidden file input */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                style={{ display: "none" }}
-                onChange={handleFileChange}
-            />
-
-            {/* DEBUG CONSOLE OVERLAY */}
-            {debugMode && (
-                <>
-                    <DebugConsole logs={logs} />
-                    {/* Hash Display */}
-                    <div style={{
-                        position: "absolute",
-                        top: 170,
-                        left: 10,
-                        right: 10,
-                        background: "rgba(0,0,0,0.8)",
-                        color: "#fff",
-                        fontFamily: "monospace",
-                        fontSize: 14,
-                        padding: 12,
-                        zIndex: 9998,
-                        borderRadius: 16,
-                        border: "1px solid rgba(255,255,255,0.2)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                    }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <span style={{ opacity: 0.7 }}>🔗 Room:</span>
-                            <span style={{ color: "#3b82f6", fontWeight: "bold" }}>
-                                {typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}
-                            </span>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <span style={{ opacity: 0.7 }}>👤 Role:</span>
-                            <span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>
-                                {role || "None (Passive Mode)"}
-                            </span>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <span style={{ opacity: 0.7 }}>📊 Status:</span>
-                            <span style={{ 
-                                color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8",
-                                fontWeight: "bold" 
-                            }}>
-                                {status}
-                            </span>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {/* 1. CONTENT RENDERING LAYER (Unified for Tile Cards & Videos) */}
-            <style>{markdownStyles}</style>
-            {(isScreenSharing ||
-            !!remoteScreenStream ||
-            isWhiteboardOpen ||
-            isDocOpen ||
-            !isBanned) && (
-                <div
-                    style={{
-                        flex: "1 1 0",
-                        width: "100%",
-                        display: "flex",
-                        flexDirection:
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                                ? "column"
-                                : shouldUseHorizontalLayout
-                                  ? "row"
-                                  : "column",
-                        gap: 8,
-                        paddingTop: 16,
-                        paddingLeft:
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                                ? isDocOpen || isWhiteboardOpen
-                                    ? 0
-                                    : 16
-                                : 16,
-                        paddingRight:
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                                ? isDocOpen || isWhiteboardOpen
-                                    ? 0
-                                    : 16
-                                : 16,
-                        paddingBottom: 0,
-                        alignItems:
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                                ? "center"
-                                : !isMobileLayout
-                                  ? "flex-end"
-                                  : "center",
-                        justifyContent:
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                                ? "flex-start"
-                                : "center",
-                        boxSizing: "border-box",
-                        minHeight: 0,
-                        position: "relative",
-                        overflow: "hidden",
-                    }}
-                >
-                    {/* TILES (Row/Column) */}
-                    {!isBanned &&
-                        !(
-                            isMobileLayout &&
-                            (status !== "connected" || isLiveMode) && // Hide tiles in mobile if not connected or in live mode
-                            (isWhiteboardOpen || isDocOpen)
-                        ) && (
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: 8,
-                                width: "100%",
-                                boxSizing: "border-box",
-                                justifyContent: "center",
-                                ...(isScreenSharing ||
-                                !!remoteScreenStream ||
-                                isWhiteboardOpen ||
-                                isDocOpen
-                                    ? {
-                                          height: isMobileLayout
-                                              ? "auto"
-                                              : 140,
-                                          flexShrink: 0,
-                                          paddingLeft:
-                                              isDocOpen || isWhiteboardOpen
-                                                  ? 16
-                                                  : 0,
-                                          paddingRight:
-                                              isDocOpen || isWhiteboardOpen
-                                                  ? 16
-                                                  : 0,
-                                          flexDirection: "row",
-                                          alignItems: "flex-start",
-                                      }
-                                    : {
-                                          flex: 1,
-                                          flexDirection: shouldUseHorizontalLayout
-                                              ? "row"
-                                              : "column",
-                                          flexWrap: (isMobileLayout && numTiles === 4) ? "wrap" : "nowrap",
-                                          alignItems: (isMobileLayout && numTiles === 4) 
-                                              ? "flex-start" // 2x2 grid align
-                                              : !isMobileLayout
-                                                  ? "flex-end"
-                                                  : "center",
-                                          alignContent: (isMobileLayout && numTiles === 4) ? "center" : "stretch",
-                                      }),
-                            }}
-                        >
-                            {(() => {
-                               const tiles: any[] = []
-                               
-                               // 1. Local Tile
-                               tiles.push({ type: 'local', stream: localStream, key: 'local' })
-                               
-                               // 2. Remote Tiles
-                               if (remoteStreams.size > 0) {
-                                   remoteStreams.forEach((stream, id) => {
-                                       tiles.push({ type: 'remote', stream, id, key: id })
-                                   })
-                               }
-
-                               // 3. Pending Tiles (Black)
-                               pendingPeerIds.forEach(id => {
-                                   if (!remoteStreams.has(id)) {
-                                       tiles.push({ type: 'pending', id, key: `pending-${id}` })
-                                   }
-                               })
-                               
-                               // 4. Placeholder (only if total tiles < 2)
-                               // If we have 1 local + 1 remote = 2 tiles. No placeholder needed.
-                               // If we have 1 local + 0 remote = 1 tile. Need placeholder.
-                               // If we have 1 local + 2 remote = 3 tiles. No placeholder needed.
-                               if (tiles.length < 2) {
-                                   tiles.push({ type: 'placeholder', key: 'placeholder' })
-                               }
-
-                               // Reorder for Volunteer: Volunteer (Local) should be on Right (Last), Student (Remote/Placeholder) on Left.
-                               if (role === 'volunteer' && tiles.length === 2 && tiles[0].type === 'local') {
-                                   tiles.reverse()
-                               }
-
-                               return tiles.map((tile, index) => {
-                                   const isLocal = tile.type === 'local'
-                                   const isRemote = tile.type === 'remote'
-                                   const isPending = tile.type === 'pending'
-                                   const isPlaceholder = tile.type === 'placeholder'
-                                   
-                                   // Logic to determine background color
-                                   let bg = themeColors.card
-                                   if (isLocal && !role && status === 'idle' && !isLiveMode) bg = themeColors.state.accent
-                                   else if (isLocal && role === 'mentor' && !isRemote) bg = themeColors.surface
-                                   else if (isPending) bg = "#000000" // Pure black for pending connections
-                                   // Placeholder background logic
-                                   else if (isPlaceholder && role === 'student' && !isRemote) bg = themeColors.surface
-
-                                   // Logic for click handler
-                                   const onClick = () => {
-                                       if (isLocal && !role && status === 'idle' && !isLiveMode) handleRoleSelect('student')
-                                       if (isPlaceholder && !role && status === 'idle') handleRoleSelect('volunteer')
-                                   }
-
-                                   return (
-                                     <div
-                                        key={tile.key}
-                                        style={{
-                                            overflow: "hidden",
-                                            position: "relative",
-                                            background: bg,
-                                            cursor: (!role && status === "idle") ? "pointer" : "default",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            ...(isScreenSharing ||
-                                            !!remoteScreenStream ||
-                                            isWhiteboardOpen ||
-                                            isDocOpen
-                                                ? {
-                                                      flex: isMobileLayout
-                                                          ? 1
-                                                          : "0 0 auto",
-                                                      width: "auto",
-                                                      height: isMobileLayout
-                                                          ? "auto"
-                                                          : "100%",
-                                                      aspectRatio: targetRatio,
-                                                      borderRadius: 24,
-                                                      minWidth: 0,
-                                                  }
-                                                : {
-                                                      width: finalWidth,
-                                                      height: finalHeight,
-                                                      borderRadius:
-                                                          finalHeight <
-                                                          (isMobileLayout ? 164 : 224)
-                                                              ? 28
-                                                              : 36,
-                                                      flexShrink: 0,
-                                                  }),
-                                        }}
-                                        onClick={onClick}
-                                    >
-                                        {/* CONTENT FOR TILE */}
-                                        {isLocal ? (
-                                             (!role && status === "idle" && !isLiveMode) ? (
-                                                <RoleSelectionButton
-                                                    colors={themeColors}
-                                                    type="student"
-                                                    isCompact={
-                                                        isScreenSharing ||
-                                                        !!remoteScreenStream ||
-                                                        isWhiteboardOpen ||
-                                                        isDocOpen ||
-                                                        finalHeight < (isMobileLayout ? 164 : 224)
-                                                    }
-                                                    isMobileLayout={isMobileLayout}
-                                                />
-                                             ) : (!role && status === "searching") || role === "student" || isLiveMode || (isPrivateRoomConnection && status === "connected" && isLocal) ? (
-                                                <VideoPlayer
-                                                    stream={tile.stream}
-                                                    isMirrored={true}
-                                                    muted={true}
-                                                    themeColors={themeColors}
-                                                />
-                                             ) : (
-                                                <VideoPlayer
-                                                    stream={localStream} // Fallback to local stream for mentor view too
-                                                    isMirrored={true}
-                                                    muted={true}
-                                                    themeColors={themeColors}
-                                                />
-                                             )
-                                        ) : isRemote ? (
-                                             isLiveMode ? (
-                                                // Live Mode AI Placeholder
-                                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
-                                                     {/* SVG PULSE (simplified for brevity in this replace, assume specific SVG is needed or copied) */}
-                                                     <div style={{color: "white"}}>AI</div>
+                        <div style={{ fontWeight: 600, fontSize: 16 }}>
+                            {isDocOpen ? "Notes" : "Whiteboard"}
                                                 </div>
-                                             ) : (
-                                                <VideoPlayer
-                                                    stream={tile.stream}
-                                                    isMirrored={false}
-                                                    themeColors={themeColors}
-                                                />
-                                             )
-                                        ) : isPending ? (
-                                             // PENDING TILE (Black)
-                                             <div style={{ width: "100%", height: "100%", background: "#000000" }} />
-                                        ) : (
-                                            // PLACEHOLDER TILE
-                                            !role && status === "idle" ? (
-                                                <RoleSelectionButton
-                                                    colors={themeColors}
-                                                    type="volunteer"
-                                                    isCompact={
-                                                        isScreenSharing ||
-                                                        !!remoteScreenStream ||
-                                                        isWhiteboardOpen ||
-                                                        isDocOpen ||
-                                                        finalHeight < (isMobileLayout ? 164 : 224)
-                                                    }
-                                                    isMobileLayout={isMobileLayout}
-                                                />
-                                            ) : isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen ? (
-                                                <VideoPlayer
-                                                    stream={null}
-                                                    placeholder="Waiting..."
-                                                    themeColors={themeColors}
-                                                    style={transparentStyle}
-                                                />
-                                            ) : (
-                                                <div
-                                                    data-layer="tile"
-                                                    className="Tile"
+                        <button
+                            onClick={isDocOpen ? toggleDoc : toggleWhiteboard}
                                                     style={{
-                                                        alignSelf: "stretch",
-                                                        height: "100%",
-                                                        padding: 16,
-                                                        background: isPrivateRoomConnection ? "#000000" : "transparent",
-                                                        overflow: "hidden",
-                                                        borderRadius: 28,
-                                                        flexDirection: "column",
-                                                        justifyContent: "center",
-                                                        alignItems: "center",
-                                                        display: "flex",
-                                                    }}
-                                                >
-                                                    {!isPrivateRoomConnection && (
-                                                        <>
-                                                            <div style={{ textAlign: "center", color: themeColors.text.primary, fontSize: 15, marginBottom: 8 }}>
-                                                                {role === 'volunteer' ? "Waiting for student..." : "Searching for mentor"}
-                                                            </div>
-                                                            {role !== 'volunteer' && (
-                                                                <div onClick={handleConnectWithAI} style={{ cursor: "pointer", color: themeColors.text.secondary, fontSize: 15 }}>
-                                                                    Or connect with AI
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-                                   )
-                               })
-                           })()}
-                        </div>
-                    )}
-
-                    {/* MAIN CONTENT AREA */}
-                    {(isScreenSharing ||
-                        !!remoteScreenStream ||
-                        isWhiteboardOpen ||
-                        isDocOpen) && (
-                        <div
-                            onPointerDown={handlePointerDown}
-                            style={{
-                                flex: 1,
-                                width: "100%",
-                                overflow: "hidden",
-                                background: "transparent",
-                                position: "relative",
+                                background: "rgba(0,0,0,0.05)",
+                                border: "none",
+                                borderRadius: "50%",
+                                width: 32,
+                                height: 32,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
+                                cursor: "pointer",
+                                fontSize: 20,
+                                color: themeColors.text.primary,
                             }}
                         >
-                            <div
-                                onPointerDown={(e) => e.stopPropagation()}
-                                style={{
-                                    position: "relative",
-                                    ...screenShareContainerStyle,
-                                    maxWidth: "100%",
-                                    maxHeight: "100%",
-                                    marginTop: 0,
-                                    marginBottom: 0,
-                                }}
-                            >
-                                {/* Drag Handles */}
-                                {!isDocOpen && !isWhiteboardOpen && (
-                                    <>
-                                        <div
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, "left")
-                                            }
-                                            style={{
-                                                position: "absolute",
-                                                top: 0,
-                                                bottom: 0,
-                                                left: -12,
-                                                width: 24,
-                                                cursor: "ew-resize",
-                                                zIndex: 100,
-                                                touchAction: "none",
-                                            }}
-                                        />
-                                        <div
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, "right")
-                                            }
-                                            style={{
-                                                position: "absolute",
-                                                top: 0,
-                                                bottom: 0,
-                                                right: -12,
-                                                width: 24,
-                                                cursor: "ew-resize",
-                                                zIndex: 100,
-                                                touchAction: "none",
-                                            }}
-                                        />
-                                    </>
-                                )}
-
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        overflow: "hidden",
-                                        borderRadius:
-                                            isDocOpen || isWhiteboardOpen
-                                                ? "28px 28px 0 0"
-                                                : 14,
-                                        position: "relative",
-                                        background:
-                                            isWhiteboardOpen && !isDocOpen
-                                                ? "white"
-                                                : "transparent",
-                                    }}
-                                >
+                            ×
+                        </button>
+                    </div>
+                )}
+                
+                <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
                                     {isDocOpen ? (
                                         <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
                                             <DocEditor
@@ -11966,27 +11823,12 @@ Do not include markdown formatting or explanations.`
                                         </div>
                                     ) : null}
 
-                                    {/* Persistent Whiteboard */}
-                                    {(isWhiteboardOpen || hasWhiteboardStarted) && (
+                    {(isWhiteboardOpen || hasWhiteboardStarted) && !isDocOpen && (
                                         <div
                                             ref={whiteboardContainerRef}
-                                            onPointerMove={
-                                                handleWhiteboardPointerMove
-                                            }
+                            onPointerMove={handleWhiteboardPointerMove}
                                             onPointerLeave={() => {
-                                                // Hide cursor when leaving whiteboard area
-                                                // We need to send to ALL connected peers
                                                 if (activeCalls.current.size > 0) {
-                                                    // This assumes data connections are managed by PeerJS 'conn' objects stored somewhere?
-                                                    // Wait, dataConnectionRef only stores ONE connection.
-                                                    // We need to store multiple data connections for mesh networking!
-                                                    // Refactor dataConnectionRef -> dataConnections (Map)
-                                                    
-                                                    // For now, let's just broadcast if we can, but we need to fix the data channel structure first?
-                                                    // Or maybe we can rely on activeCalls having associated data connections?
-                                                    // PeerJS keeps connections in peer.connections[peerId].
-                                                    
-                                                    // Quick fix: Iterate all open data connections
                                                     broadcastData({
                                                         type: "cursor-update",
                                                         payload: {
@@ -12000,48 +11842,120 @@ Do not include markdown formatting or explanations.`
                                             style={{
                                                 width: "100%",
                                                 height: "100%",
-                                                position: isWhiteboardOpen && !isDocOpen ? "relative" : "absolute",
-                                                top: 0,
-                                                left: 0,
-                                                zIndex: isWhiteboardOpen && !isDocOpen ? 0 : -1,
-                                                visibility: isWhiteboardOpen && !isDocOpen ? "visible" : "hidden",
-                                                pointerEvents: isWhiteboardOpen && !isDocOpen ? "auto" : "none",
-                                                background: "#FFF",
+                                                position: "relative",
+                                                zIndex: 0,
+                                                visibility: "visible",
+                                                pointerEvents: "auto",
+                                                background: "#F9FAFC",
                                             }}
-                                            onPointerDown={(e) =>
-                                                e.stopPropagation()
-                                            }
+                                            onPointerDown={(e) => e.stopPropagation()}
                                         >
-                                            <Tldraw
-                                                persistenceKey="framer-chatbot-whiteboard-v1"
-                                                onMount={(e) => {
-                                                    if (editor) return
-                                                    log("Tldraw editor mounted")
-                                                    setEditor(e)
-                                                    e.setCurrentTool("draw")
-                                                    const defaultColor =
-                                                        role === "volunteer"
-                                                            ? "red"
-                                                            : "black"
-                                                    e.setStyleForNextShapes(
-                                                        DefaultColorStyle,
-                                                        defaultColor
-                                                    )
-                                                    e.setStyleForNextShapes(
-                                                        DefaultSizeStyle,
-                                                        "l"
-                                                    )
-                                                    
-                                                    // Sync after mount if we have a connection and we are the host
-                                                    if (isWhiteboardOpenRef.current && dataConnectionsRef.current.size > 0) {
-                                                        const snapshot = e.store.getSnapshot()
-                                                        broadcastData({
-                                                            type: "tldraw-snapshot",
-                                                            payload: snapshot,
-                                                        })
-                                                    }
-                                                }}
-                                            />
+                                            {/* Whiteboard Toolbar (Download + Collapse) */}
+                                            <div style={{
+                                                position: "absolute",
+                                                top: 12,
+                                                right: 12,
+                                                zIndex: 9999, /* Boost Z-Index to be sure */
+                                                height: 40,
+                                                paddingLeft: 4,
+                                                paddingRight: 4,
+                                                background: "#EFF0F2",
+                                                borderRadius: 28,
+                                                justifyContent: 'flex-start',
+                                                alignItems: 'center',
+                                                display: 'inline-flex',
+                                                flexShrink: 0,
+                                                alignContent: 'center'
+                                            }}>
+                                                {/* Download Button */}
+                                                <div 
+                                                    style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                                    onClick={async () => {
+                                                        if (editor && exportToBlob) {
+                                                            try {
+                                                                const shapeIds = editor.getCurrentPageShapeIds()
+                                                                if (shapeIds.size === 0) return
+
+                                                                const blob = await exportToBlob({
+                                                                    editor,
+                                                                    ids: [...shapeIds],
+                                                                    format: 'png',
+                                                                    opts: { background: true }
+                                                                })
+                                                                const url = URL.createObjectURL(blob)
+                                                                const a = document.createElement('a')
+                                                                a.href = url
+                                                                // Format: whiteboard_curastem.org12345.png
+                                                                const randomNum = Math.floor(10000 + Math.random() * 90000)
+                                                                a.download = `whiteboard_curastem.org${randomNum}.png`
+                                                                a.click()
+                                                                URL.revokeObjectURL(url)
+                                                            } catch (e) {
+                                                                console.error("Export failed", e)
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </div>
+
+                                                {/* Collapse Button */}
+                                                <div 
+                                                    style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                                    onClick={toggleWhiteboard}
+                                                >
+                                                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </div>
+                                            </div>
+
+                                            <div style={{
+                                                position: "absolute",
+                                                top: !isMobileLayout ? 56 : 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                            }}>
+                                                <Tldraw
+                                                    persistenceKey="framer-chatbot-whiteboard-v1"
+                                                    onMount={(e) => {
+                                                        if (editor) return
+                                                        log("Tldraw editor mounted")
+                                                        setEditor(e)
+                                                        e.setCurrentTool("draw")
+                                                        const defaultColor = role === "volunteer" ? "red" : "black"
+                                                        e.setStyleForNextShapes(DefaultColorStyle, defaultColor)
+                                                        e.setStyleForNextShapes(DefaultSizeStyle, "l")
+                                                        
+                                                        // Process pending AI updates
+                                                        if (pendingWhiteboardUpdates.current.length > 0) {
+                                                            try {
+                                                                e.batch(() => {
+                                                                    while (pendingWhiteboardUpdates.current.length > 0) {
+                                                                        const { added, updated, removed } = pendingWhiteboardUpdates.current.shift()
+                                                                        if (added && added.length > 0) e.createShapes(added)
+                                                                        if (updated && updated.length > 0) e.updateShapes(updated)
+                                                                        if (removed && removed.length > 0) e.deleteShapes(removed)
+                                                                    }
+                                                                })
+                                                            } catch (err) {
+                                                                console.error("Error applying pending whiteboard updates", err)
+                                                            }
+                                                        }
+                                                        
+                                                        if (isWhiteboardOpenRef.current && dataConnectionsRef.current.size > 0) {
+                                                            const snapshot = e.store.getSnapshot()
+                                                            broadcastData({
+                                                                type: "tldraw-snapshot",
+                                                                payload: snapshot,
+                                                            })
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                             {Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
                                                 <LiveCursor
                                                     key={peerId}
@@ -12054,152 +11968,92 @@ Do not include markdown formatting or explanations.`
                                             ))}
                                         </div>
                                     )}
-
-                                    {/* Video Player - Only when neither doc nor whiteboard is main */}
-                                    {(!isDocOpen && !isWhiteboardOpen) && (
-                                        <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                                            <VideoPlayer
-                                                stream={
-                                                    remoteScreenStream ||
-                                                    screenStreamRef.current
-                                                }
-                                                isMirrored={false}
-                                                muted={!remoteScreenStream}
-                                                style={{
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    objectFit: "contain",
-                                                }}
-                                                onVideoSize={(w, h) =>
-                                                    setSharedScreenSize({
-                                                        width: w,
-                                                        height: h,
-                                                    })
-                                                }
-                                                themeColors={themeColors}
-                                            />
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* 2. DRAG HANDLE (Chat Drawer Control) */}
-            {(!isBanned ||
-                isScreenSharing ||
-                !!remoteScreenStream ||
-                isWhiteboardOpen ||
-                isDocOpen) && (
-                <div
-                    onPointerDown={handlePointerDown}
-                    onPointerEnter={() => {
-                        hoverTimeoutRef.current = window.setTimeout(() => {
-                            setIsDragBarHovered(true)
-                        }, 50) // 0.05 second delay to prevent jitter
-                    }}
-                    onPointerLeave={() => {
-                        if (hoverTimeoutRef.current) {
-                            clearTimeout(hoverTimeoutRef.current)
-                            hoverTimeoutRef.current = null
-                        }
-                        setIsDragBarHovered(false)
-                    }}
-                    style={{
-                        height: 24,
-                        width: "100%",
-                        background:
-                            isDocOpen
-                                ? chatThemeColors.background
-                                : isWhiteboardOpen
-                                ? "white"
-                                : "transparent",
-                        ...styles.flexCenter,
-                        cursor: "ns-resize",
-                        flexShrink: 0,
-                        touchAction: "none",
-                        zIndex: 20, // Lowered from 25 to be below menu (100)
-                        position: "relative",
-                    }}
-                >
+                {isMobileLayout && (
                     <div
+                        ref={mobileInputRef}
                         style={{
-                            width: 48,
-                            height: 5,
-                            borderRadius: 4,
-                            background: "rgba(255,255,255,0.2)",
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            zIndex: 100,
+                            paddingBottom: "env(safe-area-inset-bottom)",
+                            pointerEvents: "none",
                         }}
-                    />
-                    {isDragBarHovered && !isDragging.current && (
-                        <Tooltip
-                            style={{
-                                top: "100%",
-                                left: "50%",
-                                transform: "translate(-50%, 4px)",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {chatHeight < currentConstraints.maxHeight - 5
-                                ? "Click to expand chat"
-                                : "Click to collapse chat"}
-                        </Tooltip>
-                    )}
-                </div>
-            )}
+                    >
+                        <ChatInput
+                            value={inputText}
+                            onChange={(e) => {
+                                const newValue = e.target.value
+                                setInputText(newValue)
+                                const now = Date.now()
+                                const interval = 50
+                                const timeSinceLastSend = now - lastInputSendTimeRef.current
 
-            {/* 3. AI CHAT HISTORY LAYER */}
+                                if (inputTimeoutRef.current) clearTimeout(inputTimeoutRef.current)
+
+                                if (timeSinceLastSend > interval) {
+                                    if (dataConnectionsRef.current.size > 0) {
+                                    broadcastData({ type: "input-sync", payload: newValue })
+                                        lastInputSendTimeRef.current = now
+                                    }
+                                } else {
+                                    inputTimeoutRef.current = setTimeout(() => {
+                                        if (dataConnectionsRef.current.size > 0) {
+                                        broadcastData({ type: "input-sync", payload: newValue })
+                                        lastInputSendTimeRef.current = Date.now()
+                                        }
+                                    }, interval - timeSinceLastSend)
+                                }
+                            }}
+                            onSend={handleSendMessage}
+                            onConnectWithAI={handleConnectWithAI}
+                            onStop={handleStop}
+                            onEndCall={() => cleanup(true)}
+                            onFileSelect={handleFileSelect}
+                            onScreenShare={toggleScreenShare}
+                            onReport={handleReport}
+                            placeholder={isDocOpen ? "Edit notes" : "Edit whiteboard"}
+                            showEndCall={status !== "idle"}
+                            showAiLiveButton={status === "searching" && role === "student"}
+                            attachments={attachments}
+                            onRemoveAttachment={handleRemoveAttachment}
+                            isLoading={isLoading}
+                            isScreenSharing={isScreenSharing}
+                            isWhiteboardOpen={isWhiteboardOpen}
+                            toggleWhiteboard={toggleWhiteboard}
+                            isDocOpen={isDocOpen}
+                            toggleDoc={toggleDoc}
+                            isConnected={status === "connected" && !isLiveMode}
+                            status={status}
+                            isMobileLayout={isMobileLayout}
+                            isLiveMode={isLiveMode}
+                            onPasteFile={processFiles}
+                            themeColors={themeColors}
+                            role={role}
+                            hasMessages={messages.length > 0}
+                            onClearMessages={handleClearMessages}
+                            hideGradient={true}
+                            rootStyle={{ pointerEvents: "none" }}
+                        />
+                    </div>
+                )}
+                                </div>
+        )
+    }
+
+    // 2. Chat Renderer
+    const renderChatSection = (isSidebar: boolean) => {
+        return (
             <div
                 style={{
-                    width: "100%",
-                    height:
-                        isBanned &&
-                        !(
-                            isScreenSharing ||
-                            !!remoteScreenStream ||
-                            isWhiteboardOpen ||
-                            isDocOpen
-                        )
-                            ? "100%"
-                            : "auto",
-                    background:
-                        isDocOpen
-                            ? chatThemeColors.background
-                            : isWhiteboardOpen
-                            ? "white"
-                            : "transparent",
                     display: "flex",
-                    justifyContent: "center",
-                }}
-            >
-                <div
-                    style={{
-                        height:
-                            isBanned &&
-                            !(
-                                isScreenSharing ||
-                                !!remoteScreenStream ||
-                                isWhiteboardOpen ||
-                                isDocOpen
-                            )
-                                ? "100%"
-                                : chatHeight,
-                        paddingTop:
-                            isBanned &&
-                            !(
-                                isScreenSharing ||
-                                !!remoteScreenStream ||
-                                isWhiteboardOpen ||
-                                isDocOpen
-                            )
-                                ? 24
-                                : 0,
+                    flexDirection: "column",
                         width: "100%",
-                        maxWidth: 728,
+                    height: "100%", // Fill parent (which is flex: 1 in sidebar, or height: chatHeight in standard)
                         position: "relative",
-                        display: "flex",
-                        flexDirection: "column",
+                    background: isDocOpen && !isSidebar ? chatThemeColors.background : "transparent",
                     }}
                 >
                     <div
@@ -12208,9 +12062,6 @@ Do not include markdown formatting or explanations.`
                             flex: 1,
                             width: "100%",
                             padding: "0 24px",
-                            // FIX: Standard padding.
-                            // We rely on the "minHeight" logic of the last message/loader to handle the "void" dynamically.
-                            // This removes the permanent giant void at the bottom.
                             paddingBottom: 90,
                             overflowY: "auto",
                             overflowX: "hidden",
@@ -12219,7 +12070,7 @@ Do not include markdown formatting or explanations.`
                             gap: 16,
                             overscrollBehavior: "contain",
                             WebkitOverflowScrolling: "touch",
-                            position: "relative", // Ensure offsetTop calculations work correctly
+                        position: "relative",
                         }}
                     >
                         {messages.map((msg, idx) => (
@@ -12241,21 +12092,12 @@ Do not include markdown formatting or explanations.`
                         ))}
                         {isLoading &&
                             (!messages.length ||
-                                messages[messages.length - 1].role !==
-                                    "model" ||
-                                messages[messages.length - 1].text.length ===
-                                    0) && (
+                            messages[messages.length - 1].role !== "model" ||
+                            messages[messages.length - 1].text.length === 0) && (
+                            <div style={{ paddingLeft: 8, paddingBottom: 8, minHeight: "auto" }}>
                                 <div
                                     style={{
-                                        paddingLeft: 8,
-                                        paddingBottom: 8,
-                                        minHeight: "auto",
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            animation:
-                                                "pulseStar 1.5s infinite ease-in-out",
+                                        animation: "pulseStar 1.5s infinite ease-in-out",
                                             width: 20,
                                             height: 20,
                                             display: "flex",
@@ -12263,32 +12105,16 @@ Do not include markdown formatting or explanations.`
                                             justifyContent: "center",
                                         }}
                                     >
-                                        <svg
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 20 20"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                        >
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <g clipPath="url(#clipLoadAnimMentorship)">
                                                 <path
                                                     d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                                    fill={
-                                                        chatThemeColors.text
-                                                            .primary
-                                                    }
+                                                fill={chatThemeColors.text.primary}
                                                 />
                                             </g>
                                             <defs>
                                                 <clipPath id="clipLoadAnimMentorship">
-                                                    <rect
-                                                        width="20"
-                                                        height="20"
-                                                        fill={
-                                                            chatThemeColors.text
-                                                                .primary
-                                                        }
-                                                    />
+                                                <rect width="20" height="20" fill={chatThemeColors.text.primary} />
                                                 </clipPath>
                                             </defs>
                                         </svg>
@@ -12296,7 +12122,6 @@ Do not include markdown formatting or explanations.`
                                 </div>
                             )}
 
-                        {/* AI SUGGESTED REPLIES - Inside chat area (Column Layout) */}
                         {aiGeneratedSuggestions.length > 0 && !isLoading && (
                             <div
                                 data-layer="ai suggested replies"
@@ -12318,7 +12143,6 @@ Do not include markdown formatting or explanations.`
                                     <div
                                         key={index}
                                         onClick={() => handleSendMessage(suggestion)}
-                                        data-layer={`suggestion ${index + 1}`}
                                         className={`Suggestion${index + 1}`}
                                         style={{
                                             maxWidth: 380,
@@ -12328,7 +12152,7 @@ Do not include markdown formatting or explanations.`
                                             paddingBottom: 8,
                                             overflow: "hidden",
                                             borderRadius: 20,
-                                            outline: `1px ${chatThemeColors.border.subtle} solid`,
+                                            outline: `1px ${themeColors.border.subtle} solid`,
                                             outlineOffset: "-1px",
                                             justifyContent: "flex-start",
                                             alignItems: "center",
@@ -12338,19 +12162,18 @@ Do not include markdown formatting or explanations.`
                                             background: "transparent",
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = chatThemeColors.state.hoverSubtle
+                                            e.currentTarget.style.backgroundColor = themeColors.state.hoverSubtle
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor = "transparent"
                                         }}
                                     >
                                         <div
-                                            data-layer={suggestion}
                                             style={{
                                                 justifyContent: "center",
                                                 display: "flex",
                                                 flexDirection: "column",
-                                                color: chatThemeColors.text.secondary,
+                                                color: themeColors.text.secondary,
                                                 fontSize: 15,
                                                 fontFamily: "Inter",
                                                 fontWeight: "400",
@@ -12364,31 +12187,21 @@ Do not include markdown formatting or explanations.`
                                 ))}
                             </div>
                         )}
-                        
                         <div />
                     </div>
 
-                    {/* 4. CHAT INPUT INTERFACE */}
+                {/* Chat Input */}
                     <div
                         style={{
-                            position:
-                                isBanned &&
-                                !(
-                                    isScreenSharing ||
-                                    !!remoteScreenStream ||
-                                    isWhiteboardOpen ||
-                                    isDocOpen
-                                )
-                                    ? "fixed"
-                                    : "absolute",
+                        position: isBanned && !isSidebar ? "fixed" : "absolute",
                             bottom: 0,
                             left: 0,
                             right: 0,
                             width: "100%",
                             display: "flex",
                             justifyContent: "center",
-                            zIndex: 1000, // Elevated to ensure menus appear above everything
-                            pointerEvents: "none", // Let clicks pass through outside the input
+                        zIndex: 1000,
+                        pointerEvents: "none",
                             paddingBottom: "env(safe-area-inset-bottom)",
                             touchAction: "none",
                         }}
@@ -12398,33 +12211,22 @@ Do not include markdown formatting or explanations.`
                             onChange={(e) => {
                                 const newValue = e.target.value
                                 setInputText(newValue)
-
-                                // Broadcast input change
                                 const now = Date.now()
-                                const interval = 50 // Throttle updates
-                                const timeSinceLastSend =
-                                    now - lastInputSendTimeRef.current
+                            const interval = 50
+                            const timeSinceLastSend = now - lastInputSendTimeRef.current
 
-                                if (inputTimeoutRef.current)
-                                    clearTimeout(inputTimeoutRef.current)
+                            if (inputTimeoutRef.current) clearTimeout(inputTimeoutRef.current)
 
                                 if (timeSinceLastSend > interval) {
                                     if (dataConnectionsRef.current.size > 0) {
-                                        broadcastData({
-                                            type: "input-sync",
-                                            payload: newValue,
-                                        })
+                                    broadcastData({ type: "input-sync", payload: newValue })
                                         lastInputSendTimeRef.current = now
                                     }
                                 } else {
                                     inputTimeoutRef.current = setTimeout(() => {
                                         if (dataConnectionsRef.current.size > 0) {
-                                            broadcastData({
-                                                type: "input-sync",
-                                                payload: newValue,
-                                            })
-                                            lastInputSendTimeRef.current =
-                                                Date.now()
+                                        broadcastData({ type: "input-sync", payload: newValue })
+                                        lastInputSendTimeRef.current = Date.now()
                                         }
                                     }, interval - timeSinceLastSend)
                                 }
@@ -12438,9 +12240,7 @@ Do not include markdown formatting or explanations.`
                             onReport={handleReport}
                             placeholder="Ask anything"
                             showEndCall={status !== "idle"}
-                            showAiLiveButton={
-                                status === "searching" && role === "student"
-                            }
+                        showAiLiveButton={status === "searching" && role === "student"}
                             attachments={attachments}
                             onRemoveAttachment={handleRemoveAttachment}
                             isLoading={isLoading}
@@ -12454,90 +12254,427 @@ Do not include markdown formatting or explanations.`
                             isMobileLayout={isMobileLayout}
                             isLiveMode={isLiveMode}
                             onPasteFile={processFiles}
-                            themeColors={chatThemeColors}
+                            themeColors={themeColors}
                             role={role}
                             hasMessages={messages.length > 0}
                             onClearMessages={handleClearMessages}
                         />
                     </div>
                 </div>
-            </div>
+        )
+    }
 
-            {/* REPORT MODAL */}
-            <ReportModal
-                isOpen={showReportModal}
-                onClose={() => setShowReportModal(false)}
-                onSubmit={onSubmitReport}
-                participantCount={remoteStreams.size + 1}
-            />
-
-            {/* FILE DRAG OVERLAY */}
+    // 3. ScreenShare Renderer
+    const renderScreenShareSection = () => {
+        return (
             <div
+                onPointerDown={handlePointerDown}
                 style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
                     width: "100%",
                     height: "100%",
-                    zIndex: 99999,
-                    background: themeColors.state.overlay,
+                    overflow: "hidden",
+                    background: "transparent",
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    pointerEvents: "none",
-                    opacity: isDraggingFile ? 1 : 0,
-                    visibility: isDraggingFile ? "visible" : "hidden",
                 }}
             >
                 <div
+                    onPointerDown={(e) => e.stopPropagation()}
                     style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 16,
+                        position: "relative",
+                        ...screenShareContainerStyle,
+                        maxWidth: "100%",
+                        maxHeight: "100%",
                     }}
                 >
-                    <div
-                        data-svg-wrapper
-                        data-layer="share icon"
-                        className="ShareIcon"
-                    >
-                        <svg
-                            width="64"
-                            height="64"
-                            viewBox="0 0 64 64"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                     <VideoPlayer
+                        stream={remoteScreenStream || screenStreamRef.current}
+                        isMirrored={false}
+                        muted={!remoteScreenStream}
+                        style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                        }}
+                        onVideoSize={(w, h) =>
+                            setSharedScreenSize({ width: w, height: h })
+                        }
+                        themeColors={themeColors}
+                    />
+                </div>
+            </div>
+        )
+    }
+
+    // 4. Tiles Renderer
+    const renderTilesSection = (isSidebar: boolean) => {
+        // If sidebar, we force a vertical layout or similar constraints
+        // No forced style, let the standard logic handle it.
+        const forcedStyle = {}
+        
+        return (
+                <div
+                    style={{
+                        display: "flex",
+                    gap: 8,
+                    width: "100%",
+                    boxSizing: "border-box",
+                        justifyContent: "center",
+                    ...(isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
+                        ? {
+                              // If content is open, tiles are small strip
+                              height: isMobileLayout || isSidebar ? "100%" : 140,
+                              flex: isMobileLayout || isSidebar ? 1 : "0 0 auto",
+                              flexShrink: 0,
+                              paddingLeft: 0,
+                              paddingRight: 0,
+                              flexDirection: "row",
+                              alignItems: "flex-start",
+                          }
+                        : {
+                              // Default Large Tiles
+                              flex: 1,
+                              flexDirection: shouldUseHorizontalLayout ? "row" : "column",
+                              flexWrap: ((isMobileLayout || isSidebar) && numTiles === 4) ? "wrap" : "nowrap",
+                              alignItems: ((isMobileLayout || isSidebar) && numTiles === 4) 
+                                  ? "flex-start" 
+                                  : !(isMobileLayout || isSidebar)
+                                      ? "flex-end"
+                                      : "center",
+                              alignContent: ((isMobileLayout || isSidebar) && numTiles === 4) ? "center" : "stretch",
+                          }),
+                    ...forcedStyle,
+                }}
+            >
+                {(() => {
+                   const tiles: any[] = []
+                   tiles.push({ type: 'local', stream: localStream, key: 'local' })
+                   if (remoteStreams.size > 0) {
+                       remoteStreams.forEach((stream, id) => {
+                           tiles.push({ type: 'remote', stream, id, key: id })
+                       })
+                   }
+                   pendingPeerIds.forEach(id => {
+                       if (!remoteStreams.has(id)) {
+                           tiles.push({ type: 'pending', id, key: `pending-${id}` })
+                       }
+                   })
+                   if (tiles.length < 2) {
+                       tiles.push({ type: 'placeholder', key: 'placeholder' })
+                   }
+                   if (role === 'volunteer' && tiles.length === 2 && tiles[0].type === 'local') {
+                       tiles.reverse()
+                   }
+
+                   return tiles.map((tile, index) => {
+                       const isLocal = tile.type === 'local'
+                       const isRemote = tile.type === 'remote'
+                       const isPending = tile.type === 'pending'
+                       const isPlaceholder = tile.type === 'placeholder'
+                       
+                       let bg = themeColors.card
+                       if (isLocal && !role && status === 'idle' && !isLiveMode) bg = themeColors.state.accent
+                       else if (isLocal && role === 'mentor' && !isRemote) bg = themeColors.surface
+                       else if (isPending) bg = "#000000"
+                       else if (isPlaceholder && role === 'student' && !isRemote) bg = themeColors.surface
+
+                       const onClick = () => {
+                           if (isLocal && !role && status === 'idle' && !isLiveMode) handleRoleSelect('student')
+                           if (isPlaceholder && !role && status === 'idle') handleRoleSelect('volunteer')
+                       }
+
+                       return (
+                         <div
+                            key={tile.key}
+                            style={{
+                                overflow: "hidden",
+                                position: "relative",
+                                background: bg,
+                                cursor: (!role && status === "idle") ? "pointer" : "default",
+                                display: "flex",
+                                flexDirection: "column",
+                                ...(isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
+                                    ? {
+                                          flex: isMobileLayout || isSidebar
+                                              ? 1
+                                              : "0 0 auto",
+                                          width: "auto",
+                                          height: "auto",
+                                          aspectRatio: targetRatio,
+                                          borderRadius: 24,
+                                          minWidth: 0,
+                                      }
+                                    : {
+                                          width: finalWidth,
+                                          height: finalHeight,
+                                          aspectRatio: targetRatio,
+                                          borderRadius: finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224) ? 28 : 36,
+                                          flexShrink: 0,
+                                      }),
+                            }}
+                            onClick={onClick}
                         >
-                            <path
-                                d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z"
-                                fill="#0099FF"
-                                fillOpacity="0.95"
-                            />
+                            {/* CONTENT FOR TILE */}
+                            {isLocal ? (
+                                 (!role && status === "idle" && !isLiveMode) ? (
+                                    <RoleSelectionButton
+                                        colors={themeColors}
+                                        type="student"
+                                        isCompact={isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224)}
+                                        isMobileLayout={isMobileLayout}
+                                    />
+                                 ) : (!role && status === "searching") || role === "student" || isLiveMode || (isPrivateRoomConnection && status === "connected" && isLocal) ? (
+                                    <VideoPlayer stream={tile.stream} isMirrored={true} muted={true} themeColors={themeColors} />
+                                 ) : (
+                                    <VideoPlayer stream={localStream} isMirrored={true} muted={true} themeColors={themeColors} />
+                                 )
+                            ) : isRemote ? (
+                                 isLiveMode ? (
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
+                                         <div style={{color: "white"}}>AI</div>
+                    </div>
+                                 ) : (
+                                    <VideoPlayer stream={tile.stream} isMirrored={false} themeColors={themeColors} />
+                                 )
+                            ) : isPending ? (
+                                 <div style={{ width: "100%", height: "100%", background: "#000000" }} />
+                            ) : (
+                                !role && status === "idle" ? (
+                                    <RoleSelectionButton
+                                        colors={themeColors}
+                                        type="volunteer"
+                                        isCompact={isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224)}
+                                        isMobileLayout={isMobileLayout}
+                                    />
+                                ) : isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen ? (
+                                    <VideoPlayer stream={null} placeholder="Waiting..." themeColors={themeColors} style={transparentStyle} />
+                                ) : (
+                                    <div
+                                        data-layer="tile"
+                                        className="Tile"
+                            style={{
+                                            alignSelf: "stretch",
+                                            height: "100%",
+                                            padding: 16,
+                                            background: isPrivateRoomConnection ? "#000000" : "transparent",
+                                            overflow: "hidden",
+                                            borderRadius: 28,
+                                            flexDirection: "column",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            display: "flex",
+                                        }}
+                                    >
+                                        {!isPrivateRoomConnection && (
+                                            <>
+                                                <div style={{ textAlign: "center", color: themeColors.text.primary, fontSize: 15, marginBottom: 8 }}>
+                                                    {role === 'volunteer' ? "Waiting for student..." : "Searching for mentor"}
+                        </div>
+                                                {role !== 'volunteer' && (
+                                                    <div onClick={handleConnectWithAI} style={{ cursor: "pointer", color: themeColors.text.secondary, fontSize: 15 }}>
+                                                        Or connect with AI
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                       )
+                   })
+               })()}
+            </div>
+        )
+    }
+
+    // --- STANDARD LAYOUT RENDERER ---
+    // Used for:
+    // 1. Desktop Standard Mode (No Tool Open)
+    // 2. Mobile Background Layer
+    // 3. Desktop Sidebar (400px Right Column) when Tool is Open
+    const renderStandardLayout = (isSidebarContext: boolean) => {
+        // In sidebar context, we force the container to act like a mobile container
+        // But we rely on the parent container (400px width) to constrain it.
+        // The renderTilesSection and renderChatSection helpers already accept isSidebarContext to adjust their internal logic.
+        
+        // Drag bar logic:
+        // In sidebar context, the drag bar is used to resize chat vs tiles in the sidebar column.
+        // It should work exactly as it does on mobile.
+        
+        return (
+                        <div
+                            style={{
+                    flex: "1 1 0",
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    overflow: "hidden",
+                }}
+            >
+                {/* 1. Tiles & Main Content Area */}
+                {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || !isBanned) && (
+                     <div style={{
+                         flex: "1 1 0",
+                         width: "100%",
+                         display: "flex",
+                         // Sidebar context: Always column (vertical stack). Standard context: Adaptive.
+                         flexDirection: isSidebarContext 
+                             ? "column" 
+                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "column" : shouldUseHorizontalLayout ? "row" : "column"),
+                         gap: 8,
+                         paddingTop: 16,
+                         paddingLeft: 16,
+                         paddingRight: 16,
+                         paddingBottom: 0,
+                         alignItems: isSidebarContext
+                             ? "center"
+                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "center" : !isMobileLayout ? "flex-end" : "center"),
+                         justifyContent: isSidebarContext
+                             ? "flex-start" 
+                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "flex-start" : "center"),
+                         boxSizing: "border-box",
+                         minHeight: 0,
+                         position: "relative",
+                         overflow: "hidden",
+                     }}>
+                         {/* Tiles */}
+                         {renderTilesSection(isSidebarContext)}
+
+                         {/* Main Content (ScreenShare Only in this view - Tool is overlaid or not shown here if mobile tool mode) */}
+                         {(isScreenSharing || !!remoteScreenStream) && (
+                             <div style={{ flex: 1, width: "100%", overflow: "hidden", background: "transparent", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                 {renderScreenShareSection()}
+                        </div>
+                         )}
+                    </div>
+                )}
+                
+                {/* 2. Drag Handle (Present in both Standard and Sidebar) */}
+                {(!isBanned || isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) && (
+                    <div
+                        onPointerDown={handlePointerDown}
+                        onPointerEnter={() => { hoverTimeoutRef.current = window.setTimeout(() => { setIsDragBarHovered(true) }, 50) }}
+                        onPointerLeave={() => { if (hoverTimeoutRef.current) { clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = null }; setIsDragBarHovered(false) }}
+                        style={{
+                            height: 24,
+                            width: "100%",
+                            background: "transparent",
+                            ...styles.flexCenter,
+                            cursor: "ns-resize",
+                            flexShrink: 0,
+                            touchAction: "none",
+                            zIndex: 20,
+                            position: "relative",
+                        }}
+                    >
+                        <div style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.2)" }} />
+                        {isDragBarHovered && !isDragging.current && (
+                            <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 4px)", whiteSpace: "nowrap" }}>
+                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to expand chat" : "Click to hide chat"}
+                            </Tooltip>
+                        )}
+                    </div>
+                )}
+
+                {/* 3. Chat History (Drawer) */}
+                <div style={{ width: "100%", height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : "auto", background: "transparent", display: "flex", justifyContent: "center" }}>
+                    <div style={{ height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : chatHeight, paddingTop: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? 24 : 0, width: "100%", maxWidth: 728, position: "relative", display: "flex", flexDirection: "column" }}>
+                         {renderChatSection(isSidebarContext)}
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div
+            ref={containerRef}
+            style={{
+                width: "100%",
+                height: "100%",
+                background: themeColors.background,
+                color: themeColors.text.primary,
+                transition: "background 0.2s, color 0.2s",
+                fontFamily: "Inter, sans-serif",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                touchAction: "none",
+            }}
+        >
+            {/* BAN BANNER */}
+            {isBanned && (
+                <div style={{ width: "100%", background: "transparent", color: "rgba(160, 160, 160, 1)", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 500, zIndex: 2000, flexShrink: 0 }}>
+                    You are temporarily banned. Please review the <a href="https://curastem.org/code-of-conduct" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(160, 160, 160, 1)", textDecoration: "underline", fontWeight: 700 }}>code of conduct</a>.
+                </div>
+            )}
+
+            {/* Hidden file input */}
+            <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style={{ display: "none" }} onChange={handleFileChange} />
+
+            {/* DEBUG CONSOLE */}
+            {debugMode && (
+                <>
+                    <DebugConsole logs={logs} />
+                    <div style={{ position: "absolute", top: 170, left: 10, right: 10, background: "rgba(0,0,0,0.8)", color: "#fff", fontFamily: "monospace", fontSize: 14, padding: 12, zIndex: 9998, borderRadius: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>🔗 Room:</span><span style={{ color: "#3b82f6", fontWeight: "bold" }}>{typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}</span></div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>👤 Role:</span><span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>{role || "None (Passive Mode)"}</span></div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>📊 Status:</span><span style={{ color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8", fontWeight: "bold" }}>{status}</span></div>
+                    </div>
+                </>
+            )}
+
+            <style>{markdownStyles}</style>
+
+            {/* MAIN CONTENT STRUCTURE */}
+            {isSidebarMode ? (
+                // DESKTOP SPLIT VIEW (Left Tool, Right Sidebar)
+                <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
+                    {/* Left: Tool */}
+                    <div style={{ flex: 1, position: "relative" }}>
+                        {renderActiveTool(false)}
+                    </div>
+                    {/* Right: Sidebar (Tiles + ScreenShare + Chat) - Reuses Standard Layout Logic */}
+                    <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", background: themeColors.background }}>
+                        {renderStandardLayout(true)}
+                    </div>
+                </div>
+            ) : (
+                // STANDARD VIEW (Adaptive)
+                // Used for Mobile (always background) and Desktop Normal (No Tool)
+                renderStandardLayout(false)
+            )}
+
+            {/* MOBILE OVERLAY (For Tools) */}
+            {isMobileToolMode && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: themeColors.background }}>
+                    {renderActiveTool(true)}
+                </div>
+            )}
+
+            {/* REPORT MODAL */}
+            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={onSubmitReport} participantCount={remoteStreams.size + 1} />
+
+            {/* FILE DRAG OVERLAY */}
+            <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 99999, background: themeColors.state.overlay, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: isDraggingFile ? 1 : 0, visibility: isDraggingFile ? "visible" : "hidden" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                    <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z" fill="#0099FF" fillOpacity="0.95" />
                         </svg>
                     </div>
                     <div style={{ textAlign: "center" }}>
-                        <div
-                            style={{
-                                fontSize: 24,
-                                fontWeight: 700,
-                                marginBottom: 16,
-                                lineHeight: 1.4,
-                            }}
-                        >
-                            Add anything
-                        </div>
-                        <div
-                            style={{
-                                fontSize: 14,
-                                opacity: 0.65,
-                                fontWeight: 400,
-                                lineHeight: 1.4,
-                            }}
-                        >
-                            Drop any file here to add it to the conversation
-                        </div>
+                        <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 16, lineHeight: 1.4 }}>Add anything</div>
+                        <div style={{ fontSize: 14, opacity: 0.65, fontWeight: 400, lineHeight: 1.4 }}>Drop any file here to add it to the conversation</div>
                     </div>
                 </div>
             </div>
