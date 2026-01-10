@@ -3506,13 +3506,20 @@ const ChatInput = React.memo(function ChatInput({
                 }
 
                 const url = typeof window !== "undefined" ? window.location.href : ""
+                const callId = (typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : ""
+                const shareTitle = callId ? `Join my call (${callId}) | #1 free mentorship` : "Join my call | #1 free mentorship"
+                
+                if (typeof document !== "undefined") {
+                    document.title = shareTitle
+                }
+
                 if (typeof navigator !== "undefined") {
                     navigator.clipboard.writeText(url).catch(console.error)
                     // @ts-ignore
                     if (navigator.share) {
                         // @ts-ignore
                         navigator.share({
-                            title: document.title,
+                            title: shareTitle,
                             url: url,
                         }).catch(console.error)
                     }
@@ -3642,6 +3649,13 @@ const ChatInput = React.memo(function ChatInput({
                         className="CopyLinkButton"
                         onClick={() => {
                             const url = typeof window !== "undefined" ? window.location.href : ""
+                            const callId = (typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : ""
+                            const shareTitle = callId ? `Join my call (${callId}) | #1 free mentorship` : "Join my call | #1 free mentorship"
+
+                            if (typeof document !== "undefined") {
+                                document.title = shareTitle
+                            }
+
                             if (typeof navigator !== "undefined") {
                                 navigator.clipboard.writeText(url).then(() => {
                                     setHasCopiedLink(true)
@@ -3651,7 +3665,7 @@ const ChatInput = React.memo(function ChatInput({
                                 if (navigator.share) {
                                     // @ts-ignore
                                     navigator.share({
-                                        title: document.title,
+                                        title: shareTitle,
                                         url: url,
                                     }).catch(console.error)
                                 }
