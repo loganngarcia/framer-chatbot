@@ -1092,6 +1092,7 @@ const VideoPlayer = React.memo(function VideoPlayer({
     onVideoSize,
     placeholder,
     themeColors = darkColors,
+    objectFit = "cover",
 }: {
     stream: MediaStream | null
     isMirrored?: boolean
@@ -1100,6 +1101,7 @@ const VideoPlayer = React.memo(function VideoPlayer({
     onVideoSize?: (width: number, height: number) => void
     placeholder?: string
     themeColors?: typeof darkColors
+    objectFit?: "contain" | "cover" | "fill" | "none" | "scale-down"
 }) {
     const videoRef = React.useRef<HTMLVideoElement>(null)
 
@@ -1150,19 +1152,19 @@ const VideoPlayer = React.memo(function VideoPlayer({
                 ...style,
             }}
         >
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted={muted}
-                    style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        transform: isMirrored ? "scaleX(-1)" : "none",
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={muted}
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: objectFit,
+                    transform: isMirrored ? "scaleX(-1)" : "none",
                     display: stream ? "block" : "none",
-                    }}
-                />
+                }}
+            />
             {!stream && placeholder && (
                 <div
                     style={{
@@ -2851,7 +2853,7 @@ const DocEditor = React.memo(function DocEditor({
                                 zIndex: 100,
                             }}
                         >
-                            Collapse
+                            Close
                         </Tooltip>
                     )}
                   </div>
@@ -6444,7 +6446,8 @@ const captureVideoFrame = async (
 
         // Fallback: Create video element
         const video = document.createElement("video")
-        video.muted = true(video as any).playsInline = true
+        video.muted = true
+        ;(video as any).playsInline = true
         video.srcObject = new MediaStream([track])
         await video.play()
 
@@ -7889,7 +7892,8 @@ Do not include markdown formatting or explanations.`
 
     const [remoteScreenStream, setRemoteScreenStream] =
         React.useState<MediaStream | null>(null)
-    const screenCallRef = React.useRef<any>(null)
+    const screenCallRef = React.useRef<any>(null) // Deprecated: Use screenCallsRef
+    const screenCallsRef = React.useRef<Map<string, any>>(new Map())
     const mqttClient = React.useRef<any>(null)
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null) // Deprecated: Use activeCalls
@@ -8557,6 +8561,13 @@ Do not include markdown formatting or explanations.`
                     // If we use targetRatio here, we get a more accurate 'ideal' height.
                     const tileW = (availableW - 8) / 2
                     topRowHeight = tileW / targetRatio
+
+                    if (_isScreenSharing || !!_remoteScreenStream) {
+                        topRowHeight += 248
+                    }
+                } else if (_isScreenSharing || !!_remoteScreenStream) {
+                    // Desktop with Screenshare: increase reserved space
+                    topRowHeight += 248
                 }
 
                 const chromeHeight = 24 + 16 + topRowHeight + 8
@@ -8706,6 +8717,9 @@ Do not include markdown formatting or explanations.`
         } else {
             // Desktop: tiles side-by-side, target 140px height
             targetTileHeight = 140
+            if (isScreenSharing || !!remoteScreenStream) {
+                targetTileHeight += 248
+            }
         }
         
         const targetChatHeight = containerSize.height - targetTileHeight - topUIHeight
@@ -8919,6 +8933,13 @@ Do not include markdown formatting or explanations.`
             screenCallRef.current.close()
             screenCallRef.current = null
         }
+        // Close all multi-party screen calls
+        if (screenCallsRef.current.size > 0) {
+            screenCallsRef.current.forEach((call) => {
+                if (call) call.close()
+            })
+            screenCallsRef.current.clear()
+        }
         setIsScreenSharing(false)
     }, [])
 
@@ -8946,7 +8967,8 @@ Do not include markdown formatting or explanations.`
                     broadcastData({ type: "tldraw-stop" })
                     }
                 }
-                if (isScreenSharing) stopLocalScreenShare()
+                // Allow screenshare to remain open
+                // if (isScreenSharing) stopLocalScreenShare()
             }
             return willBeOpen
         })
@@ -8963,7 +8985,8 @@ Do not include markdown formatting or explanations.`
         } else {
             log("Starting whiteboard...")
             if (isDocOpen) setIsDocOpen(false)
-            if (isScreenSharing) stopLocalScreenShare()
+            // Allow screenshare to remain open
+            // if (isScreenSharing) stopLocalScreenShare()
 
             setIsWhiteboardOpen(true)
             setHasWhiteboardStarted(true)
@@ -9104,12 +9127,15 @@ Do not include markdown formatting or explanations.`
         if (isScreenSharing) {
             stopLocalScreenShare()
         } else {
+            // Allow tools to remain open
+            /*
             if (isWhiteboardOpen) {
                 setIsWhiteboardOpen(false)
                 // Notify peer to close whiteboard
                 broadcastData({ type: "tldraw-stop" })
             }
             if (isDocOpen) setIsDocOpen(false)
+            */
 
             // START SHARING
             try {
@@ -9139,9 +9165,27 @@ Do not include markdown formatting or explanations.`
                     stopLocalScreenShare()
                 }
 
-                // If connected, start a second call for the screen
-                if (activeCall.current && activeCall.current.peer) {
-                    // PeerJS call object has .peer property which is the remote ID
+                // If connected, start a second call for the screen to ALL peers
+                if (activeCalls.current.size > 0) {
+                    activeCalls.current.forEach((call, peerId) => {
+                         log(`Starting screen share call to ${peerId}...`)
+                         const screenCall = peerInstance.current.call(
+                             peerId,
+                             screenStream,
+                             {
+                                 metadata: { type: "screen" },
+                             }
+                         )
+                         screenCall.on("error", (err: any) =>
+                             log(`Sender Screen Call Error to ${peerId}: ${err}`)
+                         )
+                         screenCallsRef.current.set(peerId, screenCall)
+                         
+                         // Legacy ref fallback
+                         if (!screenCallRef.current) screenCallRef.current = screenCall
+                    })
+                } else if (activeCall.current && activeCall.current.peer) {
+                    // Fallback for legacy single-call state if activeCalls is empty for some reason
                     const peerId = activeCall.current.peer
                     log(`Starting screen share call to ${peerId}...`)
                     const call = peerInstance.current.call(
@@ -9155,6 +9199,7 @@ Do not include markdown formatting or explanations.`
                         log(`Sender Screen Call Error: ${err}`)
                     )
                     screenCallRef.current = call
+                    screenCallsRef.current.set(peerId, call)
                 }
 
                 setIsScreenSharing(true)
@@ -9383,6 +9428,8 @@ Do not include markdown formatting or explanations.`
                     stopLocalScreenShare()
                 }
 
+                // Allow tools to remain open during screenshare
+                /*
                 // Close whiteboard if open (Screen share overrides whiteboard)
                 if (isWhiteboardOpenRef.current) {
                     setIsWhiteboardOpen(false)
@@ -9390,6 +9437,7 @@ Do not include markdown formatting or explanations.`
                 if (isDocOpenRef.current) {
                     setIsDocOpen(false)
                 }
+                */
 
                 call.answer() // Answer without sending a stream back
 
@@ -9532,8 +9580,8 @@ Do not include markdown formatting or explanations.`
                     screenCall.on("error", (err: any) =>
                         log(`Sender Screen Call Error: ${err}`)
                     )
-                    screenCallRef.current = screenCall // Note: This ref only holds ONE screen call currently. 
-                    // TODO: Multi-party screen share would require a map here too.
+                    screenCallRef.current = screenCall // Legacy ref
+                    screenCallsRef.current.set(peerId, screenCall)
                 }
             }
         })
@@ -9560,6 +9608,14 @@ Do not include markdown formatting or explanations.`
             // Clean up refs
             activeCalls.current.delete(peerId)
             remoteStreamsRef.current.delete(peerId)
+            
+            // Clean up screen share call if exists
+            if (screenCallsRef.current.has(peerId)) {
+                try {
+                    screenCallsRef.current.get(peerId).close()
+                } catch (e) {}
+                screenCallsRef.current.delete(peerId)
+            }
 
             // If no more peers, set status to idle or searching?
             if (activeCalls.current.size === 0) {
@@ -10225,7 +10281,7 @@ Do not include markdown formatting or explanations.`
                 // Receive and display shared AI suggestions
                 setAiGeneratedSuggestions(data.payload)
             } else if (data.type === "doc-start") {
-                if (isScreenSharingRef.current) stopLocalScreenShare()
+                // if (isScreenSharingRef.current) stopLocalScreenShare()
                 if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
                 setIsDocOpen(true)
             } else if (data.type === "doc-stop") {
@@ -10236,7 +10292,7 @@ Do not include markdown formatting or explanations.`
                 setInputText(data.payload)
             } else if (data.type === "tldraw-start") {
                 log("Received tldraw-start command")
-                if (isScreenSharingRef.current) stopLocalScreenShare()
+                // if (isScreenSharingRef.current) stopLocalScreenShare()
                 setIsDocOpen(false)
                 setIsWhiteboardOpen(true)
                 setHasWhiteboardStarted(true)
@@ -11563,6 +11619,30 @@ Do not include markdown formatting or explanations.`
     ])
 
     // Calculate dynamic size for screen share container to match aspect ratio
+    // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
+    const videoSectionHeight = containerSize.height - chatHeight - 40
+    // If 3+ people, force square aspect ratio as per requirements? Or keep 1.55?
+    // "if 3+ people then the video tiles change to be squares."
+    const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
+    // IMPORTANT: If tiles list is built from remoteStreams + local + placeholder, 
+    // we need to make sure numTiles matches what we render.
+    // In render: 
+    // tiles = [local]
+    // remoteStreams.forEach -> tiles.push
+    // if tiles.length < 2 -> tiles.push(placeholder)
+    // So if remoteStreams.size == 0, length=2.
+    // If remoteStreams.size == 1, length=2.
+    // If remoteStreams.size == 2, length=3.
+    // So numTiles calculation above is correct for layout purposes.
+
+    // Force square aspect ratio if:
+    // 1. 3+ people connected
+    // 2. Whiteboard/Docs/Screenshare is OPEN (in which case tiles are small)
+    // User request: "on whiteboard/notes/screenshare, aspect ratio should be square for 3+ people"
+    const isMultiParty = numTiles > 2
+    const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
+    const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
+
     const screenShareContainerStyle = React.useMemo(() => {
         // If whiteboard is active, use aspect ratio based on layout:
         // Mobile: 4:5 (1080x1350), Desktop: 16:9 (1920x1080)
@@ -11595,8 +11675,18 @@ Do not include markdown formatting or explanations.`
         let topRowHeight = 140
         if (isMobileLayout) {
             const availW = Math.max(100, containerSize.width - 32)
+            // If content is open, tiles are in a single row
+            // Width is shared among tiles.
+            // But wait, renderTilesSection logic:
+            // "flex: 1" -> they share space.
+            // If 2 tiles (min), each takes 50%.
+            // If 3 tiles, each takes 33%.
+            // We need to estimate height.
+            
+            // Assuming simplified view: 2 tiles visible or scrollable?
+            // Existing logic assumed 2 tiles:
             const tileW = (availW - 8) / 2
-            topRowHeight = tileW / (4 / 3)
+            topRowHeight = tileW / targetRatio
         }
 
         const chromeHeight = chatHeight + 24 + 16 + topRowHeight + 8
@@ -11633,31 +11723,8 @@ Do not include markdown formatting or explanations.`
         sharedScreenSize,
         isWhiteboardOpen,
         isDocOpen,
+        targetRatio,
     ])
-
-    // Calculates the ideal dimensions for the video containers while preserving aspect ratio.
-    const videoSectionHeight = containerSize.height - chatHeight - 40
-    // If 3+ people, force square aspect ratio as per requirements? Or keep 1.55?
-    // "if 3+ people then the video tiles change to be squares."
-    const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
-    // IMPORTANT: If tiles list is built from remoteStreams + local + placeholder, 
-    // we need to make sure numTiles matches what we render.
-    // In render: 
-    // tiles = [local]
-    // remoteStreams.forEach -> tiles.push
-    // if tiles.length < 2 -> tiles.push(placeholder)
-    // So if remoteStreams.size == 0, length=2.
-    // If remoteStreams.size == 1, length=2.
-    // If remoteStreams.size == 2, length=3.
-    // So numTiles calculation above is correct for layout purposes.
-
-    // Force square aspect ratio if:
-    // 1. 3+ people connected
-    // 2. Whiteboard/Docs/Screenshare is OPEN (in which case tiles are small)
-    // User request: "on whiteboard/notes/screenshare, aspect ratio should be square for 3+ people"
-    const isMultiParty = numTiles > 2
-    const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
-    const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
 
     // Sidebar Logic Definition (Hoist for layout calc)
     const isToolOpen = isWhiteboardOpen || isDocOpen
@@ -12480,8 +12547,10 @@ Do not include markdown formatting or explanations.`
                         style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "contain",
+                            borderRadius: 8,
+                            overflow: "hidden",
                         }}
+                        objectFit="contain"
                         onVideoSize={(w, h) =>
                             setSharedScreenSize({ width: w, height: h })
                         }
@@ -12509,13 +12578,13 @@ Do not include markdown formatting or explanations.`
                     ...(isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
                         ? {
                               // If content is open, tiles are small strip
-                              height: isMobileLayout || isSidebar ? "100%" : 140,
-                              flex: isMobileLayout || isSidebar ? 1 : "0 0 auto",
+                            height: isMobileLayout || isSidebar ? "auto" : 140,
+                              flex: "0 0 auto",
                               flexShrink: 0,
                               paddingLeft: 0,
                               paddingRight: 0,
                               flexDirection: "row",
-                              alignItems: "flex-start",
+                              alignItems: "center",
                           }
                         : {
                               // Default Large Tiles
@@ -12585,7 +12654,7 @@ Do not include markdown formatting or explanations.`
                                               ? 1
                                               : "0 0 auto",
                                           width: "auto",
-                                          height: "auto",
+                                          height: isMobileLayout || isSidebar ? "auto" : "100%",
                                           aspectRatio: targetRatio,
                                           borderRadius: 24,
                                           minWidth: 0,
