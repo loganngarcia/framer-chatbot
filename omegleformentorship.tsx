@@ -520,7 +520,11 @@ const applyInlineFormatting = (
         ) {
             parts.push(
                 <strong key={`${keyPrefix}-${match.index}-b`}>
-                    {boldInner || boldInner2 || strongInner || bInner}
+                    {applyInlineFormatting(
+                        boldInner || boldInner2 || strongInner || bInner,
+                        `${keyPrefix}-${match.index}-b-inner`,
+                        linkStyle
+                    )}
                 </strong>
             )
         } else if (codeInner !== undefined) {
@@ -534,7 +538,13 @@ const applyInlineFormatting = (
             )
         } else if (strikeInner !== undefined) {
             parts.push(
-                <del key={`${keyPrefix}-${match.index}-del`}>{strikeInner}</del>
+                <del key={`${keyPrefix}-${match.index}-del`}>
+                    {applyInlineFormatting(
+                        strikeInner,
+                        `${keyPrefix}-${match.index}-del-inner`,
+                        linkStyle
+                    )}
+                </del>
             )
         } else if (
             italicInner !== undefined ||
@@ -543,7 +553,11 @@ const applyInlineFormatting = (
         ) {
             parts.push(
                 <em key={`${keyPrefix}-${match.index}-em`}>
-                    {italicInner || emInner || iInner}
+                    {applyInlineFormatting(
+                        italicInner || emInner || iInner,
+                        `${keyPrefix}-${match.index}-em-inner`,
+                        linkStyle
+                    )}
                 </em>
             )
         } else if (linkText !== undefined && linkUrl !== undefined) {
@@ -555,7 +569,11 @@ const applyInlineFormatting = (
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {linkText}
+                    {applyInlineFormatting(
+                        linkText,
+                        `${keyPrefix}-${match.index}-a-inner`,
+                        linkStyle
+                    )}
                 </a>
             )
         } else if (htmlLinkText !== undefined && htmlLinkUrl !== undefined) {
@@ -567,7 +585,11 @@ const applyInlineFormatting = (
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {htmlLinkText}
+                    {applyInlineFormatting(
+                        htmlLinkText,
+                        `${keyPrefix}-${match.index}-html-a-inner`,
+                        linkStyle
+                    )}
                 </a>
             )
         } else if (email !== undefined) {
@@ -12813,7 +12835,7 @@ Do not include markdown formatting or explanations.`
                             // @ts-ignore
                             transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
                             style={{
-                                transition: "border-radius 3s ease-in-out", // over 3 seconds to smoothly animate border radius changes 
+                                transition: "border-radius 4s ease-in-out", // over 4 seconds to smoothly animate border radius changes 
                                 overflow: "hidden",
                                 position: "relative",
                                 background: bg,
