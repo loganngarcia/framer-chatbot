@@ -55,7 +55,7 @@ const THREE_LETTER_WORDS = [
     "try", "tub", "tug", "urn", "use", "van", "vet", "via",
     "vow", "wag", "war", "wax", "way", "web", "wed", "wet", "who", "wig",
     "win", "wit", "won", "wow", "yak", "yam", "yap", "yes", "yet",
-    "you", "zap", "zip", "zoo", "moo", "boo", "goo", 
+    "you", "zap", "zip", "zoo", "moo", "boo", "goo", "bop",
     // Common names
     "amy", "ana", "ann", "art", "ben", "bob", "cam", "dan", "deb",
     "don", "eva", "fay", "flo", "gus", "hal", "ian", "jan", "jay",
@@ -924,6 +924,7 @@ interface Message {
 interface FileAttachmentProps {
     name: string
     type: string
+    url?: string
     onRemove?: () => void
     themeColors: typeof darkColors
 }
@@ -931,6 +932,7 @@ interface FileAttachmentProps {
 const FileAttachment = React.memo(function FileAttachment({
     name,
     type,
+    url,
     onRemove,
     themeColors,
 }: FileAttachmentProps) {
@@ -964,8 +966,20 @@ const FileAttachment = React.memo(function FileAttachment({
         return "#4285F4"
     }
 
+    const handleDownload = (e: React.MouseEvent) => {
+        if (!url || onRemove) return
+        e.stopPropagation()
+        const link = document.createElement("a")
+        link.href = url
+        link.download = name || "download"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     return (
         <div
+            onClick={handleDownload}
             style={{
                 width: 296,
                 height: 56,
@@ -977,6 +991,7 @@ const FileAttachment = React.memo(function FileAttachment({
                 alignItems: "center",
                 display: "flex",
                 overflow: "hidden",
+                cursor: url && !onRemove ? "pointer" : "default",
             }}
         >
             <div
@@ -2035,7 +2050,7 @@ const DocEditor = React.memo(function DocEditor({
             iframe.style.border = "0"
             document.body.appendChild(iframe)
 
-            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${settings.pSize}pt;line-height:1.6;}h1{font-size:${settings.h1Size}px;font-weight:700;}h2{font-size:${settings.h2Size}px;font-weight:700;border-bottom:1px solid #000;}a{color:#0099FF;text-decoration:underline;}</style></head><body>`
+            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{margin:0;padding:0;font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${Math.max(1, settings.pSize - 5)}pt;line-height:1.6;}h1{font-size:${Math.max(1, settings.h1Size - 5)}px;font-weight:700;}h2{font-size:${Math.max(1, settings.h2Size - 5)}px;font-weight:700;border-bottom:1px solid #000;}a{color:#0099FF;text-decoration:underline;}</style></head><body>`
             const footer = "</body></html>"
             const sourceHTML = header + content + footer
 
@@ -3644,7 +3659,7 @@ const ChatInput = React.memo(function ChatInput({
                 >
                   <div data-layer="text-content" className="TextContent" style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
                     <div data-layer="title" className="Title" style={{alignSelf: 'stretch', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>Add people</div>
-                    <div data-layer="description" className="Description" style={{alignSelf: 'stretch', color: themeColors.text.secondary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>Share ideas, learn together, and have fun</div>
+                    <div data-layer="description" className="Description" style={{alignSelf: 'stretch', color: themeColors.text.secondary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>{isDocOpen || isWhiteboardOpen ? "Learn together" : "Learn together, share ideas, and have fun"}</div>
                   </div>
                   <div
                         data-layer="copy-link-button"
@@ -6099,6 +6114,7 @@ const MessageBubble = React.memo(
                                                     key={i}
                                                     name={att.name || "File"}
                                                     type={att.mimeType || ""}
+                                                    url={att.url}
                                                     themeColors={themeColors}
                                                 />
                                             ))}
@@ -6531,6 +6547,8 @@ export default function OmegleMentorshipUI(props: Props) {
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
+    const [isWhiteboardDownloadHovered, setIsWhiteboardDownloadHovered] = React.useState(false)
+    const [isWhiteboardCloseHovered, setIsWhiteboardCloseHovered] = React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] =
         React.useState(false)
     
@@ -12072,6 +12090,8 @@ Do not include markdown formatting or explanations.`
                                                 {/* Download Button */}
                                                 <div 
                                                     style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                                    onMouseEnter={() => setIsWhiteboardDownloadHovered(true)}
+                                                    onMouseLeave={() => setIsWhiteboardDownloadHovered(false)}
                                                     onClick={async () => {
                                                         if (editor && exportToBlob) {
                                                             try {
@@ -12101,16 +12121,42 @@ Do not include markdown formatting or explanations.`
                                                     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                         <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                                     </svg>
+                                                    {isWhiteboardDownloadHovered && (
+                                                        <Tooltip
+                                                            style={{
+                                                                top: "100%",
+                                                                left: "50%",
+                                                                transform: "translate(-50%, 8px)",
+                                                                zIndex: 100,
+                                                            }}
+                                                        >
+                                                            Download
+                                                        </Tooltip>
+                                                    )}
                                                 </div>
 
                                                 {/* Collapse Button */}
                                                 <div 
                                                     style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
                                                     onClick={toggleWhiteboard}
+                                                    onMouseEnter={() => setIsWhiteboardCloseHovered(true)}
+                                                    onMouseLeave={() => setIsWhiteboardCloseHovered(false)}
                                                 >
                                                     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                         <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                                     </svg>
+                                                    {isWhiteboardCloseHovered && (
+                                                        <Tooltip
+                                                            style={{
+                                                                top: "100%",
+                                                                left: "50%",
+                                                                transform: "translate(-50%, 8px)",
+                                                                zIndex: 100,
+                                                            }}
+                                                        >
+                                                            Close
+                                                        </Tooltip>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -12563,7 +12609,117 @@ Do not include markdown formatting or explanations.`
 
     // 4. Tiles Renderer
     const renderTilesSection = (isSidebar: boolean) => {
-        // If sidebar, we force a vertical layout or similar constraints
+        // Calculate dynamic dimensions for contained fit
+        // Note: isSidebar means we are in the sidebar context (width ~400px)
+        // isMobileLayout means we are on a small screen (width < 768px)
+        const isSidebarOrMobile = isMobileLayout || isSidebar
+        
+        // Use calculateHeightConstraints to get the 'ideal' dimensions based on the *current* layout context
+        // If isSidebar, we pass the sidebar width (400) instead of full container width
+        const effectiveW = isSidebar ? 400 : containerSize.width
+        const effectiveH = containerSize.height
+        
+        const constraints = calculateHeightConstraints(
+            effectiveW,
+            effectiveH,
+            isSidebar ? true : isMobileLayout, // Force mobile layout logic for sidebar (vertical stack)
+            isScreenSharing,
+            remoteScreenStream,
+            isWhiteboardOpen,
+            isDocOpen,
+            sharedScreenSize
+        )
+        
+        // Extract the minHeight (which in our logic corresponds to the calculated tile area height needed)
+        // Wait, calculateHeightConstraints returns min/max CHAT height.
+        // We want the *Tile* dimensions.
+        
+        // Let's manually calculate the fit here using the same logic to be precise.
+        // We want the tiles to fit within the available space above the chat.
+        // Available Space = containerHeight - chatHeight - topUI (padding + drag bar)
+        const topUIHeight = 16 + 24 // PaddingTop (16) + DragBar area (24) + Gap (8) is usually handled in flex
+        // But the flex container has paddingTop: 16.
+        // And drag bar is 24px height.
+        // So available height for tiles = containerHeight - chatHeight - 40px (approx)
+        
+        const availableHeight = Math.max(0, effectiveH - chatHeight - 40)
+        const availableWidth = Math.max(0, effectiveW - 32) // -32 for padding (16px * 2)
+        
+        // Determine aspect ratio
+        const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
+        const isMultiParty = numTiles > 2
+        // If content is open (Tool/Screen), tiles are small. 
+        // If Sidebar/Mobile, they are vertical stack.
+        // If Desktop Standard, they are horizontal row (usually).
+        const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
+        const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
+        
+        // Calculate max fit dimensions for a single tile
+        // If we have 2 tiles, they usually stack in Mobile/Sidebar.
+        // So each tile has width = availableWidth.
+        // Height = width / ratio.
+        // Total height needed = height * 2 + gap.
+        
+        // We want to constrain this so it fits in 'availableHeight'.
+        let fitWidth = availableWidth
+        let fitHeight = fitWidth / targetRatio
+        
+        if (isSidebarOrMobile) {
+            // Stacked vertically?
+            // If we have 2 tiles, we need to fit 2 of them in availableHeight.
+            // If availableHeight is small, we shrink them.
+            // Max height per tile = (availableHeight - gap) / numTiles
+            // gap is 8px.
+            // Actually, let's assume 2 tiles for calculation safety
+            const count = Math.min(2, numTiles) 
+            const maxHPerTile = (availableHeight - (count - 1) * 8) / count
+            
+            if (fitHeight > maxHPerTile) {
+                fitHeight = maxHPerTile
+                fitWidth = fitHeight * targetRatio
+            }
+        } else {
+            // Horizontal row (Small Strip in Standard Desktop Layout)
+            // Available height is constrained by the small strip height (usually 140px)
+            // But here we are inside renderTilesSection, which might be called with isSidebar=false (Standard Layout)
+            // If isScreenSharing or Tool is open, we are in the "small strip" mode.
+            if (isContentOpen) {
+                // In small strip mode, height is fixed (e.g. 140px). 
+                // We want to fill height and set width based on aspect ratio.
+                // However, renderTilesSection styles apply logic based on conditions.
+                
+                // If we are here, it means we are calculating 'fit' dimensions for animation.
+                // For horizontal strip:
+                // height = 100% (of 140px container)
+                // width = height * ratio
+                
+                // But wait, the container height is determined by the style in renderStandardLayout:
+                // height: isMobileLayout || isSidebar ? "auto" : 140
+                
+                // So if !isMobileLayout && !isSidebar, height is 140.
+                const stripHeight = 140
+                if (fitHeight > stripHeight) {
+                    fitHeight = stripHeight
+                    fitWidth = fitHeight * targetRatio
+                }
+            } else {
+                // Large Desktop Tiles (Standard View, No Tool)
+                // TODO: Fix gap between drag bar and top of screen for tiles on the mobile/sidebar side-by-side horizontal layout. 
+                // Tiles should fill height as much as possible while maintaining aspect ratio without being cropped.
+                const widthPerTile = (availableWidth - 8) / 2
+                
+                // Check if height constrained
+                if ((widthPerTile / targetRatio) > availableHeight) {
+                    fitHeight = availableHeight
+                    fitWidth = fitHeight * targetRatio
+                } else {
+                    // Width constrained
+                    fitWidth = widthPerTile
+                    fitHeight = fitWidth / targetRatio
+                }
+            }
+        }
+        
         // No forced style, let the standard logic handle it.
         const forcedStyle = {}
         
@@ -12639,34 +12795,36 @@ Do not include markdown formatting or explanations.`
                        }
 
                        return (
-                         <div
+                         <motion.div
                             key={tile.key}
+                            initial={false}
+                            animate={{
+                                flex: "0 0 auto",
+                                width: isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar) 
+                                    ? "auto" 
+                                    : fitWidth,
+                                height: isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
+                                    ? (isMobileLayout || isSidebar ? "auto" : "100%")
+                                    : fitHeight,
+                                borderRadius: (isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar))
+                                    ? 24 
+                                    : (fitHeight < ((isMobileLayout || isSidebar) ? 164 : 224) ? 28 : 36)
+                            }}
+                            // @ts-ignore
+                            transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
                             style={{
+                                transition: "border-radius 3s ease-in-out", // over 3 seconds to smoothly animate border radius changes 
                                 overflow: "hidden",
                                 position: "relative",
                                 background: bg,
                                 cursor: (!role && status === "idle") ? "pointer" : "default",
                                 display: "flex",
                                 flexDirection: "column",
-                                ...(isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
-                                    ? {
-                                          flex: isMobileLayout || isSidebar
-                                              ? 1
-                                              : "0 0 auto",
-                                          width: "auto",
-                                          height: isMobileLayout || isSidebar ? "auto" : "100%",
-                                          aspectRatio: targetRatio,
-                                          borderRadius: 24,
-                                          minWidth: 0,
-                                      }
-                                    : {
-                                          width: finalWidth,
-                                          height: finalHeight,
-                                          aspectRatio: targetRatio,
-                                          borderRadius: finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224) ? 28 : 36,
-                                          flexShrink: 0,
-                                      }),
+                                aspectRatio: (isMobileLayout || isSidebar) ? targetRatio : targetRatio,
+                                minWidth: 0,
+                                flexShrink: (isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)) && !(isMobileLayout || isSidebar) ? 0 : 1,
                             }}
+                            layout // Added layout prop to animate aspect ratio/size changes
                             onClick={onClick}
                         >
                             {/* CONTENT FOR TILE */}
@@ -12723,7 +12881,7 @@ Do not include markdown formatting or explanations.`
                                         {!isPrivateRoomConnection && (
                                             <>
                                                 <div style={{ textAlign: "center", color: themeColors.text.primary, fontSize: 15, marginBottom: 8 }}>
-                                                    {role === 'volunteer' ? "Waiting for student..." : "Searching for mentor"}
+                                                    {role === 'volunteer' ? "Waiting for student" : "Waiting for mentor"}
                         </div>
                                                 {role !== 'volunteer' && (
                                                     <div onClick={handleConnectWithAI} style={{ cursor: "pointer", color: themeColors.text.secondary, fontSize: 15 }}>
@@ -12735,7 +12893,7 @@ Do not include markdown formatting or explanations.`
                                     </div>
                                 )
                             )}
-                        </div>
+                        </motion.div>
                        )
                    })
                })()}
@@ -12785,7 +12943,7 @@ Do not include markdown formatting or explanations.`
                          paddingBottom: 0,
                          alignItems: isSidebarContext
                              ? "center"
-                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "center" : !isMobileLayout ? "flex-end" : "center"),
+                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "center" : !isMobileLayout ? "center" : "center"),
                          justifyContent: isSidebarContext
                              ? "flex-start" 
                              : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "flex-start" : "center"),
@@ -12808,7 +12966,7 @@ Do not include markdown formatting or explanations.`
                 
                 {/* 2. Drag Handle (Present in both Standard and Sidebar) */}
                 {(!isBanned || isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) && (
-                    <div
+                    <motion.div
                         onPointerDown={handlePointerDown}
                         onPointerEnter={() => { hoverTimeoutRef.current = window.setTimeout(() => { setIsDragBarHovered(true) }, 50) }}
                         onPointerLeave={() => { if (hoverTimeoutRef.current) { clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = null }; setIsDragBarHovered(false) }}
@@ -12830,14 +12988,27 @@ Do not include markdown formatting or explanations.`
                                 {chatHeight < currentConstraints.maxHeight - 5 ? "Click to show chat" : "Click to hide chat"}
                             </Tooltip>
                         )}
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* 3. Chat History (Drawer) */}
                 <div style={{ width: "100%", height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : "auto", background: "transparent", display: "flex", justifyContent: "center" }}>
-                    <div style={{ height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : chatHeight, paddingTop: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? 24 : 0, width: "100%", maxWidth: 728, position: "relative", display: "flex", flexDirection: "column" }}>
+                    <motion.div 
+                        initial={false}
+                        animate={{ height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : chatHeight }}
+                        transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
+                        style={{ 
+                            paddingTop: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? 24 : 0, 
+                            width: "100%", 
+                            maxWidth: 728, 
+                            position: "relative", 
+                            display: "flex", 
+                            flexDirection: "column",
+                            overflow: "hidden" 
+                        }}
+                    >
                          {renderChatSection(isSidebarContext)}
-                    </div>
+                    </motion.div>
                 </div>
             </div>
         )
@@ -12889,30 +13060,73 @@ Do not include markdown formatting or explanations.`
             <style>{markdownStyles}</style>
 
             {/* MAIN CONTENT STRUCTURE */}
-            {isSidebarMode ? (
-                // DESKTOP SPLIT VIEW (Left Tool, Right Sidebar)
-                <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
-                    {/* Left: Tool */}
-                    <div style={{ flex: 1, position: "relative" }}>
-                        {renderActiveTool(false)}
-                    </div>
-                    {/* Right: Sidebar (Tiles + ScreenShare + Chat) - Reuses Standard Layout Logic */}
-                    <div style={{ width: 400, flexShrink: 0, display: "flex", flexDirection: "column", background: themeColors.background }}>
-                        {renderStandardLayout(true)}
-                    </div>
-                </div>
-            ) : (
-                // STANDARD VIEW (Adaptive)
-                // Used for Mobile (always background) and Desktop Normal (No Tool)
-                renderStandardLayout(false)
-            )}
+            <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
+                {/* Left: Tool (Desktop only) */}
+                <AnimatePresence>
+                    {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
+                        <motion.div
+                            initial={{ x: "-100%" }}
+                            animate={{ x: 0 }}
+                            exit={{ x: "-100%" }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            style={{ flex: 1, position: "relative", zIndex: 10, background: themeColors.background }}
+                        >
+                            {renderActiveTool(false)}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Right: Sidebar / Standard View */}
+                {/* 
+                   When tool is OPEN: 
+                     - Width is fixed 400px (Sidebar mode)
+                     - Flex-shrink 0
+                   When tool is CLOSED:
+                     - Width is 100% (Standard mode)
+                     - Flex 1
+                */}
+                <motion.div
+                    // Removed 'layout' prop to prevent distortion of children during width change
+                    initial={false}
+                    animate={{
+                        width: (!isMobileLayout && (isDocOpen || isWhiteboardOpen)) ? 400 : "100%",
+                        flexGrow: (!isMobileLayout && (isDocOpen || isWhiteboardOpen)) ? 0 : 1
+                    }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    style={{
+                        flexShrink: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        background: themeColors.background,
+                        position: "relative",
+                        zIndex: 5,
+                        overflow: "hidden" // Ensure content clips if needed during transition
+                    }}
+                >
+                    {renderStandardLayout(!isMobileLayout && (isDocOpen || isWhiteboardOpen))}
+                </motion.div>
+            </div>
 
             {/* MOBILE OVERLAY (For Tools) */}
-            {isMobileToolMode && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: themeColors.background }}>
-                    {renderActiveTool(true)}
-                </div>
-            )}
+            <AnimatePresence>
+                {isMobileToolMode && (
+                    <motion.div
+                        initial={{ y: "100%", scale: 0, opacity: 0 }}
+                        animate={{ y: "0%", scale: 1, opacity: 1 }}
+                        exit={{ y: "100%", scale: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 2000,
+                            background: themeColors.background,
+                            transformOrigin: "bottom center",
+                        }}
+                    >
+                        {renderActiveTool(true)}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* REPORT MODAL */}
             <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={onSubmitReport} participantCount={remoteStreams.size + 1} />
