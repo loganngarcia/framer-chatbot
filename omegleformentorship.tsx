@@ -3033,6 +3033,7 @@ const DocEditor = React.memo(function DocEditor({
                         style={{
                             outline: "none",
                             minHeight: "100%",
+                            paddingBottom: "48px", // adds padding bottom to the doc editor to end text less abruptly 
                             fontSize: "var(--doc-p-size)",
                             fontFamily: "var(--doc-current-font)",
                             lineHeight: 1.6,
