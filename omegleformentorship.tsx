@@ -908,7 +908,7 @@ const DAILY_MESSAGE_LIMIT = 250 // Limit messages per day
 
 // --- INTERFACES ---
 
-function GoogleAd({ client, slot, format = "auto", responsive = "true", layoutKey, style, className }: { client?: string, slot?: string, format?: string, responsive?: string, layoutKey?: string, style?: React.CSSProperties, className?: string }) {
+const GoogleAd = React.forwardRef<HTMLModElement, { client?: string, slot?: string, format?: string, responsive?: string, layoutKey?: string, style?: React.CSSProperties, className?: string }>(({ client, slot, format = "auto", responsive = "true", layoutKey, style, className }, ref) => {
     const isStatic = useIsStaticRenderer()
     
     React.useEffect(() => {
@@ -925,7 +925,7 @@ function GoogleAd({ client, slot, format = "auto", responsive = "true", layoutKe
 
     return (
         <div className={className} style={{ width: "100%", display: "flex", justifyContent: "center", margin: "16px 0", minHeight: "90px", ...style }}>
-             <ins className="adsbygoogle"
+             <ins ref={ref} className="adsbygoogle"
                  style={{ display: "block", width: "100%" }}
                  data-ad-client={client}
                  data-ad-slot={slot}
@@ -933,6 +933,135 @@ function GoogleAd({ client, slot, format = "auto", responsive = "true", layoutKe
                  data-full-width-responsive={responsive}
                  data-ad-layout-key={layoutKey}
              />
+        </div>
+    )
+})
+
+function AdCard({ client, slot, layoutKey, onStatusChange }: { client: string, slot: string, layoutKey: string, onStatusChange?: (status: "filled" | "unfilled" | "loading") => void }) {
+    const [status, setStatus] = React.useState<"loading" | "filled" | "unfilled">("loading")
+    const insRef = React.useRef<HTMLModElement>(null)
+
+    React.useEffect(() => {
+        const ins = insRef.current
+        if (!ins) return
+
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "attributes" && mutation.attributeName === "data-ad-status") {
+                    const s = ins.getAttribute("data-ad-status") as "filled" | "unfilled"
+                    if (s === "filled" || s === "unfilled") {
+                        setStatus(s)
+                        onStatusChange?.(s)
+                    }
+                }
+            })
+        })
+
+        observer.observe(ins, { attributes: true })
+        return () => observer.disconnect()
+    }, [onStatusChange])
+
+    // Hide completely if unfilled OR still loading (to prevent empty height gap)
+    if (status === "unfilled" || status === "loading") return (
+        <div style={{ display: 'none' }}>
+             <GoogleAd 
+                ref={insRef}
+                client={client} 
+                slot={slot} 
+                layoutKey={layoutKey} 
+                format={layoutKey ? "fluid" : "auto"}
+                style={{ margin: 0, minHeight: "auto" }}
+            />
+        </div>
+    )
+
+    return (
+        <div 
+            style={{
+                width: 300, 
+                flexShrink: 0, 
+                maxHeight: 384, 
+                paddingTop: 14, 
+                paddingBottom: 14, 
+                paddingLeft: 20, 
+                paddingRight: 16, 
+                background: '#303030', 
+                overflow: 'hidden', 
+                borderRadius: 28, 
+                justifyContent: 'flex-start', 
+                alignItems: 'center', 
+                gap: 4, 
+                display: 'flex'
+            }}
+        >
+            <div style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
+                <GoogleAd 
+                    ref={insRef}
+                    client={client} 
+                    slot={slot} 
+                    layoutKey={layoutKey} 
+                    format={layoutKey ? "fluid" : "auto"}
+                    style={{ margin: 0, minHeight: "auto" }}
+                />
+            </div>
+        </div>
+    )
+}
+
+function AdCarousel({ client, slot, layoutKey }: { client: string, slot: string, layoutKey: string }) {
+    const [ad1Status, setAd1Status] = React.useState<"loading" | "filled" | "unfilled">("loading")
+    const [ad2Status, setAd2Status] = React.useState<"loading" | "filled" | "unfilled">("loading")
+
+    // Only show the carousel if at least one ad is filled
+    const isVisible = ad1Status === "filled" || ad2Status === "filled"
+
+    return (
+        <div 
+            data-layer="custom ad carousel" 
+            className="CustomAdCarousel" 
+            style={{
+                alignSelf: 'stretch', 
+                justifyContent: 'flex-start', 
+                alignItems: 'flex-start', 
+                gap: 10, 
+                display: isVisible ? 'flex' : 'none', // Hide entire carousel if no ads
+                overflowX: "auto",
+                overflowY: "hidden", // Prevent vertical scrolling
+                paddingBottom: 4, // Space for scrollbar
+                scrollbarWidth: "none", // Hide scrollbar Firefox
+                msOverflowStyle: "none", // Hide scrollbar IE/Edge
+                marginBottom: 16, // Ensure spacing below ads
+                marginTop: 8, // Ensure spacing above ads
+                // Break out of parent padding to be full width
+                marginLeft: -4, //Move left -4px to align with the chat history
+                width: "calc(100% + 48px)",
+                paddingLeft: 0, // Flush left as requested
+                paddingRight: 24, // Keep right padding for scroll end
+                flexShrink: 0, // Prevent collapsing
+                minHeight: isVisible ? 76 : 0, // Force minimum height only when visible
+            }}
+        >
+            <style>{`
+                .CustomAdCarousel::-webkit-scrollbar {
+                    display: none; /* Hide scrollbar Chrome/Safari */
+                }
+            `}</style>
+            
+            {/* Ad 1 */}
+            <AdCard 
+                client={client} 
+                slot={slot} 
+                layoutKey={layoutKey} 
+                onStatusChange={setAd1Status}
+            />
+            
+            {/* Ad 2 */}
+            <AdCard 
+                client={client} 
+                slot={slot} 
+                layoutKey={layoutKey} 
+                onStatusChange={setAd2Status} 
+            />
         </div>
     )
 }
@@ -12449,6 +12578,27 @@ Do not include markdown formatting or explanations.`
             }
         })
 
+        // Use a memoized set of indices where ads should appear to ensure stability during renders
+        // We calculate this once based on the messages array
+        const adIndices = React.useMemo(() => {
+            const indices = new Set<number>()
+            let messageCount = 0
+            let nextAdThreshold = 4 + Math.floor(Math.random() * 2) // Start with random 4 or 5
+
+            messages.forEach((msg, idx) => {
+                // Only count model messages towards the frequency to ensure quality spacing
+                if (msg.role === "model") {
+                    messageCount++
+                    if (messageCount >= nextAdThreshold) {
+                        indices.add(idx)
+                        messageCount = 0 // Reset count
+                        nextAdThreshold = 4 + Math.floor(Math.random() * 2) // Pick new random 4 or 5
+                    }
+                }
+            })
+            return indices
+        }, [messages.length]) // Recalculate only when message length changes (new messages added)
+
         return (
             <div
                 style={{
@@ -12479,11 +12629,8 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         {messages.map((msg, idx) => {
-                            // Only show ads after every 5th message AND if the message is from the model (AI)
-                            // We check (idx + 1) because idx is 0-based
-                            const isFifthMessage = (idx + 1) % 5 === 0
                             const isModelMessage = msg.role === "model"
-                            const shouldShowAd = isFifthMessage && isModelMessage && showAds && googleAdsClient && googleAdsSlot
+                            const shouldShowAd = adIndices.has(idx) && showAds && googleAdsClient && googleAdsSlot
 
                             return (
                                 <React.Fragment key={idx}>
@@ -12508,61 +12655,11 @@ Do not include markdown formatting or explanations.`
                                         isWhiteboardOpen={isWhiteboardOpen}
                                     />
                                     {shouldShowAd && (
-                                        <div 
-                                            data-layer="custom ad carousel" 
-                                            className="CustomAdCarousel" 
-                                            style={{
-                                                alignSelf: 'stretch', 
-                                                justifyContent: 'flex-start', 
-                                                alignItems: 'flex-start', 
-                                                gap: 10, 
-                                                display: 'flex',
-                                                overflowX: "auto",
-                                                overflowY: "hidden", // Prevent vertical scrolling
-                                                paddingBottom: 4, // Space for scrollbar
-                                                scrollbarWidth: "none", // Hide scrollbar Firefox
-                                                msOverflowStyle: "none", // Hide scrollbar IE/Edge
-                                                marginBottom: 16, // Ensure spacing below ads
-                                                marginTop: 8, // Ensure spacing above ads
-                                                marginLeft: -4, //Move left -4px to align with the chat history
-                                                width: "calc(100% + 48px)",
-                                                paddingLeft: 0, // Flush left as requested
-                                                paddingRight: 24, // Keep right padding for scroll end
-                                                flexShrink: 0, // Prevent collapsing
-                                                minHeight: 76, // Force minimum height
-                                            }}
-                                        >
-                                            <style>{`
-                                                .CustomAdCarousel::-webkit-scrollbar {
-                                                    display: none; /* Hide scrollbar Chrome/Safari */
-                                                }
-                                            `}</style>
-                                            {/* Ad 1 */}
-                                            <div data-layer="ad container primary" className="AdContainerPrimary" style={{width: 300, flexShrink: 0, maxHeight: 384, paddingTop: 14, paddingBottom: 14, paddingLeft: 20, paddingRight: 16, background: '#303030', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex'}}>
-                                                <div data-layer="ad slot primary" className="AdSlotPrimary" style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
-                                                    <GoogleAd 
-                                                        client={googleAdsClient} 
-                                                        slot={googleAdsSlot} 
-                                                        layoutKey={googleAdsLayoutKey} 
-                                                        format={googleAdsLayoutKey ? "fluid" : "auto"}
-                                                        style={{ margin: 0, minHeight: "auto" }}
-                                                    />
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Ad 2 */}
-                                            <div data-layer="ad container secondary" className="AdContainerSecondary" style={{width: 300, flexShrink: 0, maxHeight: 384, paddingTop: 14, paddingBottom: 14, paddingLeft: 20, paddingRight: 16, background: '#303030', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex'}}>
-                                                <div data-layer="ad slot secondary" className="AdSlotSecondary" style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
-                                                    <GoogleAd 
-                                                        client={googleAdsClient} 
-                                                        slot={googleAdsSlot} 
-                                                        layoutKey={googleAdsLayoutKey} 
-                                                        format={googleAdsLayoutKey ? "fluid" : "auto"}
-                                                        style={{ margin: 0, minHeight: "auto" }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <AdCarousel 
+                                            client={googleAdsClient}
+                                            slot={googleAdsSlot}
+                                            layoutKey={googleAdsLayoutKey}
+                                        />
                                     )}
                                 </React.Fragment>
                             )
