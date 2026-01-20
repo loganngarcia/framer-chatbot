@@ -1,6 +1,6 @@
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { addPropertyControls, ControlType, RenderTarget } from "framer"
+import { addPropertyControls, ControlType, RenderTarget, useIsStaticRenderer } from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
 import {
@@ -907,12 +907,43 @@ const MAX_HISTORY_MESSAGES = 50 // Limit history context
 const DAILY_MESSAGE_LIMIT = 250 // Limit messages per day
 
 // --- INTERFACES ---
+
+function GoogleAd({ client, slot, format = "auto", responsive = "true", layoutKey, style, className }: { client?: string, slot?: string, format?: string, responsive?: string, layoutKey?: string, style?: React.CSSProperties, className?: string }) {
+    const isStatic = useIsStaticRenderer()
+    
+    React.useEffect(() => {
+        if (typeof window === "undefined" || isStatic || !client || !slot) return;
+        try {
+            // @ts-ignore
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+            console.error("AdSense error", e);
+        }
+    }, [isStatic, client, slot]);
+
+    if (!client || !slot) return null;
+
+    return (
+        <div className={className} style={{ width: "100%", display: "flex", justifyContent: "center", margin: "16px 0", minHeight: "90px", ...style }}>
+             <ins className="adsbygoogle"
+                 style={{ display: "block", width: "100%" }}
+                 data-ad-client={client}
+                 data-ad-slot={slot}
+                 data-ad-format={format}
+                 data-full-width-responsive={responsive}
+                 data-ad-layout-key={layoutKey}
+             />
+        </div>
+    )
+}
+
 interface Props {
     geminiApiKey: string
     systemPrompt: string
     accentColor: string
     model: string
     debugMode?: boolean
+    showAds?: boolean
 }
 
 interface Attachment {
@@ -1375,6 +1406,98 @@ function setCaretPosition(element: HTMLElement, offset: number) {
         }
     }
 }
+
+const HeaderActions = React.memo(({
+    themeColors,
+    onDownloadClick,
+    onCloseClick,
+    downloadRef,
+    isDownloadHovered,
+    onDownloadHoverChange,
+    isCloseHovered,
+    onCloseHoverChange,
+    downloadMenu,
+    downloadTooltip = "Download",
+    closeTooltip = "Close"
+}: {
+    themeColors: any,
+    onDownloadClick: (e: React.MouseEvent) => void,
+    onCloseClick: () => void,
+    downloadRef?: React.RefObject<HTMLDivElement>,
+    isDownloadHovered: boolean,
+    onDownloadHoverChange: (hovered: boolean) => void,
+    isCloseHovered: boolean,
+    onCloseHoverChange: (hovered: boolean) => void,
+    downloadMenu?: React.ReactNode,
+    downloadTooltip?: string,
+    closeTooltip?: string
+}) => {
+    return (
+        <div data-layer="right" className="Right" style={{
+            height: 40,
+            maxWidth: 808.89,
+            paddingLeft: 4,
+            paddingRight: 4,
+            background: themeColors.surface,
+            borderRadius: 28,
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            display: 'inline-flex',
+            flexShrink: 0,
+            alignContent: 'center'
+        }}>
+            <div data-svg-wrapper data-layer="download button" className="DownloadButton"
+                ref={downloadRef}
+                onClick={onDownloadClick}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseEnter={() => onDownloadHoverChange(true)}
+                onMouseLeave={() => onDownloadHoverChange(false)}
+                style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" }}
+            >
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {isDownloadHovered && (
+                    <Tooltip
+                        style={{
+                            top: "100%",
+                            left: "50%",
+                            transform: "translate(-50%, 8px)",
+                            zIndex: 100,
+                        }}
+                    >
+                        {downloadTooltip}
+                    </Tooltip>
+                )}
+            </div>
+
+            <div data-svg-wrapper data-layer="close button" className="CloseButton"
+                onClick={onCloseClick}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseEnter={() => onCloseHoverChange(true)}
+                onMouseLeave={() => onCloseHoverChange(false)}
+                style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" }}
+            >
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {isCloseHovered && (
+                    <Tooltip
+                        style={{
+                            top: "100%",
+                            left: "50%",
+                            transform: "translate(-50%, 8px)",
+                            zIndex: 100,
+                        }}
+                    >
+                        {closeTooltip}
+                    </Tooltip>
+                )}
+            </div>
+            {downloadMenu}
+        </div>
+    )
+})
 
 const DocEditor = React.memo(function DocEditor({
     content,
@@ -2839,62 +2962,25 @@ const DocEditor = React.memo(function DocEditor({
 
                 {/* Download */}
                 {/* Download and Close */}
-                <div data-layer="right" className="Right" style={{height: 40, maxWidth: 808.89, paddingLeft: 4, paddingRight: 4, background: themeColors.surface, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', display: 'inline-flex', flexShrink: 0, alignContent: 'center'}}>
-                  <div data-svg-wrapper data-layer="download button" className="DownloadButton"
-                       ref={downloadMenuRef}
-                       onClick={() => {
-                            if (!showDownloadMenu && downloadMenuRef.current) {
-                                const rect = downloadMenuRef.current.getBoundingClientRect()
-                                setDownloadMenuPosition({
-                                    top: rect.bottom + 8,
-                                    right: window.innerWidth - rect.right
-                                })
-                            }
-                            setShowDownloadMenu(!showDownloadMenu)
-                       }}
-                       onMouseEnter={() => setIsDownloadHovered(true)}
-                       onMouseLeave={() => setIsDownloadHovered(false)}
-                       style={{ cursor: 'pointer', position: 'relative' }}
-                  >
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {isDownloadHovered && (
-                        <Tooltip
-                            style={{
-                                top: "100%",
-                                left: "50%",
-                                transform: "translate(-50%, 8px)",
-                                zIndex: 100,
-                            }}
-                        >
-                            Download
-                        </Tooltip>
-                    )}
-                  </div>
-                  <div data-svg-wrapper data-layer="close doceditor button" className="CloseDoceditorButton"
-                       onClick={() => onClose && onClose()}
-                       onMouseEnter={() => setIsCloseHovered(true)}
-                       onMouseLeave={() => setIsCloseHovered(false)}
-                       style={{ cursor: 'pointer', position: 'relative' }}
-                  >
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {isCloseHovered && (
-                        <Tooltip
-                            style={{
-                                top: "100%",
-                                left: "50%",
-                                transform: "translate(-50%, 8px)",
-                                zIndex: 100,
-                            }}
-                        >
-                            Close
-                        </Tooltip>
-                    )}
-                  </div>
-                    {showDownloadMenu && createPortal(
+                <HeaderActions
+                    themeColors={themeColors}
+                    onDownloadClick={() => {
+                        if (!showDownloadMenu && downloadMenuRef.current) {
+                            const rect = downloadMenuRef.current.getBoundingClientRect()
+                            setDownloadMenuPosition({
+                                top: rect.bottom + 8,
+                                right: window.innerWidth - rect.right
+                            })
+                        }
+                        setShowDownloadMenu(!showDownloadMenu)
+                    }}
+                    onCloseClick={() => onClose && onClose()}
+                    downloadRef={downloadMenuRef}
+                    isDownloadHovered={isDownloadHovered}
+                    onDownloadHoverChange={setIsDownloadHovered}
+                    isCloseHovered={isCloseHovered}
+                    onCloseHoverChange={setIsCloseHovered}
+                    downloadMenu={showDownloadMenu && createPortal(
                         <>
                             <div
                                 style={{
@@ -2977,7 +3063,7 @@ const DocEditor = React.memo(function DocEditor({
                         </>,
                         document.body
                     )}
-                </div>
+                />
             </div>
 
             {/* Content Area */}
@@ -3626,6 +3712,7 @@ const ChatInput = React.memo(function ChatInput({
         <div
             data-layer="flexbox"
             className="Flexbox"
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
                 width: "100%",
                 maxWidth: 728,
@@ -4227,7 +4314,7 @@ const ChatInput = React.memo(function ChatInput({
                 }}
                             style={{
                                 cursor: "pointer",
-                                display: hasContent ? "block" : "none",
+                                display: (hasContent || isLoading) ? "block" : "none",
                                 opacity: 1,
                                 width: 36,
                                 height: 36,
@@ -4286,6 +4373,7 @@ const ChatInput = React.memo(function ChatInput({
 
                         {/* START LIVE AI CALL BUTTON (When idle and no input) */}
                         {!hasContent &&
+                            !isLoading &&
                             (!showEndCall || showAiLiveButton) &&
                             onConnectWithAI && (
                                 <div
@@ -4902,6 +4990,7 @@ function sanitizeMessage(text: string): string {
         "threesome",
         "thrust",
         "tits",
+        "titty",
         "titties",
         "twerk",
         "underage",
@@ -5121,7 +5210,6 @@ function sanitizeMessage(text: string): string {
         // Gen Z Derogatory Terms
         "boomer",
         "karen",
-        "simp",
         "incel",
         "cuck",
         "soyboy",
@@ -6179,11 +6267,13 @@ const MessageBubble = React.memo(
                                 whiteSpace: "pre-wrap",
                             }}
                         >
-                            {renderSimpleMarkdown(
-                                msg.text,
-                                baseTextStyle,
-                                linkStyle
-                            )}
+                            {msg.role === "user" || msg.role === "peer"
+                                ? msg.text
+                                : renderSimpleMarkdown(
+                                      msg.text,
+                                      baseTextStyle,
+                                      linkStyle
+                                  )}
                         </div>
                     )}
 
@@ -6519,7 +6609,13 @@ export default function OmegleMentorshipUI(props: Props) {
         accentColor,
         model = "gemini-3-flash-preview",
         debugMode = false,
+        showAds = true,
     } = props
+
+    // Hardcoded AdSense values as requested
+    const googleAdsClient = "ca-pub-9747624035157768"
+    const googleAdsSlot = "9605545126"
+    const googleAdsLayoutKey = "-ic+5+1+2-3"
 
     /**
      * User's session role.
@@ -6949,6 +7045,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const [userIsSpeaking, setUserIsSpeaking] = React.useState(false)
     const [isLiveGenerating, setIsLiveGenerating] = React.useState(false)
+    const [isAiSpeaking, setIsAiSpeaking] = React.useState(false) // Visual indicator for audio playback
 
     const liveClientRef = React.useRef<WebSocket | null>(null)
     const liveAudioContextRef = React.useRef<AudioContext | null>(null)
@@ -6977,6 +7074,7 @@ export default function OmegleMentorshipUI(props: Props) {
             }
         })
         activeAudioSourcesRef.current = []
+        setIsAiSpeaking(false)
         // Reset play time so next audio plays immediately
         if (liveAudioContextRef.current) {
             liveNextPlayTimeRef.current =
@@ -7427,9 +7525,15 @@ Do not include markdown formatting or explanations.`
     }, [cleanup])
 
     const startLiveSession = React.useCallback(async () => {
-        if (!geminiApiKey) return
+        log(`startLiveSession called. API Key present: ${!!geminiApiKey}`)
+        if (!geminiApiKey) {
+            log("Missing Gemini API Key")
+            return
+        }
 
+        // Use the exact model string that works in gemini.tsx
         const liveModel = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+        log(`Using Live Model: ${liveModel}`)
 
         try {
             const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiApiKey}`
@@ -7437,6 +7541,7 @@ Do not include markdown formatting or explanations.`
             liveClientRef.current = ws
 
             ws.onopen = async () => {
+                log("Connected to Gemini Live WebSocket")
                 resetSilenceTimer()
                 const currentSystemPrompt = getSystemPromptWithContext()
                 // Append doc context if available
@@ -7475,6 +7580,7 @@ Do not include markdown formatting or explanations.`
                 const AudioContextClass =
                     window.AudioContext || (window as any).webkitAudioContext
                 const audioCtx = new AudioContextClass()
+                const audioCtxRef = audioCtx // Capture for closure use
 
                 if (audioCtx.state === "suspended") {
                     await audioCtx.resume()
@@ -7514,8 +7620,9 @@ Do not include markdown formatting or explanations.`
                         if (!liveClientRef.current) return
                         let inputData = e.inputBuffer.getChannelData(0)
 
-                        // Hardcoded threshold for interruption
-                        const interruptionThreshold = 0.01
+                        // Threshold for Voice Activity Detection
+                        // Lowered to 0.001 to detect normal speaking volume
+                        const interruptionThreshold = 0.001
 
                         const isSpeaking = detectVoiceActivity(
                             inputData,
@@ -7596,10 +7703,13 @@ Do not include markdown formatting or explanations.`
                         )
 
                         // HALLUCINATION FIX: Mute audio if no voice detected (Noise Gate)
-                        // This prevents background noise from being transcribed as foreign languages
+                        // REMOVED: Native audio models are robust enough to handle background noise
+                        // and this was causing users to have to scream to be heard.
+                        /*
                         if (!userIsSpeakingRef.current && !isSpeaking) {
                             downsampledData.fill(0)
                         }
+                        */
 
                         const b64 = float32ToBase64(downsampledData)
 
@@ -7693,12 +7803,20 @@ Do not include markdown formatting or explanations.`
                                         playTime + buffer.duration
 
                                     activeAudioSourcesRef.current.push(source)
+                                    
+                                    // Start visual pulse when audio is queued
+                                    setIsAiSpeaking(true)
 
                                     source.onended = () => {
                                         activeAudioSourcesRef.current =
                                             activeAudioSourcesRef.current.filter(
                                                 (s) => s !== source
                                             )
+                                        
+                                        // If no more audio is playing AND the model is done generating (turn complete), stop visual
+                                        if (activeAudioSourcesRef.current.length === 0 && !isLiveGeneratingRef.current) {
+                                            setIsAiSpeaking(false)
+                                        }
                                     }
                                 }
                             }
@@ -7708,6 +7826,11 @@ Do not include markdown formatting or explanations.`
                     if (data.serverContent?.turnComplete) {
                         isLiveGeneratingRef.current = false
                         setIsLiveGenerating(false)
+                        
+                        // If no audio is currently playing, stop visual immediately
+                        if (activeAudioSourcesRef.current.length === 0) {
+                            setIsAiSpeaking(false)
+                        }
 
                         if (transcriptionTimeoutRef.current) {
                             clearTimeout(transcriptionTimeoutRef.current)
@@ -7814,16 +7937,24 @@ Do not include markdown formatting or explanations.`
             }
 
             ws.onclose = (ev) => {
+                log(`Gemini WebSocket Closed: Code=${ev.code}, Reason=${ev.reason}, WasClean=${ev.wasClean}`)
                 stopLiveSession()
             }
 
             ws.onerror = (e) => {
+                log("Gemini WebSocket Error Event")
+                // Extract useful error info if possible
+                // @ts-ignore
+                if (e.message) log(`WS Error message: ${e.message}`)
+                console.error(e)
                 stopLiveSession()
             }
 
             setIsLiveMode(true)
             setStatus("connected") // Connected to AI
+            log("Live Mode Enabled. Status set to 'connected'")
         } catch (e) {
+            log(`Live Init Exception: ${e}`)
             console.error("Live Init Error", e)
             stopLiveSession()
         }
@@ -7836,9 +7967,10 @@ Do not include markdown formatting or explanations.`
     ])
 
     const handleConnectWithAI = React.useCallback(() => {
+        log(`handleConnectWithAI clicked. Status: ${status}, Role: ${role}`)
         // Switch to Live Mode
         startLiveSession()
-    }, [startLiveSession])
+    }, [startLiveSession, status, role])
 
     // Cleanup on unmount
     React.useEffect(() => {
@@ -8319,11 +8451,45 @@ Do not include markdown formatting or explanations.`
 
     // --- HOOK: SCROLL MANAGER ---
     // Mimics "Chat" behavior (WhatsApp/Telegram/Gemini):
-    // 1. When a user sends a message, snap it to the top.
-    // 2. But we must avoid the "void" (scrolling past content).
-    // 3. Solution: We can ONLY snap to the top if there is enough content below it.
+    // 1. When a page reloads (or first load), we snap to the most recent user message.
+    // 2. When a user sends a message, snap it to the top.
+    // 3. But we must avoid the "void" (scrolling past content).
+    // 4. Solution: We can ONLY snap to the top if there is enough content below it.
     //    If content is short, we just scroll to the very bottom.
     //    This creates the "best effort" snap-to-top without breaking the UI.
+
+    // 1. Initial Scroll (on Mount)
+    React.useEffect(() => {
+        if (messages.length > 0) {
+            // Find the index of the last user/peer message
+            let lastUserMsgIdx = -1
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const role = messages[i].role
+                if (role === "user" || role === "peer") {
+                    lastUserMsgIdx = i
+                    break
+                }
+            }
+
+            // Fallback to last message if no user message found (rare)
+            if (lastUserMsgIdx === -1) {
+                lastUserMsgIdx = messages.length - 1
+            }
+
+            // Scroll to it immediately (no animation)
+            requestAnimationFrame(() => {
+                const element = document.getElementById(`msg-${lastUserMsgIdx}`)
+                const container = chatHistoryRef.current
+
+                if (element && container) {
+                    const desiredTop = element.offsetTop - 96
+                    container.scrollTop = desiredTop
+                }
+            })
+        }
+    }, []) // Empty dependency array = runs once on mount
+
+    // 2. New Message Scroll (User sends message)
     React.useLayoutEffect(() => {
         const lastIdx = messages.length - 1
         if (lastIdx < 0) return
@@ -12099,23 +12265,10 @@ Do not include markdown formatting or explanations.`
                                                 top: 12,
                                                 right: 12,
                                                 zIndex: 9999, /* Boost Z-Index to be sure */
-                                                height: 40,
-                                                paddingLeft: 4,
-                                                paddingRight: 4,
-                                                background: "#EFF0F2",
-                                                borderRadius: 28,
-                                                justifyContent: 'flex-start',
-                                                alignItems: 'center',
-                                                display: 'inline-flex',
-                                                flexShrink: 0,
-                                                alignContent: 'center'
                                             }}>
-                                                {/* Download Button */}
-                                                <div 
-                                                    style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
-                                                    onMouseEnter={() => setIsWhiteboardDownloadHovered(true)}
-                                                    onMouseLeave={() => setIsWhiteboardDownloadHovered(false)}
-                                                    onClick={async () => {
+                                                <HeaderActions
+                                                    themeColors={themeColors}
+                                                    onDownloadClick={async () => {
                                                         if (editor && exportToBlob) {
                                                             try {
                                                                 const shapeIds = editor.getCurrentPageShapeIds()
@@ -12140,47 +12293,12 @@ Do not include markdown formatting or explanations.`
                                                             }
                                                         }
                                                     }}
-                                                >
-                                                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    </svg>
-                                                    {isWhiteboardDownloadHovered && (
-                                                        <Tooltip
-                                                            style={{
-                                                                top: "100%",
-                                                                left: "50%",
-                                                                transform: "translate(-50%, 8px)",
-                                                                zIndex: 100,
-                                                            }}
-                                                        >
-                                                            Download
-                                                        </Tooltip>
-                                                    )}
-                                                </div>
-
-                                                {/* Collapse Button */}
-                                                <div 
-                                                    style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
-                                                    onClick={toggleWhiteboard}
-                                                    onMouseEnter={() => setIsWhiteboardCloseHovered(true)}
-                                                    onMouseLeave={() => setIsWhiteboardCloseHovered(false)}
-                                                >
-                                                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke="rgba(0,0,0,0.95)" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    </svg>
-                                                    {isWhiteboardCloseHovered && (
-                                                        <Tooltip
-                                                            style={{
-                                                                top: "100%",
-                                                                left: "50%",
-                                                                transform: "translate(-50%, 8px)",
-                                                                zIndex: 100,
-                                                            }}
-                                                        >
-                                                            Close
-                                                        </Tooltip>
-                                                    )}
-                                                </div>
+                                                    onCloseClick={toggleWhiteboard}
+                                                    isDownloadHovered={isWhiteboardDownloadHovered}
+                                                    onDownloadHoverChange={setIsWhiteboardDownloadHovered}
+                                                    isCloseHovered={isWhiteboardCloseHovered}
+                                                    onCloseHoverChange={setIsWhiteboardCloseHovered}
+                                                />
                                             </div>
 
                                             <div style={{
@@ -12248,7 +12366,7 @@ Do not include markdown formatting or explanations.`
                             bottom: 0,
                             left: 0,
                             right: 0,
-                            zIndex: 100,
+                            zIndex: 2002,
                             paddingBottom: "env(safe-area-inset-bottom)",
                             pointerEvents: "none",
                         }}
@@ -12257,7 +12375,7 @@ Do not include markdown formatting or explanations.`
                             hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
                             value={inputText}
                             onChange={(e) => {
-                                const newValue = e.target.value
+                                const newValue = sanitizeMessage(e.target.value)
                                 setInputText(newValue)
                                 const now = Date.now()
                                 const interval = 50
@@ -12286,7 +12404,7 @@ Do not include markdown formatting or explanations.`
                             onFileSelect={handleFileSelect}
                             onScreenShare={toggleScreenShare}
                             onReport={handleReport}
-                            placeholder={isDocOpen ? "Edit notes" : "Edit whiteboard"}
+                            placeholder={isLoading ? "Thinking..." : (isDocOpen ? "Edit notes" : "Edit whiteboard")}
                             showEndCall={status !== "idle"}
                             showAiLiveButton={status === "searching" && role === "student"}
                             attachments={attachments}
@@ -12360,29 +12478,95 @@ Do not include markdown formatting or explanations.`
                         position: "relative",
                         }}
                     >
-                        {messages.map((msg, idx) => (
-                            <MessageBubble
-                                key={idx}
-                                id={`msg-${idx}`}
-                                msg={msg}
-                                previousMsg={idx > 0 ? messages[idx - 1] : undefined}
-                                isMobileLayout={isMobileLayout}
-                                isLast={idx === messages.length - 1}
-                                themeColors={chatThemeColors}
-                                isStreaming={
-                                    idx === messages.length - 1 &&
-                                    (isLoading || isLiveGenerating)
-                                }
-                                copiedMessageId={copiedMessageId}
-                                onCopy={handleCopyMessage}
-                                showDocButton={idx === lastDocCallIdx}
-                                showWhiteboardButton={idx === lastWhiteboardCallIdx}
-                                onToggleDoc={() => setIsDocOpen((prev) => !prev)}
-                                onToggleWhiteboard={() => setIsWhiteboardOpen((prev) => !prev)}
-                                isDocOpen={isDocOpen}
-                                isWhiteboardOpen={isWhiteboardOpen}
-                            />
-                        ))}
+                        {messages.map((msg, idx) => {
+                            // Only show ads after every 5th message AND if the message is from the model (AI)
+                            // We check (idx + 1) because idx is 0-based
+                            const isFifthMessage = (idx + 1) % 5 === 0
+                            const isModelMessage = msg.role === "model"
+                            const shouldShowAd = isFifthMessage && isModelMessage && showAds && googleAdsClient && googleAdsSlot
+
+                            return (
+                                <React.Fragment key={idx}>
+                                    <MessageBubble
+                                        id={`msg-${idx}`}
+                                        msg={msg}
+                                        previousMsg={idx > 0 ? messages[idx - 1] : undefined}
+                                        isMobileLayout={isMobileLayout}
+                                        isLast={idx === messages.length - 1}
+                                        themeColors={chatThemeColors}
+                                        isStreaming={
+                                            idx === messages.length - 1 &&
+                                            (isLoading || isLiveGenerating)
+                                        }
+                                        copiedMessageId={copiedMessageId}
+                                        onCopy={handleCopyMessage}
+                                        showDocButton={idx === lastDocCallIdx}
+                                        showWhiteboardButton={idx === lastWhiteboardCallIdx}
+                                        onToggleDoc={() => setIsDocOpen((prev) => !prev)}
+                                        onToggleWhiteboard={() => setIsWhiteboardOpen((prev) => !prev)}
+                                        isDocOpen={isDocOpen}
+                                        isWhiteboardOpen={isWhiteboardOpen}
+                                    />
+                                    {shouldShowAd && (
+                                        <div 
+                                            data-layer="custom ad carousel" 
+                                            className="CustomAdCarousel" 
+                                            style={{
+                                                alignSelf: 'stretch', 
+                                                justifyContent: 'flex-start', 
+                                                alignItems: 'flex-start', 
+                                                gap: 10, 
+                                                display: 'flex',
+                                                overflowX: "auto",
+                                                overflowY: "hidden", // Prevent vertical scrolling
+                                                paddingBottom: 4, // Space for scrollbar
+                                                scrollbarWidth: "none", // Hide scrollbar Firefox
+                                                msOverflowStyle: "none", // Hide scrollbar IE/Edge
+                                                marginBottom: 16, // Ensure spacing below ads
+                                                marginTop: 8, // Ensure spacing above ads
+                                                marginLeft: -4, //Move left -4px to align with the chat history
+                                                width: "calc(100% + 48px)",
+                                                paddingLeft: 0, // Flush left as requested
+                                                paddingRight: 24, // Keep right padding for scroll end
+                                                flexShrink: 0, // Prevent collapsing
+                                                minHeight: 76, // Force minimum height
+                                            }}
+                                        >
+                                            <style>{`
+                                                .CustomAdCarousel::-webkit-scrollbar {
+                                                    display: none; /* Hide scrollbar Chrome/Safari */
+                                                }
+                                            `}</style>
+                                            {/* Ad 1 */}
+                                            <div data-layer="ad container primary" className="AdContainerPrimary" style={{width: 300, flexShrink: 0, maxHeight: 384, paddingTop: 14, paddingBottom: 14, paddingLeft: 20, paddingRight: 16, background: '#303030', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex'}}>
+                                                <div data-layer="ad slot primary" className="AdSlotPrimary" style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
+                                                    <GoogleAd 
+                                                        client={googleAdsClient} 
+                                                        slot={googleAdsSlot} 
+                                                        layoutKey={googleAdsLayoutKey} 
+                                                        format={googleAdsLayoutKey ? "fluid" : "auto"}
+                                                        style={{ margin: 0, minHeight: "auto" }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Ad 2 */}
+                                            <div data-layer="ad container secondary" className="AdContainerSecondary" style={{width: 300, flexShrink: 0, maxHeight: 384, paddingTop: 14, paddingBottom: 14, paddingLeft: 20, paddingRight: 16, background: '#303030', overflow: 'hidden', borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 4, display: 'flex'}}>
+                                                <div data-layer="ad slot secondary" className="AdSlotSecondary" style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
+                                                    <GoogleAd 
+                                                        client={googleAdsClient} 
+                                                        slot={googleAdsSlot} 
+                                                        layoutKey={googleAdsLayoutKey} 
+                                                        format={googleAdsLayoutKey ? "fluid" : "auto"}
+                                                        style={{ margin: 0, minHeight: "auto" }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </React.Fragment>
+                            )
+                        })}
                         {isLoading &&
                             (!messages.length ||
                             messages[messages.length - 1].role !== "model" ||
@@ -12529,7 +12713,7 @@ Do not include markdown formatting or explanations.`
                             hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
                             value={inputText}
                             onChange={(e) => {
-                                const newValue = e.target.value
+                                const newValue = sanitizeMessage(e.target.value)
                                 setInputText(newValue)
                                 const now = Date.now()
                             const interval = 50
@@ -12783,7 +12967,9 @@ Do not include markdown formatting or explanations.`
                 {(() => {
                    const tiles: any[] = []
                    tiles.push({ type: 'local', stream: localStream, key: 'local' })
-                   if (remoteStreams.size > 0) {
+                   if (isLiveMode) {
+                       tiles.push({ type: 'remote', stream: null, id: 'ai-live', key: 'ai-live' })
+                   } else if (remoteStreams.size > 0) {
                        remoteStreams.forEach((stream, id) => {
                            tiles.push({ type: 'remote', stream, id, key: id })
                        })
@@ -12867,7 +13053,31 @@ Do not include markdown formatting or explanations.`
                             ) : isRemote ? (
                                  isLiveMode ? (
                                     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
-                                         <div style={{color: "white"}}>AI</div>
+                                         <motion.svg
+                                             animate={(isLiveGenerating || isAiSpeaking) ? { // TO-DO: isAiSpeaking is not working perfectly. It should work by
+                                                opacity: [0.8, 1, 0.8],
+                                                scale: [0.95, 1.05, 0.95]
+                                             } : {
+                                                opacity: 0.95,
+                                                scale: 1
+                                             }}
+                                             transition={{
+                                                duration: 2,
+                                                ease: "easeInOut",
+                                                repeat: Infinity
+                                             }}
+                                             width="128"
+                                             height="128"
+                                             viewBox="0 0 36 36"
+                                             fill="none"
+                                             xmlns="http://www.w3.org/2000/svg"
+                                         >
+                                             <path
+                                                 d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z"
+                                                 fill="white"
+                                                 fillOpacity="0.95"
+                                             />
+                                         </motion.svg>
                     </div>
                                  ) : (
                                     <VideoPlayer stream={tile.stream} isMirrored={false} themeColors={themeColors} />
@@ -13008,7 +13218,7 @@ Do not include markdown formatting or explanations.`
                         <div style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.2)" }} />
                         {isDragBarHovered && !isDragging.current && (
                             <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 4px)", whiteSpace: "nowrap" }}>
-                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to show chat" : "Click to hide chat"}
+                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to expand chat" : "Click to hide chat"}
                             </Tooltip>
                         )}
                     </motion.div>
@@ -13204,5 +13414,11 @@ addPropertyControls(OmegleMentorshipUI, {
         defaultValue: false,
         description:
             "Enables an on-screen console overlay with copy button for debugging.",
+    },
+    showAds: {
+        type: ControlType.Boolean,
+        title: "Show Ads",
+        defaultValue: true,
+        description: "Toggle Google AdSense banners in the chat.",
     },
 })

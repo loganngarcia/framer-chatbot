@@ -127,7 +127,7 @@ const DEFAULT_FONT_INFO: FramerFontInfo = {
 
 // User abuse guardrails
 // These are designed to prevent abuse and ensure the API is used responsibly
-const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
+const SUGGESTION_MODEL_ID = "gemini-3-flash-preview"
 const INLINE_MAX_BYTES = 20 * 1024 * 1024 // 20MB
 const MAX_INPUT_LENGTH = 1000 // Limit input characters
 const MESSAGE_RATE_LIMIT_MS = 1000 // 1 second between messages
@@ -1200,7 +1200,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: suggestionPrompt }] }],
                             generationConfig: {
-                                temperature: 0.7,
+                                // Default temperature 1.0 recommended for Gemini 3
                                 maxOutputTokens: 100,
                                 stopSequences: ["\n\n"],
                                 thinkingConfig: {
@@ -2562,11 +2562,20 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
         const geminiPayload: any = {
             contents: geminiContents,
-            generationConfig: {
-                thinkingConfig: {
-                    thinkingBudget: 0,
-                },
-            },
+            generationConfig: {},
+        }
+
+        // Configure Thinking (Reasoning) based on reasoningEffort prop
+        // "none" disables thinking via thinkingBudget: 0
+        // "low" | "medium" | "high" use thinkingLevel (Gemini 3+)
+        if (reasoningEffort === "none") {
+             geminiPayload.generationConfig.thinkingConfig = {
+                 thinkingBudget: 0,
+             }
+        } else {
+             geminiPayload.generationConfig.thinkingConfig = {
+                 thinkingLevel: reasoningEffort, // "low", "medium", "high"
+             }
         }
 
         if (
@@ -2614,7 +2623,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                             errMsg = (await response.text()) || errMsg
                         } catch (tE) {}
                     }
-                    setError("Message not sent. Please try again. If this issue persists, please contact support@curastem.org")
+                    setError("Message not sent. Please try again.")
                 }
             } else if (!response.body && !signal.aborted) {
                 throw new Error("No response body from API.")
@@ -4892,10 +4901,10 @@ addPropertyControls(ChatOverlay, {
     model: {
         type: ControlType.String,
         title: "AI Model",
-        defaultValue: "gemini-2.5-flash-lite",
+        defaultValue: "gemini-3-flash-preview",
         placeholder: "model-id",
         description:
-            "Ideal: gemini-2.5-flash-lite for best speed and high accuracy.",
+            "Ideal: gemini-3-flash-preview for best speed, accuracy and thinking capabilities.",
     },
     placeholder: {
         type: ControlType.String,
