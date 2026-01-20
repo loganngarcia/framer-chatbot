@@ -1280,6 +1280,219 @@ const FileAttachment = React.memo(function FileAttachment({
     )
 })
 
+// --- HELPER COMPONENT: GEMINI LIVE CHARACTER ---
+
+const GEMINI_EYE_STATES = {
+  THINKING: {
+    id: 'thinking',
+    eye1: { left: 19.77, top: 22.81, rx: 8, ry: 10, rotate: -12, width: 41, height: 44 },
+    eye2: { left: 42.36, top: 17.48, rx: 8, ry: 10, rotate: -12, width: 41, height: 44 },
+  },
+  TALKING: {
+    id: 'talking',
+    eye1: { left: 19.37, top: 29.47, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
+    eye2: { left: 44.95, top: 28.35, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
+  },
+  BLINKING_TALKING: {
+    id: 'blinking_talking',
+    eye1: { left: 19.37, top: 34.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
+    eye2: { left: 44.95, top: 33.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
+  },
+  LOOKING: {
+    id: 'looking',
+    eye1: { left: 1.37, top: 34.47, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
+    eye2: { left: 26.95, top: 33.35, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
+  },
+  BLINKING_LOOKING: {
+    id: 'blinking_looking',
+    eye1: { left: 1.37, top: 39.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
+    eye2: { left: 26.95, top: 38.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
+  },
+}
+
+const GeminiEye = ({ config, id }: { config: any, id: string }) => {
+  const transitionStyles: React.CSSProperties = {
+    transitionProperty: 'all',
+    transitionDuration: '500ms',
+    transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  }
+
+  const isBlinking = config.ry < 4
+  if (isBlinking) {
+    transitionStyles.transitionDuration = '100ms'
+    transitionStyles.transitionTimingFunction = 'ease-in-out'
+  }
+
+  const cx = config.width / 2
+  const cy = config.height / 2
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${config.left}px`,
+        top: `${config.top}px`,
+        width: `${config.width}px`,
+        height: `${config.height}px`,
+        ...transitionStyles,
+      }}
+    >
+      <svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${config.width} ${config.height}`}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={transitionStyles}
+      >
+        <g filter={`url(#filter_eye_${id})`}>
+          <ellipse
+            cx={cx}
+            cy={cy}
+            rx={config.rx}
+            ry={config.ry}
+            transform={`rotate(${config.rotate} ${cx} ${cy})`}
+            fill="white"
+            fillOpacity="0.85"
+            shapeRendering="crispEdges"
+            style={transitionStyles}
+          />
+        </g>
+        <defs>
+          <filter
+            id={`filter_eye_${id}`}
+            x="-10"
+            y="-10"
+            width={config.width + 20}
+            height={config.height + 20}
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+            <feColorMatrix
+              in="SourceAlpha"
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+              result="hardAlpha"
+            />
+            <feOffset dy="4" />
+            <feGaussianBlur stdDeviation="6" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+            />
+            <feBlend
+              mode="normal"
+              in2="BackgroundImageFix"
+              result="effect1_dropShadow"
+            />
+            <feBlend
+              mode="normal"
+              in="SourceGraphic"
+              in2="effect1_dropShadow"
+              result="shape"
+            />
+          </filter>
+        </defs>
+      </svg>
+    </div>
+  )
+}
+
+const GeminiLiveCharacter = ({ isThinking, isSpeaking }: { isThinking: boolean, isSpeaking: boolean }) => {
+  const [currentState, setCurrentState] = React.useState(GEMINI_EYE_STATES.LOOKING)
+
+  React.useEffect(() => {
+    let timeoutId: any
+
+    if (isSpeaking) {
+      // Loop between TALKING and BLINKING_TALKING
+      const blinkLoop = () => {
+        setCurrentState(GEMINI_EYE_STATES.TALKING)
+        // Blink every 2-4 seconds randomly
+        const nextBlink = 2000 + Math.random() * 2000
+        timeoutId = setTimeout(() => {
+          setCurrentState(GEMINI_EYE_STATES.BLINKING_TALKING)
+          timeoutId = setTimeout(() => {
+             blinkLoop()
+          }, 150) // Blink duration
+        }, nextBlink)
+      }
+      blinkLoop()
+      return () => clearTimeout(timeoutId)
+    }
+
+    if (isThinking) {
+      setCurrentState(GEMINI_EYE_STATES.THINKING)
+      return
+    }
+
+    // Default: Waiting / Looking (Loop between LOOKING and BLINKING_LOOKING)
+    const blinkLoopLooking = () => {
+      setCurrentState(GEMINI_EYE_STATES.LOOKING)
+      // Blink every 3-5 seconds randomly (slower blinking when idle)
+      const nextBlink = 3000 + Math.random() * 2000
+      timeoutId = setTimeout(() => {
+        setCurrentState(GEMINI_EYE_STATES.BLINKING_LOOKING)
+        timeoutId = setTimeout(() => {
+           blinkLoopLooking()
+        }, 150)
+      }, nextBlink)
+    }
+    blinkLoopLooking()
+    return () => clearTimeout(timeoutId)
+
+  }, [isThinking, isSpeaking])
+
+  return (
+      <div style={{ transform: 'scale(1.28)', position: 'relative', width: 100, height: 102 }}>
+        <div 
+          style={{ 
+            width: 100, 
+            height: 102,
+            position: 'relative',
+            cursor: 'pointer',
+            transition: 'transform 0.3s',
+          }}
+        >
+          {/* Layer: White Body */}
+          <div
+            style={{ 
+                position: 'absolute',
+                left: 0, 
+                top: 0, 
+                width: 100, 
+                height: 102,
+                background: 'white',
+                borderRadius: 9999,
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            }}
+          />
+
+          {/* Layer: Blue Blur */}
+          <div
+            style={{
+              position: 'absolute',
+              width: 76.66,
+              height: 80,
+              left: 11.66,
+              top: 10.31,
+              background: 'linear-gradient(180deg, #0099FF 0%, rgba(255,255,255,0) 100%)',
+              boxShadow: '0px 16px 24px rgba(0, 153, 255, 0.25)',
+              borderRadius: 9999,
+              filter: 'blur(8px)',
+            }}
+          />
+
+          {/* Layer: Eyes */}
+          <GeminiEye config={currentState.eye1} id="eye1" />
+          <GeminiEye config={currentState.eye2} id="eye2" />
+        </div>
+      </div>
+  )
+}
+
 // --- HELPER COMPONENT: VIDEO PLAYER ---
 const VideoPlayer = React.memo(function VideoPlayer({
     stream,
@@ -13149,32 +13362,8 @@ Do not include markdown formatting or explanations.`
                                  )
                             ) : isRemote ? (
                                  isLiveMode ? (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
-                                         <motion.svg
-                                             animate={(isLiveGenerating || isAiSpeaking) ? { // TO-DO: isAiSpeaking is not working perfectly. It should work by
-                                                opacity: [0.8, 1, 0.8],
-                                                scale: [0.95, 1.05, 0.95]
-                                             } : {
-                                                opacity: 0.95,
-                                                scale: 1
-                                             }}
-                                             transition={{
-                                                duration: 2,
-                                                ease: "easeInOut",
-                                                repeat: Infinity
-                                             }}
-                                             width="128"
-                                             height="128"
-                                             viewBox="0 0 36 36"
-                                             fill="none"
-                                             xmlns="http://www.w3.org/2000/svg"
-                                         >
-                                             <path
-                                                 d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z"
-                                                 fill="white"
-                                                 fillOpacity="0.95"
-                                             />
-                                         </motion.svg>
+                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(180deg, #4DB8FF 0%, #0099FF 100%)" }}>
+                                        <GeminiLiveCharacter isThinking={isLiveGenerating} isSpeaking={isAiSpeaking} />
                     </div>
                                  ) : (
                                     <VideoPlayer stream={tile.stream} isMirrored={false} themeColors={themeColors} />
