@@ -1102,6 +1102,7 @@ interface Props {
     model: string
     debugMode?: boolean
     showAds?: boolean
+    defaultSuggestions?: string[]
 }
 
 interface Attachment {
@@ -7033,6 +7034,7 @@ export default function OmegleMentorshipUI(props: Props) {
         model = "gemini-3-flash-preview",
         debugMode = false,
         showAds = true,
+        defaultSuggestions = [],
     } = props
 
     // Hardcoded AdSense values as requested
@@ -8979,6 +8981,17 @@ Do not include markdown formatting or explanations.`
     const hasSnappedForMessages = React.useRef(false)
     const chatHeightBeforeOverlay = React.useRef<number | null>(null)
     const isMobileLayout = containerSize.width < 768
+
+    // Default Suggestions Logic
+    React.useEffect(() => {
+        if (messages.length === 0 && defaultSuggestions && defaultSuggestions.length > 0) {
+            // Shuffle
+            const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
+            // Slice based on layout
+            const count = isMobileLayout ? 10 : 3
+            setAiGeneratedSuggestions(shuffled.slice(0, count))
+        }
+    }, [isMobileLayout, defaultSuggestions, messages.length])
 
     const peerMetadataRef = React.useRef<Map<string, { isMobile: boolean }>>(new Map())
     const isMobileLayoutRef = React.useRef(isMobileLayout)
@@ -11264,7 +11277,7 @@ Do not include markdown formatting or explanations.`
                             {
                                 name: "update_doc",
                                 description:
-                                    "Updates the document editor. Use this to write documents, resumes, guides, emails, and all other long text content. You have full control over HTML formatting.",
+                                    "Updates the document editor. Use this to write documents, resumes, and emails. You have full control over HTML formatting.",
                                 parameters: {
                                     type: "OBJECT",
                                     properties: {
@@ -11280,7 +11293,7 @@ Do not include markdown formatting or explanations.`
                             {
                                 name: "update_whiteboard",
                                 description:
-                                    "Updates the tldraw whiteboard canvas. Use this to draw diagrams, flowcharts, mind maps, or visual notes. You can add, update, or remove shapes.",
+                                    "Updates the tldraw whiteboard canvas. Use this to draw diagrams, flowcharts, mind maps, or complex visualizations. You can add, update, or remove shapes.",
                                 parameters: {
                                     type: "OBJECT",
                                     properties: {
@@ -13105,7 +13118,7 @@ Do not include markdown formatting or explanations.`
                                     msOverflowStyle: "none",
                                 }}
                             >
-                                {aiGeneratedSuggestions.slice(0, isMobileLayout ? 5 : 3).map((suggestion, index) => (
+                                {aiGeneratedSuggestions.slice(0, isMobileLayout ? 10 : 3).map((suggestion, index) => (
                                     <div
                                         key={index}
                                         onClick={() => handleSendMessage(suggestion)}
@@ -13902,5 +13915,24 @@ addPropertyControls(OmegleMentorshipUI, {
         title: "Show Ads",
         defaultValue: true,
         description: "Toggle Google AdSense banners in the chat.",
+    },
+    defaultSuggestions: {
+        type: ControlType.Array,
+        control: {
+            type: ControlType.String,
+        },
+        title: "Default Suggestions",
+        defaultValue: [
+            "Get a job",
+            "Scholarships",
+            "Apply for FAFSA",
+            "Internships",
+            "Resume help",
+            "College apps",
+            "Interview prep",
+            "Stress & anxiety",
+            "Student loans",
+            "Transfer to UC/CSU",
+        ],
     },
 })
