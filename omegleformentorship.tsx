@@ -4864,6 +4864,9 @@ const ChatInput = React.memo(function ChatInput({
                             flexShrink: 0,
                             pointerEvents: "auto",
                             position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                         }}
                     >
                         {isEndCallTooltipHovered && (
