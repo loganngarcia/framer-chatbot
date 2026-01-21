@@ -479,10 +479,10 @@ const applyInlineFormatting = (
     const parts: (string | JSX.Element)[] = []
     let lastIndex = 0
 
-    // Improved regex with better URL detection
-    // Order matters: specific patterns (markdown links, HTML) before auto-detection
+    // Improved regex with simplified URL capture (validation/trimming handled in logic)
+    // Removed capture groups for specific URL parts to avoid regex engine confusion
     const combinedRegex =
-        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|(https?:\/\/[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\].,;:!?)])|([a-zA-Z0-9][-a-zA-Z0-9]*\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/[^\s<>"{}|\\^`\[\]]*)?(?=[.,;:!?)]*(?:\s|$)))/gi
+        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|(https?:\/\/[^\s]+)|((?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?))/gi
 
     let match
     while ((match = combinedRegex.exec(textSegment)) !== null) {
@@ -602,38 +602,67 @@ const applyInlineFormatting = (
                     {email}
                 </a>
             )
-        } else if (httpUrl !== undefined) {
-            parts.push(
-                <a
-                    key={`${keyPrefix}-${match.index}-http`}
-                    href={httpUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={linkStyle}
-                >
-                    {httpUrl}
-                </a>
-            )
-        } else if (plainUrl !== undefined) {
+        } else if (httpUrl !== undefined || plainUrl !== undefined) {
+            const rawUrl = httpUrl || plainUrl
+            let url = rawUrl
+            let tail = ""
+            
+            // Trim trailing punctuation and unbalanced parens
+            while (url.length > 0) {
+                const lastChar = url[url.length - 1]
+                // Punctuation that shouldn't end a URL
+                if (/[.,;:!?]/.test(lastChar)) {
+                    url = url.slice(0, -1)
+                    tail = lastChar + tail
+                    continue
+                }
+                // Parentheses balance check
+                if (lastChar === ')') {
+                    const openCount = (url.match(/\(/g) || []).length
+                    const closeCount = (url.match(/\)/g) || []).length
+                    if (closeCount > openCount) {
+                        url = url.slice(0, -1)
+                        tail = lastChar + tail
+                        continue
+                    }
+                }
+                // Special case for query param quotes - keep them if balanced or part of query
+                if (lastChar === '"') {
+                    const quoteCount = (url.match(/"/g) || []).length
+                    if (quoteCount % 2 !== 0) {
+                         url = url.slice(0, -1)
+                         tail = lastChar + tail
+                         continue
+                    }
+                }
+                break
+            }
+
             parts.push(
                 <a
                     key={`${keyPrefix}-${match.index}-url`}
-                    href={ensureProtocol(plainUrl)}
+                    href={ensureProtocol(url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {plainUrl}
+                    {url}
                 </a>
             )
+            if (tail) {
+                parts.push(tail)
+            }
         } else {
             parts.push(fullMatch)
         }
+
         lastIndex = match.index + fullMatch.length
     }
+
     if (lastIndex < textSegment.length) {
         parts.push(textSegment.substring(lastIndex))
     }
+
     return parts
 }
 
@@ -1318,9 +1347,12 @@ const GeminiEye = ({ config, id }: { config: any, id: string }) => {
   }
 
   const isBlinking = config.ry < 4
-  if (isBlinking) {
-    transitionStyles.transitionDuration = '100ms'
-    transitionStyles.transitionTimingFunction = 'ease-in-out'
+  
+  // Apply faster transition for blink
+  const currentTransitionStyles = {
+      ...transitionStyles,
+      transitionDuration: isBlinking ? '100ms' : '500ms',
+      transitionTimingFunction: isBlinking ? 'ease-in-out' : 'cubic-bezier(0.34, 1.56, 0.64, 1)'
   }
 
   const cx = config.width / 2
@@ -1334,68 +1366,113 @@ const GeminiEye = ({ config, id }: { config: any, id: string }) => {
         top: `${config.top}px`,
         width: `${config.width}px`,
         height: `${config.height}px`,
-        ...transitionStyles,
+        ...currentTransitionStyles,
       }}
     >
-      <svg
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${config.width} ${config.height}`}
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        style={transitionStyles}
-      >
-        <g filter={`url(#filter_eye_${id})`}>
-          <ellipse
-            cx={cx}
-            cy={cy}
-            rx={config.rx}
-            ry={config.ry}
-            transform={`rotate(${config.rotate} ${cx} ${cy})`}
-            fill="white"
-            fillOpacity="0.85"
-            shapeRendering="crispEdges"
-            style={transitionStyles}
-          />
-        </g>
-        <defs>
-          <filter
-            id={`filter_eye_${id}`}
-            x="-10"
-            y="-10"
-            width={config.width + 20}
-            height={config.height + 20}
-            filterUnits="userSpaceOnUse"
-            colorInterpolationFilters="sRGB"
-          >
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feColorMatrix
-              in="SourceAlpha"
-              type="matrix"
-              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-              result="hardAlpha"
-            />
-            <feOffset dy="4" />
-            <feGaussianBlur stdDeviation="6" />
-            <feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix
-              type="matrix"
-              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
-            />
-            <feBlend
-              mode="normal"
-              in2="BackgroundImageFix"
-              result="effect1_dropShadow"
-            />
-            <feBlend
-              mode="normal"
-              in="SourceGraphic"
-              in2="effect1_dropShadow"
-              result="shape"
-            />
-          </filter>
-        </defs>
-      </svg>
+        {/* Closed Eye (Blink) */}
+        <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: isBlinking ? 1 : 0,
+            transform: `scale(${isBlinking ? 1 : 0.8})`,
+            transition: 'opacity 100ms ease-in-out, transform 100ms ease-in-out',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            pointerEvents: 'none'
+        }}>
+             <svg width="100%" height="100%" viewBox="0 0 74 55" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g filter={`url(#filter_blink_${id})`}>
+                    <path d="M50.5534 23.2448C50.6256 25.3123 44.399 22.2078 36.6459 22.4785C28.8928 22.7493 22.5492 26.2927 22.477 24.2252C22.4048 22.1577 28.6314 15.2622 36.3845 14.9915C44.1376 14.7207 50.4812 21.1773 50.5534 23.2448Z" fill="white" fillOpacity="0.85" shapeRendering="crispEdges"/>
+                </g>
+                <defs>
+                    <filter id={`filter_blink_${id}`} x="0.00174713" y="-5.62668e-05" width="73.0278" height="54.8363" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                        <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                        <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                        <feOffset dy="7.4916"/>
+                        <feGaussianBlur stdDeviation="11.2374"/>
+                        <feComposite in2="hardAlpha" operator="out"/>
+                        <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
+                        <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_495_119"/>
+                        <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_495_119" result="shape"/>
+                    </filter>
+                </defs>
+            </svg>
+        </div>
+
+        {/* Open Eye */}
+        <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: isBlinking ? 0 : 1,
+            transition: 'opacity 100ms ease-in-out',
+            pointerEvents: 'none'
+        }}>
+            <svg
+                width="100%"
+                height="100%"
+                viewBox={`0 0 ${config.width} ${config.height}`}
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <g filter={`url(#filter_eye_${id})`}>
+                <ellipse
+                    cx={cx}
+                    cy={cy}
+                    rx={config.rx}
+                    ry={config.ry}
+                    transform={`rotate(${config.rotate} ${cx} ${cy})`}
+                    fill="white"
+                    fillOpacity="0.85"
+                    shapeRendering="crispEdges"
+                    style={currentTransitionStyles} 
+                />
+                </g>
+                <defs>
+                  <filter
+                    id={`filter_eye_${id}`}
+                    x="-10"
+                    y="-10"
+                    width={config.width + 20}
+                    height={config.height + 20}
+                    filterUnits="userSpaceOnUse"
+                    colorInterpolationFilters="sRGB"
+                  >
+                    <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                    <feColorMatrix
+                      in="SourceAlpha"
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                      result="hardAlpha"
+                    />
+                    <feOffset dy="4" />
+                    <feGaussianBlur stdDeviation="6" />
+                    <feComposite in2="hardAlpha" operator="out" />
+                    <feColorMatrix
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                    />
+                    <feBlend
+                      mode="normal"
+                      in2="BackgroundImageFix"
+                      result="effect1_dropShadow"
+                    />
+                    <feBlend
+                      mode="normal"
+                      in="SourceGraphic"
+                      in2="effect1_dropShadow"
+                      result="shape"
+                    />
+                  </filter>
+                </defs>
+            </svg>
+        </div>
     </div>
   )
 }
@@ -1454,6 +1531,8 @@ const GeminiLiveCharacter = ({ isThinking, isSpeaking }: { isThinking: boolean, 
             position: 'relative',
             cursor: 'pointer',
             transition: 'transform 0.3s',
+            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.08)',
+            borderRadius: 9999
           }}
         >
           {/* Layer: White Body */}
@@ -1466,7 +1545,6 @@ const GeminiLiveCharacter = ({ isThinking, isSpeaking }: { isThinking: boolean, 
                 height: 102,
                 background: 'white',
                 borderRadius: 9999,
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
             }}
           />
 
@@ -1820,8 +1898,8 @@ const HeaderActions = React.memo(({
                 onMouseLeave={() => onCloseHoverChange(false)}
                 style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" }}
             >
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M27 18.25H21.75M21.75 18.25V13M21.75 18.25L27 13M13 21.75H18.25M18.25 21.75V27M18.25 21.75L13 27" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11.1016 0.599998L0.601562 11.1M0.601562 0.599998L11.1016 11.1" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 {isCloseHovered && (
                     <Tooltip
@@ -4202,10 +4280,10 @@ const ChatInput = React.memo(function ChatInput({
                     display: "flex"
                 }}
             >
-                {/* INPUT BOX */}
+                {/* CHAT INPUT BAR */}
                 <div
-                    data-layer="input-box"
-                    className="InputBox"
+                    data-layer="chat-input-bar"
+                    className="ChatInputBar"
                     style={{
                         flex: "1 1 0",
                         minHeight: 56,
@@ -7021,7 +7099,9 @@ export default function OmegleMentorshipUI(props: Props) {
 
     // --- STATE: DOC EDITOR ---
     const [isDocOpen, setIsDocOpen] = React.useState(false)
-    const isDocOpenRef = React.useRef(isDocOpen)
+    const isDocOpenRef = React.useRef(false)
+    
+    // Sync ref for access inside callbacks/loops
     React.useEffect(() => {
         isDocOpenRef.current = isDocOpen
     }, [isDocOpen])
@@ -8885,9 +8965,11 @@ Do not include markdown formatting or explanations.`
     const MIN_CHAT_HEIGHT = 204
 
     // --- STATE: LAYOUT & DIMENSIONS ---
-    const [containerSize, setContainerSize] = React.useState({
-        width: 0,
-        height: 0,
+    const [containerSize, setContainerSize] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            return { width: window.innerWidth, height: window.innerHeight }
+        }
+        return { width: 0, height: 0 }
     })
     // Track previous container size to handle virtual keyboard resizing logic
     const prevContainerSize = React.useRef({ width: 0, height: 0 })
@@ -11254,6 +11336,11 @@ Do not include markdown formatting or explanations.`
                             }
                         })
                     },
+                    toolConfig: {
+                        functionCallingConfig: {
+                            mode: "AUTO",
+                        }
+                    }
                 }
 
                 if (debugMode) {
@@ -11382,9 +11469,53 @@ Do not include markdown formatting or explanations.`
                                             return newArr
                                         })
                                     }
-                                    if (part.functionCall) {
-                                        accumulatedFunctionCall =
-                                            part.functionCall
+                                    // Aggressively check for function call start even if args are empty
+                                    // Handle potential snake_case from raw API
+                                    const fnCall = part.functionCall || (part as any).function_call
+                                    
+                                    if (fnCall) {
+                                        // Initialize if needed
+                                        if (!accumulatedFunctionCall) {
+                                            accumulatedFunctionCall = { name: "", args: {} }
+                                        }
+
+                                        // Merge Name
+                                        if (fnCall.name) {
+                                            accumulatedFunctionCall.name = fnCall.name
+                                        }
+
+                                        // Merge/Update Args
+                                        // Check for standard 'args' OR 'partial_args' (Vertex style)
+                                        // Note: In standard API, 'args' is usually the full object at the end.
+                                        // In streaming mode (if supported), 'partial_args' might be sent.
+                                        const newArgs = (fnCall as any).partial_args || fnCall.args
+                                        if (newArgs) {
+                                            accumulatedFunctionCall.args = newArgs
+                                        }
+                                        
+                                        // Streaming Tool Call Support:
+                                        // If it's the `update_doc` tool, OPEN IMMEDIATELY.
+                                        if (accumulatedFunctionCall.name === "update_doc") {
+                                            // TODO: Fix real-time streaming of doc content.
+                                            // ISSUE: The Doc Editor is NOT opening immediately when the tool call starts, and text is NOT streaming.
+                                            // It appears the standard Gemini API (v1beta) buffers the entire function call and sends it only when complete,
+                                            // preventing real-time updates. 'partial_args' is likely only available in Vertex AI.
+                                            // We are aggressively checking for 'update_doc' to force the editor open, but if the API doesn't send the name early, we can't open it.
+                                            
+                                            // Force open state via ref to bypass closure staleness if needed
+                                            if (!isDocOpenRef.current) {
+                                                setIsDocOpen(true)
+                                                // Optimistically update ref so we don't spam the setter
+                                                isDocOpenRef.current = true
+                                            }
+                                            
+                                            // Update Content
+                                            if (accumulatedFunctionCall.args) {
+                                                const args = accumulatedFunctionCall.args as any
+                                                const newContent = args.content || ""
+                                                if (newContent) setDocContent(newContent)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -11394,15 +11525,15 @@ Do not include markdown formatting or explanations.`
                     }
                 }
 
-                // Handle Tool Call
+                // Handle Tool Call - Final Execution
                 if (accumulatedFunctionCall) {
                     if (accumulatedFunctionCall.name === "update_doc") {
                         const args = accumulatedFunctionCall.args as any
                         const newContent = args.content || ""
                         setDocContent(newContent)
-                        if (!isDocOpen) setIsDocOpen(true) // Auto-open
+                        if (!isDocOpen) setIsDocOpen(true) // Ensure open on completion too
 
-                        // BROADCAST DOC UPDATE
+                        // BROADCAST DOC UPDATE - Only broadcast on final completion to avoid flooding peers
                         if (dataConnectionsRef.current.size > 0) {
                             broadcastData({
                                 type: "doc-update",
@@ -12814,6 +12945,8 @@ Do not include markdown formatting or explanations.`
 
         return (
             <div
+                data-layer="chat-area-container"
+                className="ChatAreaContainer"
                 style={{
                     display: "flex",
                     flexDirection: "column",
@@ -12825,6 +12958,8 @@ Do not include markdown formatting or explanations.`
                 >
                     <div
                         ref={chatHistoryRef}
+                        data-layer="chat-messages-area"
+                        className="ChatMessagesArea"
                         style={{
                             flex: 1,
                             width: "100%",
@@ -13182,18 +13317,38 @@ Do not include markdown formatting or explanations.`
         let fitHeight = fitWidth / targetRatio
         
         if (isSidebarOrMobile) {
-            // Stacked vertically?
-            // If we have 2 tiles, we need to fit 2 of them in availableHeight.
-            // If availableHeight is small, we shrink them.
-            // Max height per tile = (availableHeight - gap) / numTiles
-            // gap is 8px.
-            // Actually, let's assume 2 tiles for calculation safety
-            const count = Math.min(2, numTiles) 
-            const maxHPerTile = (availableHeight - (count - 1) * 8) / count
-            
-            if (fitHeight > maxHPerTile) {
-                fitHeight = maxHPerTile
-                fitWidth = fitHeight * targetRatio
+            if (shouldUseHorizontalLayout) {
+                // Horizontal Layout (Side-by-side or Grid)
+                const isGrid = numTiles === 4
+                const cols = isGrid ? 2 : numTiles
+                const rows = isGrid ? 2 : 1
+                
+                const widthPerTile = (availableWidth - (cols - 1) * 8) / cols
+                const maxHPerTile = (availableHeight - (rows - 1) * 8) / rows
+                
+                let h = widthPerTile / targetRatio
+                
+                if (h > maxHPerTile) {
+                    fitHeight = maxHPerTile
+                    fitWidth = fitHeight * targetRatio
+                } else {
+                    fitWidth = widthPerTile
+                    fitHeight = h
+                }
+            } else {
+                // Stacked vertically?
+                // If we have 2 tiles, we need to fit 2 of them in availableHeight.
+                // If availableHeight is small, we shrink them.
+                // Max height per tile = (availableHeight - gap) / numTiles
+                // gap is 8px.
+                // Actually, let's assume 2 tiles for calculation safety
+                const count = Math.min(2, numTiles) 
+                const maxHPerTile = (availableHeight - (count - 1) * 8) / count
+                
+                if (fitHeight > maxHPerTile) {
+                    fitHeight = maxHPerTile
+                    fitWidth = fitHeight * targetRatio
+                }
             }
         } else {
             // Horizontal row (Small Strip in Standard Desktop Layout)
@@ -13221,7 +13376,6 @@ Do not include markdown formatting or explanations.`
                 }
             } else {
                 // Large Desktop Tiles (Standard View, No Tool)
-                // TODO: Fix gap between drag bar and top of screen for tiles on the mobile/sidebar side-by-side horizontal layout. 
                 // Tiles should fill height as much as possible while maintaining aspect ratio without being cropped.
                 const widthPerTile = (availableWidth - 8) / 2
                 
@@ -13242,6 +13396,8 @@ Do not include markdown formatting or explanations.`
         
         return (
                 <div
+                    data-layer="video-tiles-container"
+                    className="VideoTilesContainer"
                     style={{
                         display: "flex",
                     gap: 8,
@@ -13315,7 +13471,7 @@ Do not include markdown formatting or explanations.`
 
                        return (
                          <motion.div
-                            key={tile.key}
+                            key={index}
                             initial={false}
                             animate={{
                                 flex: "0 0 auto",
@@ -13436,6 +13592,8 @@ Do not include markdown formatting or explanations.`
         
         return (
                         <div
+                            data-layer="standard-layout-container"
+                            className="StandardLayoutContainer"
                             style={{
                     flex: "1 1 0",
                     width: "100%",
@@ -13447,7 +13605,7 @@ Do not include markdown formatting or explanations.`
             >
                 {/* 1. Tiles & Main Content Area */}
                 {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || !isBanned) && (
-                     <div style={{
+                     <div data-layer="tiles-main-content-area" className="TilesMainContentArea" style={{
                          flex: "1 1 0",
                          width: "100%",
                          display: "flex",
@@ -13476,7 +13634,7 @@ Do not include markdown formatting or explanations.`
 
                          {/* Main Content (ScreenShare Only in this view - Tool is overlaid or not shown here if mobile tool mode) */}
                          {(isScreenSharing || !!remoteScreenStream) && (
-                             <div style={{ flex: 1, width: "100%", overflow: "hidden", background: "transparent", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                             <div data-layer="screen-share-section" className="ScreenShareSection" style={{ flex: 1, width: "100%", overflow: "hidden", background: "transparent", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                  {renderScreenShareSection()}
                         </div>
                          )}
@@ -13486,6 +13644,8 @@ Do not include markdown formatting or explanations.`
                 {/* 2. Drag Handle (Present in both Standard and Sidebar) */}
                 {(!isBanned || isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) && (
                     <motion.div
+                        data-layer="drag-handle-container"
+                        className="DragHandleContainer"
                         onPointerDown={handlePointerDown}
                         onPointerEnter={() => { hoverTimeoutRef.current = window.setTimeout(() => { setIsDragBarHovered(true) }, 50) }}
                         onPointerLeave={() => { if (hoverTimeoutRef.current) { clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = null }; setIsDragBarHovered(false) }}
@@ -13501,7 +13661,10 @@ Do not include markdown formatting or explanations.`
                             position: "relative",
                         }}
                     >
-                        <div style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.2)" }} />
+                            <div
+                                data-layer="drag-indicator"
+                                style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(133,133,133)" }} 
+                            />
                         {isDragBarHovered && !isDragging.current && (
                             <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 4px)", whiteSpace: "nowrap" }}>
                                 {chatHeight < currentConstraints.maxHeight - 5 ? "Click to expand chat" : "Click to hide chat"}
@@ -13511,13 +13674,19 @@ Do not include markdown formatting or explanations.`
                 )}
 
                 {/* 3. Chat History (Drawer) */}
-                <div style={{ width: "100%", height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : "auto", background: "transparent", display: "flex", justifyContent: "center" }}>
+                <div 
+                    data-layer="chat-history-drawer"
+                    className="ChatHistoryDrawer"
+                    style={{ width: "100%", height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : "auto", background: "transparent", display: "flex", justifyContent: "center" }}
+                >
                     <motion.div 
+                        data-layer="chat-history-content"
+                        className="ChatHistoryContent"
                         initial={false}
                         animate={{ height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : chatHeight }}
                         transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
                         style={{ 
-                            paddingTop: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? 24 : 0, 
+                            paddingTop: 0, 
                             width: "100%", 
                             maxWidth: 728, 
                             position: "relative", 
@@ -13536,6 +13705,8 @@ Do not include markdown formatting or explanations.`
     return (
         <div
             ref={containerRef}
+            data-layer="main-app-container"
+            className="MainAppContainer"
             style={{
                 width: "100%",
                 height: "100%",
@@ -13556,7 +13727,11 @@ Do not include markdown formatting or explanations.`
         >
             {/* BAN BANNER */}
             {isBanned && (
-                <div style={{ width: "100%", background: "transparent", color: "rgba(160, 160, 160, 1)", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 500, zIndex: 2000, flexShrink: 0 }}>
+                <div 
+                    data-layer="ban-banner"
+                    className="BanBanner"
+                    style={{ width: "100%", background: "transparent", color: "rgba(160, 160, 160, 1)", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 500, zIndex: 2000, flexShrink: 0 }}
+                >
                     You are temporarily banned. Please review the <a href="https://curastem.org/code-of-conduct" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(160, 160, 160, 1)", textDecoration: "underline", fontWeight: 700 }}>code of conduct</a>.
                 </div>
             )}
@@ -13579,11 +13754,17 @@ Do not include markdown formatting or explanations.`
             <style>{markdownStyles}</style>
 
             {/* MAIN CONTENT STRUCTURE */}
-            <div style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}>
+            <div 
+                data-layer="main-content-layout"
+                className="MainContentLayout"
+                style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}
+            >
                 {/* Left: Tool (Desktop only) */}
                 <AnimatePresence>
                     {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
                         <motion.div
+                            data-layer="desktop-tool-panel"
+                            className="DesktopToolPanel"
                             initial={{ x: "-100%" }}
                             animate={{ x: 0 }}
                             exit={{ x: "-100%" }}
@@ -13605,6 +13786,8 @@ Do not include markdown formatting or explanations.`
                      - Flex 1
                 */}
                 <motion.div
+                    data-layer="right-content-panel"
+                    className="RightContentPanel"
                     // Removed 'layout' prop to prevent distortion of children during width change
                     initial={false}
                     animate={{
@@ -13630,6 +13813,8 @@ Do not include markdown formatting or explanations.`
             <AnimatePresence>
                 {isMobileToolMode && (
                     <motion.div
+                        data-layer="mobile-tool-overlay"
+                        className="MobileToolOverlay"
                         initial={{ y: "100%", scale: 0, opacity: 0 }}
                         animate={{ y: "0%", scale: 1, opacity: 1 }}
                         exit={{ y: "100%", scale: 0, opacity: 0 }}
@@ -13651,8 +13836,16 @@ Do not include markdown formatting or explanations.`
             <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={onSubmitReport} participantCount={remoteStreams.size + 1} />
 
             {/* FILE DRAG OVERLAY */}
-            <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 99999, background: themeColors.state.overlay, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: isDraggingFile ? 1 : 0, visibility: isDraggingFile ? "visible" : "hidden" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <div 
+                data-layer="file-drag-overlay"
+                className="FileDragOverlay"
+                style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 99999, background: themeColors.state.overlay, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: isDraggingFile ? 1 : 0, visibility: isDraggingFile ? "visible" : "hidden" }}
+            >
+                <div 
+                    data-layer="file-drag-content"
+                    className="FileDragContent"
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}
+                >
                     <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
                         <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z" fill="#0099FF" fillOpacity="0.95" />
@@ -13680,8 +13873,8 @@ addPropertyControls(OmegleMentorshipUI, {
     model: {
         type: ControlType.String,
         title: "AI Model",
-        defaultValue: "gemini-2.5-flash-lite",
-        description: "Model ID (e.g., gemini-2.5-flash-lite",
+        defaultValue: "gemini-3-flash-preview",
+        description: "Model ID (e.g., gemini-3-flash-preview)",
     },
     systemPrompt: {
         type: ControlType.String,
