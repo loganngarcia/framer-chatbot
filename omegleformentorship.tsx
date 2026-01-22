@@ -4890,7 +4890,7 @@ const ChatInput = React.memo(function ChatInput({
 })
 
 // --- HELPER COMPONENT: DEBUG CONSOLE ---
-function DebugConsole({ logs }: { logs: string[] }) {
+function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; status: string }) {
     const scrollRef = React.useRef<HTMLDivElement>(null)
     const [copied, setCopied] = React.useState(false)
 
@@ -4911,59 +4911,105 @@ function DebugConsole({ logs }: { logs: string[] }) {
     }
 
     return (
-        <div
+        <motion.div
+            drag
+            dragMomentum={false}
+            dragElastic={0.1}
             style={{
-                position: "absolute",
-                top: 10,
-                left: 10,
-                right: 10,
-                height: 150,
-                background: "rgba(0,0,0,0.9)",
+                position: "fixed",
+                bottom: 20,
+                right: 20,
+                width: 300,
+                height: 400,
+                background: "rgba(0,0,0,0.12)",
                 color: "#0f0",
                 fontFamily: "monospace",
                 fontSize: 12,
-                padding: 8,
-                overflowY: "auto",
+                padding: 12,
+                overflow: "hidden",
                 zIndex: 9999,
                 pointerEvents: "auto",
                 borderRadius: 28,
                 display: "flex",
                 flexDirection: "column",
+                cursor: "grab"
             }}
+            whileDrag={{ cursor: "grabbing", scale: 1.01 }}
         >
-            <div style={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center",
+            {/* Status Bar */}
+            <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
                 marginBottom: 8,
                 paddingBottom: 8,
+                flexShrink: 0
             }}>
-                <div style={{ color: "#fff", fontWeight: "bold" }}>🔍 Debug Console</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                    <span style={{ opacity: 0.7 }}>🔗 Room:</span>
+                    <span style={{ color: "#3b82f6", fontWeight: "bold" }}>
+                        {typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}
+                    </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                    <span style={{ opacity: 0.7 }}>👤 Role:</span>
+                    <span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>
+                        {role || "None (Passive Mode)"}
+                    </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                    <span style={{ opacity: 0.7 }}>📊 Status:</span>
+                    <span style={{
+                        color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8",
+                        fontWeight: "bold"
+                    }}>
+                        {status}
+                    </span>
+                </div>
+            </div>
+
+            {/* Header with copy button */}
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+                flexShrink: 0
+            }}>
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>🔍 Debug Logs</div>
                 <button
                     onClick={handleCopy}
                     style={{
                         background: copied ? "#22c55e" : "#3b82f6",
                         color: "#fff",
                         border: "none",
-                        borderRadius: 8,
-                        padding: "6px 12px",
-                        fontSize: 11,
+                        borderRadius: 6,
+                        padding: "4px 8px",
+                        fontSize: 10,
                         cursor: "pointer",
                         fontWeight: "600",
                         transition: "all 0.2s",
+                        flexShrink: 0
                     }}
                 >
-                    {copied ? "✓ Copied!" : "📋 Copy Logs"}
+                    {copied ? "✓ Copied!" : "📋 Copy"}
                 </button>
             </div>
-            <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-                {logs.slice(-200).map((log, i) => (
-                    <div key={i} style={{ marginBottom: 4 }}>
+
+            {/* Logs */}
+            <div ref={scrollRef} style={{
+                flex: 1,
+                overflowY: "auto",
+                fontSize: 11,
+                lineHeight: 1.3
+            }}>
+                {logs.slice(-100).map((log, i) => (
+                    <div key={i} style={{ marginBottom: 3, wordBreak: "break-word" }}>
                         {log}
                     </div>
                 ))}
             </div>
-        </div>
+        </motion.div>
     )
 }
 
@@ -7250,7 +7296,8 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const pendingSnapshotRef = React.useRef<any>(null)
     const isScreenSharingRef = React.useRef(false)
-    const saveChatHistoryRef = React.useRef<() => void>(() => {})
+    const saveChatHistoryRef = React.useRef<(title?: string) => void>(() => {})
+    const generatingTitleForRef = React.useRef(new Set<string>())
 
     React.useEffect(() => {
         isScreenSharingRef.current = isScreenSharing
@@ -8728,7 +8775,70 @@ Do not include markdown formatting or explanations.`
         }
     }, [])
 
-    const saveChatHistory = React.useCallback(() => {
+    const generateChatTitle = React.useCallback(async (firstMessageText: string) => {
+        if (!geminiApiKey || !currentChatId) return
+
+        // Skip if title exists or generation is in progress
+        const existing = savedChats.find(c => c.id === currentChatId)
+        if ((existing && existing.title !== "New chat") || generatingTitleForRef.current.has(currentChatId)) return
+
+        generatingTitleForRef.current.add(currentChatId)
+        
+        try {
+            const prompt = `Summarize this message into a short title (3-5 words). Just the title, no quotes: "${firstMessageText}"`
+            
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 1.0, maxOutputTokens: 20 },
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        ]
+                    })
+                }
+            )
+            
+            if (!response.ok) {
+                generatingTitleForRef.current.delete(currentChatId)
+                return
+            }
+            
+            const data = await response.json()
+            const candidate = data.candidates?.[0]
+            const finishReason = candidate?.finishReason
+            const text = candidate?.content?.parts?.[0]?.text
+            
+            let finalTitle = text
+            if (finishReason === "RECITATION" || finishReason === "SAFETY" || !text) {
+                finalTitle = firstMessageText.split(' ').slice(0, 4).join(' ')
+            } else {
+                finalTitle = text.trim().replace(/^["']|["']$/g, '')
+            }
+
+            // Save locally
+            saveChatHistoryRef.current(finalTitle)
+
+            // Broadcast title to peers so they don't have to generate it
+            if (dataConnectionsRef.current.size > 0) {
+                broadcastData({
+                    type: "chat-title",
+                    payload: finalTitle
+                })
+            }
+            
+        } catch (e) {
+            generatingTitleForRef.current.delete(currentChatId)
+        }
+    }, [geminiApiKey, currentChatId, savedChats])
+
+    const saveChatHistory = React.useCallback((overrideTitle?: string) => {
         const msgs = messagesRef.current
         if (!msgs || msgs.length === 0) return
 
@@ -8749,30 +8859,40 @@ Do not include markdown formatting or explanations.`
              } catch(e) { console.error("Whiteboard snapshot failed", e) }
         }
 
-        // Get title from first 3 words
-        const firstUserMsg = msgs.find(m => (m.role === 'user' || m.role === 'peer') && m.text)
-        let title = "New chat"
-        if (firstUserMsg && firstUserMsg.text) {
-             const words = firstUserMsg.text.split(' ')
-             title = words.slice(0, 3).join(' ')
-        }
-
-        const sessionToSave: ChatSession = {
-            id: currentChatId,
-            title: title,
-            timestamp: Date.now(),
-            messages: msgs.map(m => ({ ...m, attachments: undefined })),
-            notes: docContentRef.current,
-            whiteboard: whiteboardData
-        }
-
         setSavedChats(prev => {
+            const existing = prev.find(c => c.id === currentChatId)
+            const titleToUse = overrideTitle || (existing ? existing.title : "New chat")
+
+            const sessionToSave: ChatSession = {
+                id: currentChatId,
+                title: titleToUse,
+                timestamp: Date.now(),
+                messages: msgs.map(m => ({ ...m, attachments: undefined })),
+                notes: docContentRef.current,
+                whiteboard: whiteboardData
+            }
+
             const others = prev.filter(c => c.id !== currentChatId)
             const updated = [sessionToSave, ...others].slice(0, 25)
             localStorage.setItem("saved_chat_history", JSON.stringify(updated))
             return updated
         })
     }, [remoteStreams, isLiveMode, currentChatId])
+
+    // Title Generation Effect
+    React.useEffect(() => {
+        const msgs = messages
+        const firstUserMsg = msgs.find(m => (m.role === 'user' || m.role === 'peer') && m.text)
+        
+        if (firstUserMsg && currentChatId) {
+             const chatInHistory = savedChats.find(c => c.id === currentChatId)
+             const currentTitle = chatInHistory ? chatInHistory.title : "New chat"
+             
+             if (currentTitle === "New chat") {
+                 generateChatTitle(firstUserMsg.text)
+             }
+        }
+    }, [messages, currentChatId, savedChats, generateChatTitle])
 
     React.useEffect(() => {
         saveChatHistoryRef.current = saveChatHistory
@@ -9780,13 +9900,13 @@ Do not include markdown formatting or explanations.`
         }
     }, [isWhiteboardOpen, editor, role])
 
-    const broadcastData = (data: any) => {
+    const broadcastData = React.useCallback((data: any) => {
         dataConnectionsRef.current.forEach((conn) => {
              if (conn.open) {
                  conn.send(data)
              }
         })
-    }
+    }, [])
 
     const handleDocChange = React.useCallback((content: string) => {
         setDocContent(content)
@@ -10232,6 +10352,18 @@ Do not include markdown formatting or explanations.`
         peer.on("connection", (conn: any) => {
             log(`Data connection received from ${conn.peer}`)
             handleDataConnection(conn)
+
+            // If we have a chat title, share it with the new peer so they sync up
+            const currentHistory = savedChats.find(c => c.id === currentChatId)
+            if (currentHistory && currentHistory.title && currentHistory.title !== "New chat") {
+                // Wait for open
+                conn.on("open", () => {
+                     conn.send(JSON.stringify({
+                        type: "chat-title",
+                        payload: currentHistory.title
+                    }))
+                })
+            }
         })
 
         peer.on("call", (call: any) => {
@@ -11012,6 +11144,16 @@ Do not include markdown formatting or explanations.`
                     payload: { isMobile: isMobileLayoutRef.current },
                 })
 
+                // If we have a chat title, share it with the new peer so they sync up
+                const currentHistory = savedChats.find(c => c.id === currentChatId)
+                if (currentHistory && currentHistory.title && currentHistory.title !== "New chat") {
+                    conn.send(JSON.stringify({
+                        type: "chat-title",
+                        payload: currentHistory.title
+                    }))
+                }
+
+
                 // 1. Sync Document
                 if (isDocOpenRef.current) {
                     log("Syncing document state to new peer...")
@@ -11748,7 +11890,7 @@ Do not include markdown formatting or explanations.`
                         }
 
                         if (!accumulatedText) {
-                            accumulatedText = "Check out this document."
+                            accumulatedText = "This document might help:"
                             setMessages((prev) => {
                                 const newArr = [...prev]
                                 if (
@@ -12202,6 +12344,15 @@ Do not include markdown formatting or explanations.`
             })),
         }
         setMessages((prev) => [...prev, userMsg])
+        
+        // Immediate title generation trigger
+        const hasUserMessage = messages.some(m => m.role === "user")
+        if (!hasUserMessage) {
+            // Log for debugging
+            // console.log("[Gemini] First user message detected, triggering title generation")
+            generateChatTitle(textToSend)
+        }
+
         setInputText("")
         setAttachments([])
         if (fileInputRef.current) fileInputRef.current.value = ""
@@ -12254,7 +12405,7 @@ Do not include markdown formatting or explanations.`
         }
 
         await generateAIResponse(textToSend, attachmentsToSend, "user")
-    }, [inputText, attachments, generateAIResponse, fetchLocation])
+    }, [inputText, attachments, generateAIResponse, fetchLocation, messages, generateChatTitle])
 
     // --- DRAG-TO-RESIZE LOGIC ---
 
@@ -14417,14 +14568,7 @@ Do not include markdown formatting or explanations.`
 
             {/* DEBUG CONSOLE */}
             {debugMode && (
-                <>
-                    <DebugConsole logs={logs} />
-                    <div style={{ position: "absolute", top: 170, left: 10, right: 10, background: "rgba(0,0,0,0.8)", color: "#fff", fontFamily: "monospace", fontSize: 14, padding: 12, zIndex: 9998, borderRadius: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>🔗 Room:</span><span style={{ color: "#3b82f6", fontWeight: "bold" }}>{typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}</span></div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>👤 Role:</span><span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>{role || "None (Passive Mode)"}</span></div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ opacity: 0.7 }}>📊 Status:</span><span style={{ color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8", fontWeight: "bold" }}>{status}</span></div>
-                    </div>
-                </>
+                <DebugConsole logs={logs} role={role} status={status} />
             )}
 
             <style>{markdownStyles}</style>
