@@ -8674,7 +8674,19 @@ Do not include markdown formatting or explanations.`
         }
     }, [currentChatId])
 
-    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false)
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("is_sidebar_open")
+            return saved === "true"
+        }
+        return false
+    })
+
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("is_sidebar_open", isSidebarOpen.toString())
+        }
+    }, [isSidebarOpen])
     const [isSidebarBtnHovered, setIsSidebarBtnHovered] = React.useState(false)
     const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(null)
     const [isNewChatHovered, setIsNewChatHovered] = React.useState(false)
@@ -14064,7 +14076,15 @@ Do not include markdown formatting or explanations.`
                     left: 8, 
                     top: 8, 
                     position: 'absolute', 
-                    zIndex: 9999, 
+                    // Lower z-index on mobile so it sits behind tools (z-index 2000)
+                    // But on desktop, it needs to be accessible.
+                    // Actually, if tool is open on mobile, it covers the whole screen.
+                    // The user said: "sidebar open button should show behind doceditor/whiteboard instead of above"
+                    // MobileToolOverlay has zIndex: 2000.
+                    // This button has zIndex: 9999.
+                    // We need to lower it below 2000 if a tool is open?
+                    // Or just set it to something reasonable like 100, and ensure tools are higher.
+                    zIndex: 100, 
                     cursor: 'pointer',
                     background: isSidebarBtnHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
                     borderRadius: '50%',
