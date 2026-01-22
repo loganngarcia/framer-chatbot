@@ -480,6 +480,21 @@ function ensureProtocol(url: string): string {
     return url
 }
 
+function removeUtmParams(url: string): string {
+    const parts = url.split("?")
+    if (parts.length < 2) return url
+
+    const baseUrl = parts[0]
+    const query = parts[1]
+
+    const newQuery = query
+        .split("&")
+        .filter((part) => !part.startsWith("utm_"))
+        .join("&")
+
+    return newQuery ? `${baseUrl}?${newQuery}` : baseUrl
+}
+
 const applyInlineFormatting = (
     textSegment: string,
     keyPrefix: string,
@@ -574,7 +589,7 @@ const applyInlineFormatting = (
             parts.push(
                 <a
                     key={`${keyPrefix}-${match.index}-a`}
-                    href={ensureProtocol(linkUrl)}
+                    href={ensureProtocol(removeUtmParams(linkUrl))}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
@@ -590,7 +605,7 @@ const applyInlineFormatting = (
             parts.push(
                 <a
                     key={`${keyPrefix}-${match.index}-html-a`}
-                    href={ensureProtocol(htmlLinkUrl)}
+                    href={ensureProtocol(removeUtmParams(htmlLinkUrl))}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
@@ -651,7 +666,7 @@ const applyInlineFormatting = (
             parts.push(
                 <a
                     key={`${keyPrefix}-${match.index}-url`}
-                    href={ensureProtocol(url)}
+                    href={ensureProtocol(removeUtmParams(url))}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={linkStyle}
