@@ -14048,7 +14048,7 @@ Do not include markdown formatting or explanations.`
             ref={containerRef}
             data-layer="main-app-container"
             className="MainAppContainer"
-            onClick={() => isSidebarOpen && setIsSidebarOpen(false)}
+            onClick={() => isMobileLayout && isSidebarOpen && setIsSidebarOpen(false)}
             style={{
                 width: "100%",
                 height: "100%",
