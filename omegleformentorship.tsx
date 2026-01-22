@@ -14343,7 +14343,7 @@ Do not include markdown formatting or explanations.`
                                 </svg>
                             </div>
                         </div>
-                        <div data-layer="search-bar" className="SearchBar" style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, background: 'rgba(255, 255, 255, 0.06)', overflow: 'hidden', borderRadius: 50, justifyContent: 'flex-start', alignItems: 'center', gap: 6, display: 'inline-flex'}}>
+                        <div data-layer="search-bar" className="SearchBar" style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, background: '#333333', overflow: 'hidden', borderRadius: 50, justifyContent: 'flex-start', alignItems: 'center', gap: 6, display: 'inline-flex'}}>
                             <div data-svg-wrapper data-layer="search-icon" className="SearchIcon" style={{ marginTop: 2 }}>
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M10.9289 10.8023L14.7616 14.6M12.6167 6.5224C12.6167 8.09311 11.9837 9.5995 10.8571 10.7102C9.73045 11.8208 8.20241 12.4448 6.60911 12.4448C5.01581 12.4448 3.48777 11.8208 2.36113 10.7102C1.2345 9.5995 0.601563 8.09311 0.601562 6.5224C0.601563 4.95168 1.2345 3.44529 2.36113 2.33463C3.48777 1.22396 5.01581 0.599998 6.60911 0.599998C8.20241 0.599998 9.73045 1.22396 10.8571 2.33463C11.9837 3.44529 12.6167 4.95168 12.6167 6.5224Z" stroke="white" strokeOpacity="0.65" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
