@@ -25,6 +25,7 @@ interface ChatSession {
     notes: string
     whiteboard: any
     isPinned?: boolean
+    pinnedAt?: number
 }
 
 // -----------------------------------------------------------------------------
@@ -8872,11 +8873,24 @@ Do not include markdown formatting or explanations.`
                 timestamp: Date.now(),
                 messages: msgs.map(m => ({ ...m, attachments: undefined })),
                 notes: docContentRef.current,
-                whiteboard: whiteboardData
+                whiteboard: whiteboardData,
+                isPinned: existing?.isPinned,
+                pinnedAt: existing?.pinnedAt
             }
 
             const others = prev.filter(c => c.id !== currentChatId)
-            const updated = [sessionToSave, ...others].slice(0, 25)
+            let updated = [sessionToSave, ...others]
+
+            updated.sort((a, b) => {
+                if (a.isPinned && !b.isPinned) return -1
+                if (!a.isPinned && b.isPinned) return 1
+                if (a.isPinned && b.isPinned) {
+                    return (b.pinnedAt || 0) - (a.pinnedAt || 0)
+                }
+                return b.timestamp - a.timestamp
+            })
+
+            updated = updated.slice(0, 25)
             localStorage.setItem("saved_chat_history", JSON.stringify(updated))
             return updated
         })
@@ -10127,13 +10141,24 @@ Do not include markdown formatting or explanations.`
     // --- SIDEBAR ACTIONS ---
     const handlePinChat = React.useCallback((chatId: string) => {
         setSavedChats(prev => {
-            const updated = prev.map(c => c.id === chatId ? { ...c, isPinned: !c.isPinned } : c)
-            // Sort: Pinned first, then by timestamp (newest first)
-            return updated.sort((a, b) => {
+            const updated = prev.map(c => {
+                if (c.id === chatId) {
+                    const newPinned = !c.isPinned
+                    return { ...c, isPinned: newPinned, pinnedAt: newPinned ? Date.now() : undefined }
+                }
+                return c
+            })
+            // Sort: Pinned first (by pinnedAt desc), then unpinned (by timestamp desc)
+            const sorted = updated.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1
                 if (!a.isPinned && b.isPinned) return 1
+                if (a.isPinned && b.isPinned) {
+                    return (b.pinnedAt || 0) - (a.pinnedAt || 0)
+                }
                 return b.timestamp - a.timestamp
             })
+            localStorage.setItem("saved_chat_history", JSON.stringify(sorted))
+            return sorted
         })
         setMenuOpenChatId(null)
         setMenuPosition(null)
@@ -13162,7 +13187,7 @@ Do not include markdown formatting or explanations.`
                           </div>
                           <div onClick={() => setIsSidebarOpen(false)} style={{cursor: 'pointer'}} data-svg-wrapper data-layer="close sidebar button" className="CloseSidebarButton">
                             <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 14H26M10 22H26" stroke="#858585" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </div>
                         </div>
@@ -14290,7 +14315,7 @@ Do not include markdown formatting or explanations.`
                 }}
             >
                 <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 14H26M10 22H26" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
             </div>
 
@@ -14473,11 +14498,12 @@ Do not include markdown formatting or explanations.`
                                     />
                                 ) : (
                                     <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>
-                                        {chat.isPinned && <span style={{ marginRight: 4 }}>📌</span>}{chat.title}
+                                        {chat.title}
                                     </div>
                                 )}
 
-                                {(hoveredChatId === chat.id || menuOpenChatId === chat.id || isMobileLayout) && !editingChatId && (
+
+                                {(hoveredChatId === chat.id || menuOpenChatId === chat.id || isMobileLayout) && !editingChatId ? (
                                         <div
                                         onClick={(e) => {
                                             e.stopPropagation()
@@ -14511,7 +14537,13 @@ Do not include markdown formatting or explanations.`
                                             </svg>
                                         </div>
                                     </div>
-                                )}
+                                ) : (chat.isPinned && !editingChatId && (
+                                    <div data-svg-wrapper data-layer="16x24 to make sure its centered and good" style={{ width: 16, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                                        <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z" fill="white" fillOpacity="0.45"/>
+                                        </svg>
+                                    </div>
+                                ))}
                             </div>
                         ))}
                     </div>
@@ -14549,7 +14581,7 @@ Do not include markdown formatting or explanations.`
                                 }}
                             >
                                 <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M10 14H26M10 22H26" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                             </div>
                         </div>
@@ -14797,7 +14829,13 @@ Do not include markdown formatting or explanations.`
                                 {
                                     id: 'pin',
                                     label: chat.isPinned ? "Unpin" : "Pin",
-                                    icon: (
+                                    icon: chat.isPinned ? (
+                                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M3.61219 6.66505C3.84674 6.66157 4.11171 6.66951 4.37683 6.67872L5.57408 7.90234C5.16225 7.90665 4.74889 7.89255 4.38855 7.87988C3.99177 7.86593 3.67685 7.85673 3.45106 7.87109C3.17446 7.88872 2.82596 8.14464 2.62684 8.59374C2.42793 9.04267 2.49466 9.40603 2.67274 9.58396L7.6141 14.5263C7.79323 14.7053 8.15755 14.7719 8.60628 14.5732C9.05537 14.3741 9.31132 14.0261 9.32893 13.749C9.34312 13.5229 9.33317 13.2073 9.31916 12.8105C9.30726 12.4734 9.29485 12.0901 9.2967 11.705L10.5233 12.957C10.5336 13.2703 10.5417 13.5762 10.5262 13.8242C10.4706 14.7067 9.78154 15.3655 9.0926 15.6708C8.44618 15.9572 7.55502 16.0351 6.89438 15.4921L6.76548 15.3749L4.71862 13.3281L1.02334 17.0243C0.789076 17.2586 0.410024 17.2585 0.175696 17.0243C-0.058565 16.79 -0.0585655 16.411 0.175696 16.1767L3.87 12.4794L1.82412 10.4326C1.15477 9.76359 1.22403 8.7962 1.5292 8.10742C1.83442 7.41895 2.49268 6.72947 3.37488 6.67384L3.61219 6.66505Z" fill="white" fillOpacity="0.95"/>
+                                            <path d="M0.314366 0.397528C0.511812 0.204725 0.828424 0.208084 1.02139 0.405341L6.98911 6.5127H6.99204L7.86703 7.40527L7.86312 7.40723L9.77228 9.36131C9.77342 9.35957 9.77505 9.35816 9.77619 9.35643L10.6639 10.2627C10.6629 10.2656 10.6619 10.2685 10.6609 10.2715L16.0369 15.7734C16.2298 15.9708 16.2263 16.2874 16.0291 16.4804C15.8316 16.6733 15.515 16.6699 15.322 16.4726L0.306554 1.10455C0.113661 0.907105 0.117057 0.59052 0.314366 0.397528Z" fill="white" fillOpacity="0.95"/>
+                                            <path d="M10.5047 0.35749C11.0516 -0.00459142 11.9578 -0.250724 12.6385 0.429755L16.7683 4.56057C17.451 5.24176 17.2044 6.14765 16.8416 6.69434C16.6484 6.98522 16.3879 7.24439 16.0945 7.43066C15.8414 7.59129 15.5327 7.71638 15.2009 7.73144H15.0574C14.8582 7.72095 14.6246 7.68762 14.4177 7.66015C14.1981 7.63099 13.9857 7.60485 13.783 7.59473C13.3896 7.57513 13.187 7.62869 13.0916 7.69336L13.0574 7.7207L11.2977 9.48045L10.4578 8.62304L12.2088 6.87208C12.6819 6.39988 13.3717 6.37294 13.8435 6.39649C14.1011 6.40938 14.3577 6.44173 14.5759 6.47071C14.807 6.50141 14.9816 6.5259 15.1209 6.53321L15.1785 6.52931C15.2452 6.51967 15.3393 6.48943 15.4519 6.41798C15.5975 6.32551 15.7378 6.18738 15.8416 6.03126C16.0724 5.68355 16.0031 5.49159 15.9216 5.41018L11.7908 1.27838C11.7098 1.19735 11.5164 1.12768 11.1678 1.35846C11.0113 1.46205 10.8732 1.60193 10.7811 1.74712C10.6865 1.89621 10.6633 2.01205 10.6668 2.07622V2.07915C10.6741 2.21844 10.6986 2.39309 10.7293 2.62407C10.7583 2.84224 10.7907 3.09894 10.8035 3.35648C10.8271 3.82819 10.8 4.51623 10.3279 4.98928L8.59554 6.72071L7.7557 5.8633L9.47932 4.14163L9.50666 4.10745C9.57136 4.012 9.62493 3.80929 9.60529 3.41605C9.59516 3.21358 9.56902 3.00171 9.53986 2.78227C9.51249 2.57622 9.47918 2.34335 9.46858 2.14458C9.44659 1.75729 9.58359 1.39439 9.7674 1.10455C9.95384 0.810629 10.2135 0.55033 10.5047 0.35749Z" fill="white" fillOpacity="0.95"/>
+                                        </svg>
+                                    ) : (
                                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <path d="M0.601562 16.6008L4.71716 12.4843M2.25047 10.0088C1.40246 9.16164 2.2558 7.34562 3.41493 7.27273C4.46205 7.20606 6.88607 7.58562 7.69231 6.77939L9.90566 4.56603C10.4541 4.01669 10.1057 2.78824 10.0701 2.1109C10.0186 1.20778 11.455 0.0922083 12.2168 0.853994L16.3475 4.98559C17.112 5.74827 15.9919 7.18028 15.0915 7.13228C14.4142 7.09673 13.1848 6.74828 12.6355 7.29673L10.4221 9.51009C9.61677 10.3163 9.99544 12.7395 9.92966 13.7866C9.85677 14.9466 8.04075 15.7999 7.19185 14.951L2.25047 10.0088Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </svg>
