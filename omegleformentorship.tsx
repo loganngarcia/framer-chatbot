@@ -8739,7 +8739,10 @@ Do not include markdown formatting or explanations.`
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => {
         if (typeof window !== "undefined") {
             const saved = localStorage.getItem("is_sidebar_open")
-            return saved === "true"
+            // If saved value exists, use it. Otherwise default to false (collapsed).
+            if (saved !== null) {
+                return saved === "true"
+            }
         }
         return false
     })
@@ -9214,6 +9217,7 @@ Do not include markdown formatting or explanations.`
 
     // Default Suggestions Logic
     React.useEffect(() => {
+        // Always set suggestions if messages are empty, regardless of how we got there
         if (messages.length === 0 && defaultSuggestions && defaultSuggestions.length > 0) {
             // Shuffle
             const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
@@ -9221,7 +9225,7 @@ Do not include markdown formatting or explanations.`
             const count = 10
             setAiGeneratedSuggestions(shuffled.slice(0, count))
         }
-    }, [isMobileLayout, defaultSuggestions, messages.length])
+    }, [isMobileLayout, defaultSuggestions, messages.length, currentChatId]) // Added currentChatId dependency
 
     const peerMetadataRef = React.useRef<Map<string, { isMobile: boolean }>>(new Map())
     const isMobileLayoutRef = React.useRef(isMobileLayout)
@@ -10098,7 +10102,15 @@ Do not include markdown formatting or explanations.`
         const newId = Date.now().toString()
         setCurrentChatId(newId)
         setMessages([])
-        setAiGeneratedSuggestions([])
+        
+        // Reset suggestions with default ones if available
+        if (defaultSuggestions && defaultSuggestions.length > 0) {
+            const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
+            setAiGeneratedSuggestions(shuffled.slice(0, 10))
+        } else {
+            setAiGeneratedSuggestions([])
+        }
+        
         setDocContent("") // Reset docs too? Usually yes for new chat.
         
         // Clear persistence
@@ -12351,6 +12363,22 @@ Do not include markdown formatting or explanations.`
             // Log for debugging
             // console.log("[Gemini] First user message detected, triggering title generation")
             generateChatTitle(textToSend)
+
+            // Save chat immediately on first message
+            setSavedChats(prev => {
+                const existing = prev.find(c => c.id === currentChatId)
+                if (existing) return prev
+
+                const newChat: ChatSession = {
+                    id: currentChatId,
+                    title: "New Chat", // Temporary title until generated
+                    timestamp: Date.now(),
+                    messages: [userMsg],
+                    notes: docContent,
+                    whiteboard: null
+                }
+                return [newChat, ...prev]
+            })
         }
 
         setInputText("")
@@ -13009,8 +13037,10 @@ Do not include markdown formatting or explanations.`
                         {/* 
                           New Chat button - Mobile/Duplicated version
                           Same logic: only show if current chat is NOT saved (new)
+                          BUT NOW: We HIDE this if it's unsaved, so it doesn't appear in list until message sent.
+                          The prompt requested: "a new chat shouldnt be SHOWN in sidebar until a mesage is actually snet"
                         */}
-                        {!savedChats.find(c => c.id === currentChatId) && (
+                        {false && !savedChats.find(c => c.id === currentChatId) && (
                              <div 
                                 onClick={() => {
                                     setIsSidebarOpen(false)
@@ -14347,13 +14377,15 @@ Do not include markdown formatting or explanations.`
                           
                           So:
                           - We should check if `currentChatId` exists in `savedChats`.
-                          - If NOT, it means it's a new unsaved chat. We should render it in the list.
+                          - If NOT, it means it's a new unsaved chat.
+                          - CHANGED: We now HIDE this item entirely if it's new/unsaved.
+                          - It will only appear once saved (after first message).
                         */}
-                        {!savedChats.find(c => c.id === currentChatId) && (
+                        {false && !savedChats.find(c => c.id === currentChatId) && (
                              <div 
                                 onClick={() => {
                                     // It's already open, just close sidebar
-                                    setIsSidebarOpen(false)
+                                    if (isMobileLayout) setIsSidebarOpen(false)
                                 }}
                                 data-layer="chat item (current new)" 
                                 style={{
@@ -14388,7 +14420,7 @@ Do not include markdown formatting or explanations.`
                                             editorRef.current.store.loadSnapshot(chat.whiteboard)
                                         } catch(e) { console.error(e) }
                                     }
-                                    setIsSidebarOpen(false)
+                                    if (isMobileLayout) setIsSidebarOpen(false)
                                 }} 
                                 onMouseEnter={() => setHoveredChatId(chat.id)}
                                 onMouseLeave={() => setHoveredChatId(null)}
@@ -14490,7 +14522,7 @@ Do not include markdown formatting or explanations.`
                                 data-svg-wrapper 
                                 data-layer="new chat (6% white fill on HOVER)" 
                                 className="NewChat6WhiteFillOnHover"
-                                onClick={(e) => { e.stopPropagation(); handleClearMessages(); setIsSidebarOpen(false); }}
+                                onClick={(e) => { e.stopPropagation(); handleClearMessages(); if (isMobileLayout) setIsSidebarOpen(false); }}
                                 onMouseEnter={() => setIsTopNewChatHovered(true)}
                                 onMouseLeave={() => setIsTopNewChatHovered(false)}
                                 style={{
