@@ -12823,7 +12823,7 @@ Do not include markdown formatting or explanations.`
         >
 
                 {false && (
-                    <div data-layer="left sidebar" className="LeftSidebar" style={{width: 240, height: 982, maxHeight: '100%', paddingTop: 128, position: 'absolute', top: 0, left: 0, bottom: 0, background: '#181818', overflow: 'hidden', borderRight: '0.33px rgba(255, 255, 255, 0.20) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', zIndex: 10000}}>
+                    <div data-layer="left sidebar" className="LeftSidebar" style={{width: 260, height: 982, maxHeight: '100%', paddingTop: 128, position: 'absolute', top: 0, left: 0, bottom: 0, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', zIndex: 10000}}>
                       <div data-layer="chat history flexbox" className="ChatHistoryFlexbox" style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}>
                         <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
                           <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word'}}>Your chats</div>
@@ -12886,7 +12886,7 @@ Do not include markdown formatting or explanations.`
                         ))}
                       </div>
                       
-                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 240, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, left: 0, top: 0, position: 'absolute', background: '#181818', borderRight: '1px rgba(255, 255, 255, 0.10) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
+                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 260, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, right: 0, top: 0, position: 'absolute', background: '#141414', borderLeft: '1px rgba(255, 255, 255, 0.10) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
                         <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
                           <div data-layer="new chat" className="NewChat" style={{width: 36, height: 36, paddingLeft: 9, paddingRight: 9, justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
                             <div data-svg-wrapper data-layer="thinking" className="Thinking" style={{position: 'relative'}}>
@@ -14061,16 +14061,13 @@ Do not include markdown formatting or explanations.`
                 data-layer="open sidebar (6% white fill on hover)" 
                 className="OpenSidebar6WhiteFillOnHover" 
                 style={{
-                    left: 8, 
+                    right: 8, 
                     top: 8, 
                     position: 'absolute', 
                     zIndex: 9999, 
                     cursor: 'pointer',
                     background: isSidebarBtnHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
-                    borderRadius: '50%', // Assuming it should still be round if it has a fill? The prompt didn't specify radius but "fill" implies shape. The SVG is 36x36. I'll keep it round or just wrap. The user snippet has a div wrapper.
-                    // The user snippet provided: <div ... style={{left: 0, top: 0, position: 'absolute'}}> <svg...> </div>
-                    // It doesn't explicitly set width/height on the div, but SVG is 36x36.
-                    // "only when its hovered it should have a 6% white background fill" -> implies the div gets the fill.
+                    borderRadius: '50%',
                     width: 36,
                     height: 36,
                     display: 'flex',
@@ -14089,47 +14086,59 @@ Do not include markdown formatting or explanations.`
                 </svg>
             </div>
 
+            <AnimatePresence>
             {isSidebarOpen && (
                 <>
                     {isMobileLayout && (
-                        <div
+                        <motion.div
+                            key="sidebar-overlay"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
                             style={{
                                 position: "fixed",
                                 top: 0,
                                 left: 0,
                                 right: 0,
-                        bottom: 0,
-                        background: colors.state.overlay,
-                        zIndex: 9999, // Below sidebar (10000)
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        setIsSidebarOpen(false)
-                    }}
-                />
-            )}
-            <div 
-                data-layer="left sidebar" 
-                className="LeftSidebar" 
-                style={{
-                        width: 240, 
-                        height: '100%', 
-                        paddingTop: 108, 
-                        position: 'absolute', 
-                        top: 0, 
-                        left: 0, 
-                        bottom: 0, 
-                        background: '#181818', 
-                        overflow: 'hidden', 
-                        flexDirection: 'column', 
-                        justifyContent: 'flex-start', 
-                        alignItems: 'flex-start', 
-                        gap: 24, 
-                        display: 'inline-flex', 
-                        zIndex: 10000
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
+                                bottom: 0,
+                                background: colors.state.overlay,
+                                zIndex: 9999, // Below sidebar (10000)
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setIsSidebarOpen(false)
+                            }}
+                        />
+                    )}
+                    <motion.div 
+                        key="sidebar-panel"
+                        data-layer="right sidebar"  
+                        className="RightSidebar" 
+                        initial={{ x: "100%" }}
+                        animate={{ x: 0 }}
+                        exit={{ x: "100%" }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        style={{
+                            width: 260, 
+                            height: '100%', 
+                            paddingTop: 108, 
+                            position: 'absolute', 
+                            top: 0, 
+                            right: 0, 
+                            bottom: 0, 
+                            background: '#141414', 
+                            overflow: 'hidden', 
+                            flexDirection: 'column', 
+                            justifyContent: 'flex-start', 
+                            alignItems: 'flex-start', 
+                            gap: 24, 
+                            display: 'inline-flex', 
+                            zIndex: 10000,
+                            borderLeft: '0.33px rgba(255, 255, 255, 0.20) solid'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                     <div 
                         data-layer="chat history flexbox" 
                         className="ChatHistoryFlexbox" 
@@ -14300,7 +14309,7 @@ Do not include markdown formatting or explanations.`
                         ))}
                     </div>
                     
-                    <div data-layer="fixed top nav" className="FixedTopNav" style={{width: '100%', padding: 8, left: 0, top: 0, position: 'absolute', background: '#181818', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 12, display: 'inline-flex'}}>
+                    <div data-layer="fixed top nav" className="FixedTopNav" style={{width: '100%', padding: 8, left: 0, top: 0, position: 'absolute', background: '#141414', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 12, display: 'inline-flex'}}>
                         <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
                             <div 
                                 data-svg-wrapper 
@@ -14364,9 +14373,10 @@ Do not include markdown formatting or explanations.`
                             />
                         </div>
                     </div>
-                </div>
+                </motion.div>
                 </>
             )}
+            </AnimatePresence>
             {/* BAN BANNER */}
             {isBanned && (
                 <div 
@@ -14404,8 +14414,8 @@ Do not include markdown formatting or explanations.`
                     width: "100%", 
                     height: "100%", 
                     overflow: "hidden",
-                    paddingLeft: (!isMobileLayout && isSidebarOpen) ? 240 : 0,
-                    transition: "padding-left 0.2s ease-in-out"
+                    paddingRight: (!isMobileLayout && isSidebarOpen) ? 260 : 0,
+                    transition: "padding-right 0.2s ease-in-out"
                 }}
             >
                 {/* Right: Sidebar / Standard View */}
