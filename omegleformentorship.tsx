@@ -1,6 +1,11 @@
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { addPropertyControls, ControlType, RenderTarget, useIsStaticRenderer } from "framer"
+import {
+    addPropertyControls,
+    ControlType,
+    RenderTarget,
+    useIsStaticRenderer,
+} from "framer"
 import { motion, AnimatePresence } from "framer-motion"
 // @ts-ignore
 import {
@@ -32,55 +37,413 @@ interface ChatSession {
 // Three Letter Word List for Hash Generation
 // -----------------------------------------------------------------------------
 const THREE_LETTER_WORDS = [
-    "ace", "act", "add", "age", "ago", "aid", "aim", "air", "all", "amp",
-    "ant", "ape", "apt", "arc", "arm", "art", "ash", "ask", "ate",
-    "axe", "bad", "bag", "ban", "bar", "bat", "bay", "bed", "bee", "bet",
-    "bib", "bid", "big", "bin", "bit", "bow", "box", "boy", "bud", "bug",
-    "bun", "bus", "cab", "can", "cap", "car", "cat", "cod", "cog", "cop",
-    "cot", "cow", "cry", "cub", "cue", "cup", "cut", "dad", "day", "den",
-    "did", "dig", "dim", "dip", "dog", "dot", "dry", "dug", "duo",
-    "dye", "ear", "eat", "egg", "ego", "elf", "elk", "elm", "end", "era",
-    "eve", "fan", "far", "fat", "fax", "fed", "fee", "few", "fig",
-    "fin", "fit", "fix", "fly", "fob", "fog", "for", "fox", "fry", "fun",
-    "fur", "gag", "gap", "gas", "gel", "gem", "get", "gig", "gin", "got",
-    "gum", "gut", "guy", "gym", "had", "ham", "has", "hat", "hay", "hem",
-    "hen", "her", "hid", "him", "hip", "his", "hit", "hog", "hop",
-    "hot", "how", "hub", "hug", "hum", "hut", "ice", "ill", "ink", "inn",
-    "ion", "ivy", "jab", "jam", "jar", "jaw", "jay", "jet", "jig", "job",
-    "jog", "joy", "jug", "keg", "key", "kid", "kin", "kit", "lab", "lad",
-    "lag", "lap", "law", "lay", "led", "leg", "let", "lid", "lie", "lip",
-    "lit", "lob", "log", "lot", "low", "lug", "mad", "man", "map", "mat",
-    "max", "men", "met", "mid", "mix", "mob", "mom", "mop", "mow", "mud",
-    "mug", "nab", "nap", "net", "new", "nil", "nip", "nod", "nor", "now",
-    "nun", "nut", "oak", "oar", "oat", "odd", "off", "oil", "old",
-    "orb", "ore", "our", "out", "owl", "own", "pad", "pal", "pan",
-    "par", "pat", "paw", "pay", "pea", "peg", "pen", "pep", "pet", "pie",
-    "pig", "pin", "pit", "pod", "pop", "pot", "pro", "pub", "pug", "pun",
-    "pup", "put", "rag", "ram", "ran", "rap", "rat", "raw", "ray", "red",
-    "rib", "rid", "rig", "rim", "rip", "rob", "rod", "rot", "row", "rub",
-    "rug", "run", "rut", "sad", "sag", "sap", "sat", "saw", "say", "sea",
-    "see", "set", "sew", "she", "shy", "sin", "sip", "sir", "sit",
-    "ski", "sky", "sly", "sob", "sod", "son", "sow", "soy", "spa", "spy",
-    "sub", "sum", "sun", "tab", "tag", "tan", "tap", "tar", "tax", "tea",
-    "ten", "the", "tie", "tin", "tip", "toe", "ton", "top", "tow", "toy",
-    "try", "tub", "tug", "urn", "use", "van", "vet", "via",
-    "vow", "wag", "war", "wax", "way", "web", "wed", "wet", "who", "wig",
-    "win", "wit", "won", "wow", "yak", "yam", "yap", "yes", "yet",
-    "you", "zap", "zip", "zoo", "moo", "boo", "goo", "bop",
+    "ace",
+    "act",
+    "add",
+    "age",
+    "ago",
+    "aid",
+    "aim",
+    "air",
+    "all",
+    "amp",
+    "ant",
+    "ape",
+    "apt",
+    "arc",
+    "arm",
+    "art",
+    "ash",
+    "ask",
+    "ate",
+    "axe",
+    "bad",
+    "bag",
+    "ban",
+    "bar",
+    "bat",
+    "bay",
+    "bed",
+    "bee",
+    "bet",
+    "bib",
+    "bid",
+    "big",
+    "bin",
+    "bit",
+    "bow",
+    "box",
+    "boy",
+    "bud",
+    "bug",
+    "bun",
+    "bus",
+    "cab",
+    "can",
+    "cap",
+    "car",
+    "cat",
+    "cod",
+    "cog",
+    "cop",
+    "cot",
+    "cow",
+    "cry",
+    "cub",
+    "cue",
+    "cup",
+    "cut",
+    "dad",
+    "day",
+    "den",
+    "did",
+    "dig",
+    "dim",
+    "dip",
+    "dog",
+    "dot",
+    "dry",
+    "dug",
+    "duo",
+    "dye",
+    "ear",
+    "eat",
+    "egg",
+    "ego",
+    "elf",
+    "elk",
+    "elm",
+    "end",
+    "era",
+    "eve",
+    "fan",
+    "far",
+    "fat",
+    "fax",
+    "fed",
+    "fee",
+    "few",
+    "fig",
+    "fin",
+    "fit",
+    "fix",
+    "fly",
+    "fob",
+    "fog",
+    "for",
+    "fox",
+    "fry",
+    "fun",
+    "fur",
+    "gag",
+    "gap",
+    "gas",
+    "gel",
+    "gem",
+    "get",
+    "gig",
+    "gin",
+    "got",
+    "gum",
+    "gut",
+    "guy",
+    "gym",
+    "had",
+    "ham",
+    "has",
+    "hat",
+    "hay",
+    "hem",
+    "hen",
+    "her",
+    "hid",
+    "him",
+    "hip",
+    "his",
+    "hit",
+    "hog",
+    "hop",
+    "hot",
+    "how",
+    "hub",
+    "hug",
+    "hum",
+    "hut",
+    "ice",
+    "ill",
+    "ink",
+    "inn",
+    "ion",
+    "ivy",
+    "jab",
+    "jam",
+    "jar",
+    "jaw",
+    "jay",
+    "jet",
+    "jig",
+    "job",
+    "jog",
+    "joy",
+    "jug",
+    "keg",
+    "key",
+    "kid",
+    "kin",
+    "kit",
+    "lab",
+    "lad",
+    "lag",
+    "lap",
+    "law",
+    "lay",
+    "led",
+    "leg",
+    "let",
+    "lid",
+    "lie",
+    "lip",
+    "lit",
+    "lob",
+    "log",
+    "lot",
+    "low",
+    "lug",
+    "mad",
+    "man",
+    "map",
+    "mat",
+    "max",
+    "men",
+    "met",
+    "mid",
+    "mix",
+    "mob",
+    "mom",
+    "mop",
+    "mow",
+    "mud",
+    "mug",
+    "nab",
+    "nap",
+    "net",
+    "new",
+    "nil",
+    "nip",
+    "nod",
+    "nor",
+    "now",
+    "nun",
+    "nut",
+    "oak",
+    "oar",
+    "oat",
+    "odd",
+    "off",
+    "oil",
+    "old",
+    "orb",
+    "ore",
+    "our",
+    "out",
+    "owl",
+    "own",
+    "pad",
+    "pal",
+    "pan",
+    "par",
+    "pat",
+    "paw",
+    "pay",
+    "pea",
+    "peg",
+    "pen",
+    "pep",
+    "pet",
+    "pie",
+    "pig",
+    "pin",
+    "pit",
+    "pod",
+    "pop",
+    "pot",
+    "pro",
+    "pub",
+    "pug",
+    "pun",
+    "pup",
+    "put",
+    "rag",
+    "ram",
+    "ran",
+    "rap",
+    "rat",
+    "raw",
+    "ray",
+    "red",
+    "rib",
+    "rid",
+    "rig",
+    "rim",
+    "rip",
+    "rob",
+    "rod",
+    "rot",
+    "row",
+    "rub",
+    "rug",
+    "run",
+    "rut",
+    "sad",
+    "sag",
+    "sap",
+    "sat",
+    "saw",
+    "say",
+    "sea",
+    "see",
+    "set",
+    "sew",
+    "she",
+    "shy",
+    "sin",
+    "sip",
+    "sir",
+    "sit",
+    "ski",
+    "sky",
+    "sly",
+    "sob",
+    "sod",
+    "son",
+    "sow",
+    "soy",
+    "spa",
+    "spy",
+    "sub",
+    "sum",
+    "sun",
+    "tab",
+    "tag",
+    "tan",
+    "tap",
+    "tar",
+    "tax",
+    "tea",
+    "ten",
+    "the",
+    "tie",
+    "tin",
+    "tip",
+    "toe",
+    "ton",
+    "top",
+    "tow",
+    "toy",
+    "try",
+    "tub",
+    "tug",
+    "urn",
+    "use",
+    "van",
+    "vet",
+    "via",
+    "vow",
+    "wag",
+    "war",
+    "wax",
+    "way",
+    "web",
+    "wed",
+    "wet",
+    "who",
+    "wig",
+    "win",
+    "wit",
+    "won",
+    "wow",
+    "yak",
+    "yam",
+    "yap",
+    "yes",
+    "yet",
+    "you",
+    "zap",
+    "zip",
+    "zoo",
+    "moo",
+    "boo",
+    "goo",
+    "bop",
     // Common names
-    "amy", "ana", "ann", "art", "ben", "bob", "cam", "dan", "deb",
-    "don", "eva", "fay", "flo", "gus", "hal", "ian", "jan", "jay",
-    "jim", "joe", "jon", "joy", "kai", "kay", "ken", "kim", "kit", "leo",
-    "lia", "mac", "max", "meg", "mia", "ned",
-    "pam", "pat", "peg", "pia", "ray", "rex", "rob", "rod",
-    "ron", "roy", "sal", "sam", "sue", "tad", "ted", "tim", "tom", "zac", 
-    "zoe"
+    "amy",
+    "ana",
+    "ann",
+    "art",
+    "ben",
+    "bob",
+    "cam",
+    "dan",
+    "deb",
+    "don",
+    "eva",
+    "fay",
+    "flo",
+    "gus",
+    "hal",
+    "ian",
+    "jan",
+    "jay",
+    "jim",
+    "joe",
+    "jon",
+    "joy",
+    "kai",
+    "kay",
+    "ken",
+    "kim",
+    "kit",
+    "leo",
+    "lia",
+    "mac",
+    "max",
+    "meg",
+    "mia",
+    "ned",
+    "pam",
+    "pat",
+    "peg",
+    "pia",
+    "ray",
+    "rex",
+    "rob",
+    "rod",
+    "ron",
+    "roy",
+    "sal",
+    "sam",
+    "sue",
+    "tad",
+    "ted",
+    "tim",
+    "tom",
+    "zac",
+    "zoe",
 ]
 
 const generateLinkHash = () => {
-    const w1 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
-    const w2 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
-    const w3 = THREE_LETTER_WORDS[Math.floor(Math.random() * THREE_LETTER_WORDS.length)]
+    const w1 =
+        THREE_LETTER_WORDS[
+            Math.floor(Math.random() * THREE_LETTER_WORDS.length)
+        ]
+    const w2 =
+        THREE_LETTER_WORDS[
+            Math.floor(Math.random() * THREE_LETTER_WORDS.length)
+        ]
+    const w3 =
+        THREE_LETTER_WORDS[
+            Math.floor(Math.random() * THREE_LETTER_WORDS.length)
+        ]
     return `#${w1}-${w2}-${w3}`
 }
 
@@ -141,7 +504,7 @@ function detectVoiceActivity(
 
         if (i > 0 && audioData[i] * audioData[i - 1] < 0) {
             zeroCrossings++
-    }
+        }
     }
 
     const rms = Math.sqrt(sumSquares / audioData.length)
@@ -188,15 +551,16 @@ const getDeviceInfo = () => {
     if (typeof navigator === "undefined") {
         return { isMobile: false, isMac: false, isIOS: false, isAndroid: false }
     }
-    
+
     const ua = navigator.userAgent
     const platform = navigator.platform
-    
-    const isIOS = /iPhone|iPad|iPod/.test(ua) || /iPhone|iPad|iPod/.test(platform)
+
+    const isIOS =
+        /iPhone|iPad|iPod/.test(ua) || /iPhone|iPad|iPod/.test(platform)
     const isAndroid = /Android/.test(ua)
     const isMac = /Mac/.test(platform) || /Macintosh/.test(ua)
     const isMobile = isIOS || isAndroid
-    
+
     return { isMobile, isMac: isMac || isIOS, isIOS, isAndroid }
 }
 
@@ -212,9 +576,9 @@ interface TooltipProps {
 
 const Tooltip = ({ children, style }: TooltipProps) => {
     // Initial render with hidden opacity to avoid flash of wrong position
-    const [position, setPosition] = React.useState<React.CSSProperties>({ 
-        ...style, 
-        visibility: "hidden" 
+    const [position, setPosition] = React.useState<React.CSSProperties>({
+        ...style,
+        visibility: "hidden",
     })
     const tooltipRef = React.useRef<HTMLDivElement>(null)
 
@@ -222,12 +586,13 @@ const Tooltip = ({ children, style }: TooltipProps) => {
         if (!tooltipRef.current) return
 
         const rect = tooltipRef.current.getBoundingClientRect()
-        const parentRect = tooltipRef.current.offsetParent?.getBoundingClientRect()
+        const parentRect =
+            tooltipRef.current.offsetParent?.getBoundingClientRect()
         const EDGE_PADDING = 8
-        
-        const newStyle: React.CSSProperties = { 
+
+        const newStyle: React.CSSProperties = {
             ...style,
-            visibility: "visible"
+            visibility: "visible",
         }
 
         if (parentRect) {
@@ -241,7 +606,8 @@ const Tooltip = ({ children, style }: TooltipProps) => {
 
             // Check right edge
             if (theoreticalRight > window.innerWidth - EDGE_PADDING) {
-                const offset = parentRect.right - (window.innerWidth - EDGE_PADDING)
+                const offset =
+                    parentRect.right - (window.innerWidth - EDGE_PADDING)
                 newStyle.right = `${offset}px`
                 newStyle.left = "auto"
                 newStyle.transform = "translateY(8px)"
@@ -259,7 +625,7 @@ const Tooltip = ({ children, style }: TooltipProps) => {
             if (theoreticalBottom > window.innerHeight) {
                 newStyle.bottom = "100%"
                 newStyle.top = "auto"
-                
+
                 // If we adjusted horizontally, use simple vertical flip
                 if (newStyle.transform === "translateY(8px)") {
                     newStyle.transform = "translateY(-8px)"
@@ -271,14 +637,15 @@ const Tooltip = ({ children, style }: TooltipProps) => {
         }
 
         // Only update if different to avoid loops (though layout effect runs synchronously)
-        setPosition(prev => {
-             // Simple shallow comparison for style props
-             const isSame = Object.keys(newStyle).every(
-                 key => newStyle[key as keyof React.CSSProperties] === prev[key as keyof React.CSSProperties]
-             )
-             return isSame ? prev : newStyle
+        setPosition((prev) => {
+            // Simple shallow comparison for style props
+            const isSame = Object.keys(newStyle).every(
+                (key) =>
+                    newStyle[key as keyof React.CSSProperties] ===
+                    prev[key as keyof React.CSSProperties]
+            )
+            return isSame ? prev : newStyle
         })
-
     }, [style, children])
 
     return (
@@ -360,7 +727,7 @@ const darkColors = {
     background: "#212121",
     surface: "#303030",
     surfaceHighlight: "#3D3D3D",
-    surfaceMenu: "#353535", 
+    surfaceMenu: "#353535",
     surfaceModal: "#1E1E1E",
     card: "#2E2E2E",
 
@@ -632,7 +999,7 @@ const applyInlineFormatting = (
             const rawUrl = httpUrl || plainUrl
             let url = rawUrl
             let tail = ""
-            
+
             // Trim trailing punctuation and unbalanced parens
             while (url.length > 0) {
                 const lastChar = url[url.length - 1]
@@ -643,7 +1010,7 @@ const applyInlineFormatting = (
                     continue
                 }
                 // Parentheses balance check
-                if (lastChar === ')') {
+                if (lastChar === ")") {
                     const openCount = (url.match(/\(/g) || []).length
                     const closeCount = (url.match(/\)/g) || []).length
                     if (closeCount > openCount) {
@@ -656,9 +1023,9 @@ const applyInlineFormatting = (
                 if (lastChar === '"') {
                     const quoteCount = (url.match(/"/g) || []).length
                     if (quoteCount % 2 !== 0) {
-                         url = url.slice(0, -1)
-                         tail = lastChar + tail
-                         continue
+                        url = url.slice(0, -1)
+                        tail = lastChar + tail
+                        continue
                     }
                 }
                 break
@@ -720,7 +1087,10 @@ const renderTable = (
     )
 
     return (
-        <div key={key} style={{ overflowX: "auto", width: "100%", display: "block" }}>
+        <div
+            key={key}
+            style={{ overflowX: "auto", width: "100%", display: "block" }}
+        >
             <table className="chat-markdown-table">
                 <thead>
                     <tr>
@@ -783,11 +1153,11 @@ const renderSimpleMarkdown = (
         // Split by lines to handle mixed content better
         const lines = segment.split("\n")
         const nodes: JSX.Element[] = []
-        
+
         let currentListType: "ul" | "ol" | null = null
         let currentListItems: string[] = []
         let currentTableLines: string[] = []
-        
+
         const flushList = () => {
             if (!currentListType || currentListItems.length === 0) return
             const ListTag = currentListType === "ul" ? "ul" : "ol"
@@ -798,12 +1168,17 @@ const renderSimpleMarkdown = (
                     style={{
                         paddingLeft: 20,
                         margin: "0.5em 0",
-                        listStyleType: currentListType === "ul" ? "disc" : "decimal",
+                        listStyleType:
+                            currentListType === "ul" ? "disc" : "decimal",
                     }}
                 >
                     {currentListItems.map((item, i) => (
                         <li key={`${key}-li-${i}`} style={baseTextStyle}>
-                            {applyInlineFormatting(item, `${key}-li-${i}`, linkStyle)}
+                            {applyInlineFormatting(
+                                item,
+                                `${key}-li-${i}`,
+                                linkStyle
+                            )}
                         </li>
                     ))}
                 </ListTag>
@@ -813,40 +1188,66 @@ const renderSimpleMarkdown = (
         }
 
         const flushTable = () => {
-             if (currentTableLines.length === 0) return
-             // Basic validation: needs at least header and separator
-             if (currentTableLines.length >= 2 && currentTableLines[1].includes("---")) {
-                 const key = `table-${segIndex}-${nodes.length}`
-                 const tableBlock = currentTableLines.join("\n")
-                 const table = renderTable(tableBlock, key, baseTextStyle, linkStyle)
-                 if (table) nodes.push(table)
-                 else {
-                     // Fallback: render as text lines if table parsing failed
-                     currentTableLines.forEach((line, i) => {
+            if (currentTableLines.length === 0) return
+            // Basic validation: needs at least header and separator
+            if (
+                currentTableLines.length >= 2 &&
+                currentTableLines[1].includes("---")
+            ) {
+                const key = `table-${segIndex}-${nodes.length}`
+                const tableBlock = currentTableLines.join("\n")
+                const table = renderTable(
+                    tableBlock,
+                    key,
+                    baseTextStyle,
+                    linkStyle
+                )
+                if (table) nodes.push(table)
+                else {
+                    // Fallback: render as text lines if table parsing failed
+                    currentTableLines.forEach((line, i) => {
                         nodes.push(
-                            <div key={`p-tbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: "0.2em 0" }}>
-                                {applyInlineFormatting(line, `p-tbl-${segIndex}-${nodes.length}-${i}`, linkStyle)}
+                            <div
+                                key={`p-tbl-${segIndex}-${nodes.length}-${i}`}
+                                style={{ ...baseTextStyle, margin: "0.2em 0" }}
+                            >
+                                {applyInlineFormatting(
+                                    line,
+                                    `p-tbl-${segIndex}-${nodes.length}-${i}`,
+                                    linkStyle
+                                )}
                             </div>
                         )
-                     })
-                 }
-             } else {
-                 // Not a valid table, render as text lines
-                 currentTableLines.forEach((line, i) => {
+                    })
+                }
+            } else {
+                // Not a valid table, render as text lines
+                currentTableLines.forEach((line, i) => {
                     nodes.push(
-                        <div key={`p-badtbl-${segIndex}-${nodes.length}-${i}`} style={{ ...baseTextStyle, margin: 0, minHeight: "1.2em" }}>
-                            {applyInlineFormatting(line, `p-badtbl-${segIndex}-${nodes.length}-${i}`, linkStyle)}
+                        <div
+                            key={`p-badtbl-${segIndex}-${nodes.length}-${i}`}
+                            style={{
+                                ...baseTextStyle,
+                                margin: 0,
+                                minHeight: "1.2em",
+                            }}
+                        >
+                            {applyInlineFormatting(
+                                line,
+                                `p-badtbl-${segIndex}-${nodes.length}-${i}`,
+                                linkStyle
+                            )}
                         </div>
                     )
-                 })
-             }
-             currentTableLines = []
+                })
+            }
+            currentTableLines = []
         }
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i]
             const trimmed = line.trim()
-            
+
             // Table handling
             if (trimmed.includes("|")) {
                 flushList() // Close list if we enter a table
@@ -859,7 +1260,7 @@ const renderSimpleMarkdown = (
             // List handling
             const ulMatch = trimmed.match(/^[-*]\s+(.*)/)
             const olMatch = trimmed.match(/^(\d+)\.\s+(.*)/)
-            
+
             if (ulMatch) {
                 if (currentListType !== "ul") flushList()
                 currentListType = "ul"
@@ -873,7 +1274,7 @@ const renderSimpleMarkdown = (
             } else {
                 flushList()
             }
-            
+
             // if (!trimmed) continue
 
             // Headings
@@ -892,37 +1293,60 @@ const renderSimpleMarkdown = (
                             margin: "0.5em 0",
                         }}
                     >
-                        {applyInlineFormatting(content, `h-${segIndex}-${i}`, linkStyle)}
+                        {applyInlineFormatting(
+                            content,
+                            `h-${segIndex}-${i}`,
+                            linkStyle
+                        )}
                     </div>
                 )
                 continue
             }
-            
+
             // Blockquote
             if (trimmed.startsWith(">")) {
                 const content = trimmed.replace(/^>\s?/gm, "").trim()
                 nodes.push(
-                    <blockquote key={`qt-${segIndex}-${i}`} className="chat-markdown-blockquote">
-                        {applyInlineFormatting(content, `qt-${segIndex}-${i}`, linkStyle)}
+                    <blockquote
+                        key={`qt-${segIndex}-${i}`}
+                        className="chat-markdown-blockquote"
+                    >
+                        {applyInlineFormatting(
+                            content,
+                            `qt-${segIndex}-${i}`,
+                            linkStyle
+                        )}
                     </blockquote>
                 )
                 continue
             }
-            
+
             // Horizontal Rule
             if (/^---+$|^\*\*\*+$/.test(trimmed)) {
-                nodes.push(<hr key={`hr-${segIndex}-${i}`} className="chat-markdown-hr" />)
+                nodes.push(
+                    <hr
+                        key={`hr-${segIndex}-${i}`}
+                        className="chat-markdown-hr"
+                    />
+                )
                 continue
             }
 
             // Regular Paragraph Line
             nodes.push(
-                <div key={`p-${segIndex}-${i}`} style={{ ...baseTextStyle, margin: 0, minHeight: "1.2em" }}>
-                    {applyInlineFormatting(trimmed, `p-${segIndex}-${i}`, linkStyle)}
+                <div
+                    key={`p-${segIndex}-${i}`}
+                    style={{ ...baseTextStyle, margin: 0, minHeight: "1.2em" }}
+                >
+                    {applyInlineFormatting(
+                        trimmed,
+                        `p-${segIndex}-${i}`,
+                        linkStyle
+                    )}
                 </div>
             )
         }
-        
+
         flushList()
         flushTable()
 
@@ -963,37 +1387,86 @@ const DAILY_MESSAGE_LIMIT = 250 // Limit messages per day
 
 // --- INTERFACES ---
 
-const GoogleAd = React.forwardRef<HTMLModElement, { client?: string, slot?: string, format?: string, responsive?: string, layoutKey?: string, style?: React.CSSProperties, className?: string }>(({ client, slot, format = "auto", responsive = "true", layoutKey, style, className }, ref) => {
-    const isStatic = useIsStaticRenderer()
-    
-    React.useEffect(() => {
-        if (typeof window === "undefined" || isStatic || !client || !slot) return;
-        try {
-            // @ts-ignore
-            (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-            console.error("AdSense error", e);
-        }
-    }, [isStatic, client, slot]);
+const GoogleAd = React.forwardRef<
+    HTMLModElement,
+    {
+        client?: string
+        slot?: string
+        format?: string
+        responsive?: string
+        layoutKey?: string
+        style?: React.CSSProperties
+        className?: string
+    }
+>(
+    (
+        {
+            client,
+            slot,
+            format = "auto",
+            responsive = "true",
+            layoutKey,
+            style,
+            className,
+        },
+        ref
+    ) => {
+        const isStatic = useIsStaticRenderer()
 
-    if (!client || !slot) return null;
+        React.useEffect(() => {
+            if (typeof window === "undefined" || isStatic || !client || !slot)
+                return
+            try {
+                // @ts-ignore
+                ;(window.adsbygoogle = window.adsbygoogle || []).push({})
+            } catch (e) {
+                console.error("AdSense error", e)
+            }
+        }, [isStatic, client, slot])
 
-    return (
-        <div className={className} style={{ width: "100%", display: "flex", justifyContent: "center", margin: "16px 0", minHeight: "90px", ...style }}>
-             <ins ref={ref} className="adsbygoogle"
-                 style={{ display: "block", width: "100%" }}
-                 data-ad-client={client}
-                 data-ad-slot={slot}
-                 data-ad-format={format}
-                 data-full-width-responsive={responsive}
-                 data-ad-layout-key={layoutKey}
-             />
-        </div>
-    )
-})
+        if (!client || !slot) return null
 
-function AdCard({ client, slot, layoutKey, onStatusChange }: { client: string, slot: string, layoutKey: string, onStatusChange?: (status: "filled" | "unfilled" | "loading") => void }) {
-    const [status, setStatus] = React.useState<"loading" | "filled" | "unfilled">("loading")
+        return (
+            <div
+                className={className}
+                style={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    margin: "16px 0",
+                    minHeight: "90px",
+                    ...style,
+                }}
+            >
+                <ins
+                    ref={ref}
+                    className="adsbygoogle"
+                    style={{ display: "block", width: "100%" }}
+                    data-ad-client={client}
+                    data-ad-slot={slot}
+                    data-ad-format={format}
+                    data-full-width-responsive={responsive}
+                    data-ad-layout-key={layoutKey}
+                />
+            </div>
+        )
+    }
+)
+
+function AdCard({
+    client,
+    slot,
+    layoutKey,
+    onStatusChange,
+}: {
+    client: string
+    slot: string
+    layoutKey: string
+    onStatusChange?: (status: "filled" | "unfilled" | "loading") => void
+}) {
+    const [status, setStatus] = React.useState<
+        "loading" | "filled" | "unfilled"
+    >("loading")
     const insRef = React.useRef<HTMLModElement>(null)
 
     React.useEffect(() => {
@@ -1002,8 +1475,13 @@ function AdCard({ client, slot, layoutKey, onStatusChange }: { client: string, s
 
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-                if (mutation.type === "attributes" && mutation.attributeName === "data-ad-status") {
-                    const s = ins.getAttribute("data-ad-status") as "filled" | "unfilled"
+                if (
+                    mutation.type === "attributes" &&
+                    mutation.attributeName === "data-ad-status"
+                ) {
+                    const s = ins.getAttribute("data-ad-status") as
+                        | "filled"
+                        | "unfilled"
                     if (s === "filled" || s === "unfilled") {
                         setStatus(s)
                         onStatusChange?.(s)
@@ -1017,44 +1495,52 @@ function AdCard({ client, slot, layoutKey, onStatusChange }: { client: string, s
     }, [onStatusChange])
 
     // Hide completely if unfilled OR still loading (to prevent empty height gap)
-    if (status === "unfilled" || status === "loading") return (
-        <div style={{ display: 'none' }}>
-             <GoogleAd 
-                ref={insRef}
-                client={client} 
-                slot={slot} 
-                layoutKey={layoutKey} 
-                format={layoutKey ? "fluid" : "auto"}
-                style={{ margin: 0, minHeight: "auto" }}
-            />
-        </div>
-    )
+    if (status === "unfilled" || status === "loading")
+        return (
+            <div style={{ display: "none" }}>
+                <GoogleAd
+                    ref={insRef}
+                    client={client}
+                    slot={slot}
+                    layoutKey={layoutKey}
+                    format={layoutKey ? "fluid" : "auto"}
+                    style={{ margin: 0, minHeight: "auto" }}
+                />
+            </div>
+        )
 
     return (
-        <div 
+        <div
             style={{
-                width: 300, 
-                flexShrink: 0, 
-                maxHeight: 384, 
-                paddingTop: 14, 
-                paddingBottom: 14, 
-                paddingLeft: 20, 
-                paddingRight: 16, 
-                background: '#303030', 
-                overflow: 'hidden', 
-                borderRadius: 28, 
-                justifyContent: 'flex-start', 
-                alignItems: 'center', 
-                gap: 4, 
-                display: 'flex'
+                width: 300,
+                flexShrink: 0,
+                maxHeight: 384,
+                paddingTop: 14,
+                paddingBottom: 14,
+                paddingLeft: 20,
+                paddingRight: 16,
+                background: "#303030",
+                overflow: "hidden",
+                borderRadius: 28,
+                justifyContent: "flex-start",
+                alignItems: "center",
+                gap: 4,
+                display: "flex",
             }}
         >
-            <div style={{flex: '1 1 0', height: "auto", minHeight: 46.52, width: "100%"}}>
-                <GoogleAd 
+            <div
+                style={{
+                    flex: "1 1 0",
+                    height: "auto",
+                    minHeight: 46.52,
+                    width: "100%",
+                }}
+            >
+                <GoogleAd
                     ref={insRef}
-                    client={client} 
-                    slot={slot} 
-                    layoutKey={layoutKey} 
+                    client={client}
+                    slot={slot}
+                    layoutKey={layoutKey}
                     format={layoutKey ? "fluid" : "auto"}
                     style={{ margin: 0, minHeight: "auto" }}
                 />
@@ -1063,23 +1549,35 @@ function AdCard({ client, slot, layoutKey, onStatusChange }: { client: string, s
     )
 }
 
-function AdCarousel({ client, slot, layoutKey }: { client: string, slot: string, layoutKey: string }) {
-    const [ad1Status, setAd1Status] = React.useState<"loading" | "filled" | "unfilled">("loading")
-    const [ad2Status, setAd2Status] = React.useState<"loading" | "filled" | "unfilled">("loading")
+function AdCarousel({
+    client,
+    slot,
+    layoutKey,
+}: {
+    client: string
+    slot: string
+    layoutKey: string
+}) {
+    const [ad1Status, setAd1Status] = React.useState<
+        "loading" | "filled" | "unfilled"
+    >("loading")
+    const [ad2Status, setAd2Status] = React.useState<
+        "loading" | "filled" | "unfilled"
+    >("loading")
 
     // Only show the carousel if at least one ad is filled
     const isVisible = ad1Status === "filled" || ad2Status === "filled"
 
     return (
-        <div 
-            data-layer="custom ad carousel" 
-            className="CustomAdCarousel" 
+        <div
+            data-layer="custom ad carousel"
+            className="CustomAdCarousel"
             style={{
-                alignSelf: 'stretch', 
-                justifyContent: 'flex-start', 
-                alignItems: 'flex-start', 
-                gap: 10, 
-                display: isVisible ? 'flex' : 'none', // Hide entire carousel if no ads
+                alignSelf: "stretch",
+                justifyContent: "flex-start",
+                alignItems: "flex-start",
+                gap: 10,
+                display: isVisible ? "flex" : "none", // Hide entire carousel if no ads
                 overflowX: "auto",
                 overflowY: "hidden", // Prevent vertical scrolling
                 paddingBottom: 4, // Space for scrollbar
@@ -1101,21 +1599,21 @@ function AdCarousel({ client, slot, layoutKey }: { client: string, slot: string,
                     display: none; /* Hide scrollbar Chrome/Safari */
                 }
             `}</style>
-            
+
             {/* Ad 1 */}
-            <AdCard 
-                client={client} 
-                slot={slot} 
-                layoutKey={layoutKey} 
+            <AdCard
+                client={client}
+                slot={slot}
+                layoutKey={layoutKey}
                 onStatusChange={setAd1Status}
             />
-            
+
             {/* Ad 2 */}
-            <AdCard 
-                client={client} 
-                slot={slot} 
-                layoutKey={layoutKey} 
-                onStatusChange={setAd2Status} 
+            <AdCard
+                client={client}
+                slot={slot}
+                layoutKey={layoutKey}
+                onStatusChange={setAd2Status}
             />
         </div>
     )
@@ -1244,12 +1742,39 @@ const FileAttachment = React.memo(function FileAttachment({
                     justifyContent: "center",
                 }}
             >
-                <div data-svg-wrapper data-layer="file-icon" className="FileIcon" style={{position: 'relative', width: "100%", height: "100%"}}>
-                  <svg width="100%" height="100%" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M0 14C0 6.26801 6.26801 0 14 0H48V48H14C6.26801 48 0 41.732 0 34V14Z" fill={getIconColor(name, type)}/>
-                  <path d="M15 17C15 16.4477 15.4477 16 16 16H32C32.5523 16 33 16.4477 33 17C33 17.5523 32.5523 18 32 18H16C15.4477 18 15 17.5523 15 17ZM15 24C15 23.4477 15.4477 23 16 23H32C32.5523 23 33 23.4477 33 24C33 24.5523 32.5523 25 32 25H16C15.4477 25 15 24.5523 15 24ZM15 31C15 30.4477 15.4477 30 16 30H23C23.5523 30 24 30.4477 24 31C24 31.5523 23.5523 32 23 32H16C15.4477 32 15 31.5523 15 31Z" fill="white" fillOpacity="0.95"/>
-                  <path d="M23 29.835C23.6434 29.835 24.165 30.3566 24.165 31C24.165 31.6434 23.6434 32.165 23 32.165H16C15.3566 32.165 14.835 31.6434 14.835 31C14.835 30.3566 15.3566 29.835 16 29.835H23ZM32 22.835C32.6434 22.835 33.165 23.3566 33.165 24C33.165 24.6434 32.6434 25.165 32 25.165H16C15.3566 25.165 14.835 24.6434 14.835 24C14.835 23.3566 15.3566 22.835 16 22.835H32ZM32 15.835C32.6434 15.835 33.165 16.3566 33.165 17C33.165 17.6434 32.6434 18.165 32 18.165H16C15.3566 18.165 14.835 17.6434 14.835 17C14.835 16.3566 15.3566 15.835 16 15.835H32Z" stroke="white" strokeOpacity="0.95" strokeWidth="0.33"/>
-                  </svg>
+                <div
+                    data-svg-wrapper
+                    data-layer="file-icon"
+                    className="FileIcon"
+                    style={{
+                        position: "relative",
+                        width: "100%",
+                        height: "100%",
+                    }}
+                >
+                    <svg
+                        width="100%"
+                        height="100%"
+                        viewBox="0 0 48 48"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M0 14C0 6.26801 6.26801 0 14 0H48V48H14C6.26801 48 0 41.732 0 34V14Z"
+                            fill={getIconColor(name, type)}
+                        />
+                        <path
+                            d="M15 17C15 16.4477 15.4477 16 16 16H32C32.5523 16 33 16.4477 33 17C33 17.5523 32.5523 18 32 18H16C15.4477 18 15 17.5523 15 17ZM15 24C15 23.4477 15.4477 23 16 23H32C32.5523 23 33 23.4477 33 24C33 24.5523 32.5523 25 32 25H16C15.4477 25 15 24.5523 15 24ZM15 31C15 30.4477 15.4477 30 16 30H23C23.5523 30 24 30.4477 24 31C24 31.5523 23.5523 32 23 32H16C15.4477 32 15 31.5523 15 31Z"
+                            fill="white"
+                            fillOpacity="0.95"
+                        />
+                        <path
+                            d="M23 29.835C23.6434 29.835 24.165 30.3566 24.165 31C24.165 31.6434 23.6434 32.165 23 32.165H16C15.3566 32.165 14.835 31.6434 14.835 31C14.835 30.3566 15.3566 29.835 16 29.835H23ZM32 22.835C32.6434 22.835 33.165 23.3566 33.165 24C33.165 24.6434 32.6434 25.165 32 25.165H16C15.3566 25.165 14.835 24.6434 14.835 24C14.835 23.3566 15.3566 22.835 16 22.835H32ZM32 15.835C32.6434 15.835 33.165 16.3566 33.165 17C33.165 17.6434 32.6434 18.165 32 18.165H16C15.3566 18.165 14.835 17.6434 14.835 17C14.835 16.3566 15.3566 15.835 16 15.835H32Z"
+                            stroke="white"
+                            strokeOpacity="0.95"
+                            strokeWidth="0.33"
+                        />
+                    </svg>
                 </div>
             </div>
             {onRemove && (
@@ -1339,263 +1864,407 @@ const FileAttachment = React.memo(function FileAttachment({
 // --- HELPER COMPONENT: GEMINI LIVE CHARACTER ---
 
 const GEMINI_EYE_STATES = {
-  THINKING: {
-    id: 'thinking',
-    eye1: { left: 19.77, top: 22.81, rx: 8, ry: 10, rotate: -12, width: 41, height: 44 },
-    eye2: { left: 42.36, top: 17.48, rx: 8, ry: 10, rotate: -12, width: 41, height: 44 },
-  },
-  TALKING: {
-    id: 'talking',
-    eye1: { left: 19.37, top: 29.47, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
-    eye2: { left: 44.95, top: 28.35, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
-  },
-  BLINKING_TALKING: {
-    id: 'blinking_talking',
-    eye1: { left: 19.37, top: 34.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
-    eye2: { left: 44.95, top: 33.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
-  },
-  LOOKING: {
-    id: 'looking',
-    eye1: { left: 1.37, top: 34.47, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
-    eye2: { left: 26.95, top: 33.35, rx: 8.5, ry: 10.5, rotate: -2, width: 41, height: 45 },
-  },
-  BLINKING_LOOKING: {
-    id: 'blinking_looking',
-    eye1: { left: 1.37, top: 39.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
-    eye2: { left: 26.95, top: 38.0, rx: 7.5, ry: 2, rotate: -2, width: 41, height: 35 },
-  },
+    THINKING: {
+        id: "thinking",
+        eye1: {
+            left: 19.77,
+            top: 22.81,
+            rx: 8,
+            ry: 10,
+            rotate: -12,
+            width: 41,
+            height: 44,
+        },
+        eye2: {
+            left: 42.36,
+            top: 17.48,
+            rx: 8,
+            ry: 10,
+            rotate: -12,
+            width: 41,
+            height: 44,
+        },
+    },
+    TALKING: {
+        id: "talking",
+        eye1: {
+            left: 19.37,
+            top: 29.47,
+            rx: 8.5,
+            ry: 10.5,
+            rotate: -2,
+            width: 41,
+            height: 45,
+        },
+        eye2: {
+            left: 44.95,
+            top: 28.35,
+            rx: 8.5,
+            ry: 10.5,
+            rotate: -2,
+            width: 41,
+            height: 45,
+        },
+    },
+    BLINKING_TALKING: {
+        id: "blinking_talking",
+        eye1: {
+            left: 19.37,
+            top: 34.0,
+            rx: 7.5,
+            ry: 2,
+            rotate: -2,
+            width: 41,
+            height: 35,
+        },
+        eye2: {
+            left: 44.95,
+            top: 33.0,
+            rx: 7.5,
+            ry: 2,
+            rotate: -2,
+            width: 41,
+            height: 35,
+        },
+    },
+    LOOKING: {
+        id: "looking",
+        eye1: {
+            left: 1.37,
+            top: 34.47,
+            rx: 8.5,
+            ry: 10.5,
+            rotate: -2,
+            width: 41,
+            height: 45,
+        },
+        eye2: {
+            left: 26.95,
+            top: 33.35,
+            rx: 8.5,
+            ry: 10.5,
+            rotate: -2,
+            width: 41,
+            height: 45,
+        },
+    },
+    BLINKING_LOOKING: {
+        id: "blinking_looking",
+        eye1: {
+            left: 1.37,
+            top: 39.0,
+            rx: 7.5,
+            ry: 2,
+            rotate: -2,
+            width: 41,
+            height: 35,
+        },
+        eye2: {
+            left: 26.95,
+            top: 38.0,
+            rx: 7.5,
+            ry: 2,
+            rotate: -2,
+            width: 41,
+            height: 35,
+        },
+    },
 }
 
-const GeminiEye = ({ config, id }: { config: any, id: string }) => {
-  const transitionStyles: React.CSSProperties = {
-    transitionProperty: 'all',
-    transitionDuration: '500ms',
-    transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-  }
-
-  const isBlinking = config.ry < 4
-  
-  // Apply faster transition for blink
-  const currentTransitionStyles = {
-      ...transitionStyles,
-      transitionDuration: isBlinking ? '100ms' : '500ms',
-      transitionTimingFunction: isBlinking ? 'ease-in-out' : 'cubic-bezier(0.34, 1.56, 0.64, 1)'
-  }
-
-  const cx = config.width / 2
-  const cy = config.height / 2
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: `${config.left}px`,
-        top: `${config.top}px`,
-        width: `${config.width}px`,
-        height: `${config.height}px`,
-        ...currentTransitionStyles,
-      }}
-    >
-        {/* Closed Eye (Blink) */}
-        <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            opacity: isBlinking ? 1 : 0,
-            transform: `scale(${isBlinking ? 1 : 0.8})`,
-            transition: 'opacity 100ms ease-in-out, transform 100ms ease-in-out',
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            pointerEvents: 'none'
-        }}>
-             <svg width="100%" height="100%" viewBox="0 0 74 55" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <g filter={`url(#filter_blink_${id})`}>
-                    <path d="M50.5534 23.2448C50.6256 25.3123 44.399 22.2078 36.6459 22.4785C28.8928 22.7493 22.5492 26.2927 22.477 24.2252C22.4048 22.1577 28.6314 15.2622 36.3845 14.9915C44.1376 14.7207 50.4812 21.1773 50.5534 23.2448Z" fill="white" fillOpacity="0.85" shapeRendering="crispEdges"/>
-                </g>
-                <defs>
-                    <filter id={`filter_blink_${id}`} x="0.00174713" y="-5.62668e-05" width="73.0278" height="54.8363" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-                        <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-                        <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                        <feOffset dy="7.4916"/>
-                        <feGaussianBlur stdDeviation="11.2374"/>
-                        <feComposite in2="hardAlpha" operator="out"/>
-                        <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
-                        <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_495_119"/>
-                        <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_495_119" result="shape"/>
-                    </filter>
-                </defs>
-            </svg>
-        </div>
-
-        {/* Open Eye */}
-        <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            opacity: isBlinking ? 0 : 1,
-            transition: 'opacity 100ms ease-in-out',
-            pointerEvents: 'none'
-        }}>
-            <svg
-                width="100%"
-                height="100%"
-                viewBox={`0 0 ${config.width} ${config.height}`}
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-                <g filter={`url(#filter_eye_${id})`}>
-                <ellipse
-                    cx={cx}
-                    cy={cy}
-                    rx={config.rx}
-                    ry={config.ry}
-                    transform={`rotate(${config.rotate} ${cx} ${cy})`}
-                    fill="white"
-                    fillOpacity="0.85"
-                    shapeRendering="crispEdges"
-                    style={currentTransitionStyles} 
-                />
-                </g>
-                <defs>
-                  <filter
-                    id={`filter_eye_${id}`}
-                    x="-10"
-                    y="-10"
-                    width={config.width + 20}
-                    height={config.height + 20}
-                    filterUnits="userSpaceOnUse"
-                    colorInterpolationFilters="sRGB"
-                  >
-                    <feFlood floodOpacity="0" result="BackgroundImageFix" />
-                    <feColorMatrix
-                      in="SourceAlpha"
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                      result="hardAlpha"
-                    />
-                    <feOffset dy="4" />
-                    <feGaussianBlur stdDeviation="6" />
-                    <feComposite in2="hardAlpha" operator="out" />
-                    <feColorMatrix
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
-                    />
-                    <feBlend
-                      mode="normal"
-                      in2="BackgroundImageFix"
-                      result="effect1_dropShadow"
-                    />
-                    <feBlend
-                      mode="normal"
-                      in="SourceGraphic"
-                      in2="effect1_dropShadow"
-                      result="shape"
-                    />
-                  </filter>
-                </defs>
-            </svg>
-        </div>
-    </div>
-  )
-}
-
-const GeminiLiveCharacter = ({ isThinking, isSpeaking }: { isThinking: boolean, isSpeaking: boolean }) => {
-  const [currentState, setCurrentState] = React.useState(GEMINI_EYE_STATES.LOOKING)
-
-  React.useEffect(() => {
-    let timeoutId: any
-
-    if (isSpeaking) {
-      // Loop between TALKING and BLINKING_TALKING
-      const blinkLoop = () => {
-        setCurrentState(GEMINI_EYE_STATES.TALKING)
-        // Blink every 2-4 seconds randomly
-        const nextBlink = 2000 + Math.random() * 2000
-        timeoutId = setTimeout(() => {
-          setCurrentState(GEMINI_EYE_STATES.BLINKING_TALKING)
-          timeoutId = setTimeout(() => {
-             blinkLoop()
-          }, 150) // Blink duration
-        }, nextBlink)
-      }
-      blinkLoop()
-      return () => clearTimeout(timeoutId)
+const GeminiEye = ({ config, id }: { config: any; id: string }) => {
+    const transitionStyles: React.CSSProperties = {
+        transitionProperty: "all",
+        transitionDuration: "500ms",
+        transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
     }
 
-    if (isThinking) {
-      setCurrentState(GEMINI_EYE_STATES.THINKING)
-      return
+    const isBlinking = config.ry < 4
+
+    // Apply faster transition for blink
+    const currentTransitionStyles = {
+        ...transitionStyles,
+        transitionDuration: isBlinking ? "100ms" : "500ms",
+        transitionTimingFunction: isBlinking
+            ? "ease-in-out"
+            : "cubic-bezier(0.34, 1.56, 0.64, 1)",
     }
 
-    // Default: Waiting / Looking (Loop between LOOKING and BLINKING_LOOKING)
-    const blinkLoopLooking = () => {
-      setCurrentState(GEMINI_EYE_STATES.LOOKING)
-      // Blink every 3-5 seconds randomly (slower blinking when idle)
-      const nextBlink = 3000 + Math.random() * 2000
-      timeoutId = setTimeout(() => {
-        setCurrentState(GEMINI_EYE_STATES.BLINKING_LOOKING)
-        timeoutId = setTimeout(() => {
-           blinkLoopLooking()
-        }, 150)
-      }, nextBlink)
-    }
-    blinkLoopLooking()
-    return () => clearTimeout(timeoutId)
+    const cx = config.width / 2
+    const cy = config.height / 2
 
-  }, [isThinking, isSpeaking])
-
-  return (
-      <div style={{ transform: 'scale(1.28)', position: 'relative', width: 100, height: 102 }}>
-        <div 
-          style={{ 
-            width: 100, 
-            height: 102,
-            position: 'relative',
-            cursor: 'pointer',
-            transition: 'transform 0.3s',
-            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.08)',
-            borderRadius: 9999
-          }}
-        >
-          {/* Layer: White Body */}
-          <div
-            style={{ 
-                position: 'absolute',
-                left: 0, 
-                top: 0, 
-                width: 100, 
-                height: 102,
-                background: 'white',
-                borderRadius: 9999,
-            }}
-          />
-
-          {/* Layer: Blue Blur */}
-          <div
+    return (
+        <div
             style={{
-              position: 'absolute',
-              width: 76.66,
-              height: 80,
-              left: 11.66,
-              top: 10.31,
-              background: 'linear-gradient(180deg, #0099FF 0%, rgba(255,255,255,0) 100%)',
-              boxShadow: '0px 16px 24px rgba(0, 153, 255, 0.25)',
-              borderRadius: 9999,
-              filter: 'blur(8px)',
+                position: "absolute",
+                left: `${config.left}px`,
+                top: `${config.top}px`,
+                width: `${config.width}px`,
+                height: `${config.height}px`,
+                ...currentTransitionStyles,
             }}
-          />
+        >
+            {/* Closed Eye (Blink) */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: isBlinking ? 1 : 0,
+                    transform: `scale(${isBlinking ? 1 : 0.8})`,
+                    transition:
+                        "opacity 100ms ease-in-out, transform 100ms ease-in-out",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                }}
+            >
+                <svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 74 55"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <g filter={`url(#filter_blink_${id})`}>
+                        <path
+                            d="M50.5534 23.2448C50.6256 25.3123 44.399 22.2078 36.6459 22.4785C28.8928 22.7493 22.5492 26.2927 22.477 24.2252C22.4048 22.1577 28.6314 15.2622 36.3845 14.9915C44.1376 14.7207 50.4812 21.1773 50.5534 23.2448Z"
+                            fill="white"
+                            fillOpacity="0.85"
+                            shapeRendering="crispEdges"
+                        />
+                    </g>
+                    <defs>
+                        <filter
+                            id={`filter_blink_${id}`}
+                            x="0.00174713"
+                            y="-5.62668e-05"
+                            width="73.0278"
+                            height="54.8363"
+                            filterUnits="userSpaceOnUse"
+                            colorInterpolationFilters="sRGB"
+                        >
+                            <feFlood
+                                floodOpacity="0"
+                                result="BackgroundImageFix"
+                            />
+                            <feColorMatrix
+                                in="SourceAlpha"
+                                type="matrix"
+                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                result="hardAlpha"
+                            />
+                            <feOffset dy="7.4916" />
+                            <feGaussianBlur stdDeviation="11.2374" />
+                            <feComposite in2="hardAlpha" operator="out" />
+                            <feColorMatrix
+                                type="matrix"
+                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                            />
+                            <feBlend
+                                mode="normal"
+                                in2="BackgroundImageFix"
+                                result="effect1_dropShadow_495_119"
+                            />
+                            <feBlend
+                                mode="normal"
+                                in="SourceGraphic"
+                                in2="effect1_dropShadow_495_119"
+                                result="shape"
+                            />
+                        </filter>
+                    </defs>
+                </svg>
+            </div>
 
-          {/* Layer: Eyes */}
-          <GeminiEye config={currentState.eye1} id="eye1" />
-          <GeminiEye config={currentState.eye2} id="eye2" />
+            {/* Open Eye */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: isBlinking ? 0 : 1,
+                    transition: "opacity 100ms ease-in-out",
+                    pointerEvents: "none",
+                }}
+            >
+                <svg
+                    width="100%"
+                    height="100%"
+                    viewBox={`0 0 ${config.width} ${config.height}`}
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <g filter={`url(#filter_eye_${id})`}>
+                        <ellipse
+                            cx={cx}
+                            cy={cy}
+                            rx={config.rx}
+                            ry={config.ry}
+                            transform={`rotate(${config.rotate} ${cx} ${cy})`}
+                            fill="white"
+                            fillOpacity="0.85"
+                            shapeRendering="crispEdges"
+                            style={currentTransitionStyles}
+                        />
+                    </g>
+                    <defs>
+                        <filter
+                            id={`filter_eye_${id}`}
+                            x="-10"
+                            y="-10"
+                            width={config.width + 20}
+                            height={config.height + 20}
+                            filterUnits="userSpaceOnUse"
+                            colorInterpolationFilters="sRGB"
+                        >
+                            <feFlood
+                                floodOpacity="0"
+                                result="BackgroundImageFix"
+                            />
+                            <feColorMatrix
+                                in="SourceAlpha"
+                                type="matrix"
+                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                result="hardAlpha"
+                            />
+                            <feOffset dy="4" />
+                            <feGaussianBlur stdDeviation="6" />
+                            <feComposite in2="hardAlpha" operator="out" />
+                            <feColorMatrix
+                                type="matrix"
+                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                            />
+                            <feBlend
+                                mode="normal"
+                                in2="BackgroundImageFix"
+                                result="effect1_dropShadow"
+                            />
+                            <feBlend
+                                mode="normal"
+                                in="SourceGraphic"
+                                in2="effect1_dropShadow"
+                                result="shape"
+                            />
+                        </filter>
+                    </defs>
+                </svg>
+            </div>
         </div>
-      </div>
-  )
+    )
+}
+
+const GeminiLiveCharacter = ({
+    isThinking,
+    isSpeaking,
+}: {
+    isThinking: boolean
+    isSpeaking: boolean
+}) => {
+    const [currentState, setCurrentState] = React.useState(
+        GEMINI_EYE_STATES.LOOKING
+    )
+
+    React.useEffect(() => {
+        let timeoutId: any
+
+        if (isSpeaking) {
+            // Loop between TALKING and BLINKING_TALKING
+            const blinkLoop = () => {
+                setCurrentState(GEMINI_EYE_STATES.TALKING)
+                // Blink every 2-4 seconds randomly
+                const nextBlink = 2000 + Math.random() * 2000
+                timeoutId = setTimeout(() => {
+                    setCurrentState(GEMINI_EYE_STATES.BLINKING_TALKING)
+                    timeoutId = setTimeout(() => {
+                        blinkLoop()
+                    }, 150) // Blink duration
+                }, nextBlink)
+            }
+            blinkLoop()
+            return () => clearTimeout(timeoutId)
+        }
+
+        if (isThinking) {
+            setCurrentState(GEMINI_EYE_STATES.THINKING)
+            return
+        }
+
+        // Default: Waiting / Looking (Loop between LOOKING and BLINKING_LOOKING)
+        const blinkLoopLooking = () => {
+            setCurrentState(GEMINI_EYE_STATES.LOOKING)
+            // Blink every 3-5 seconds randomly (slower blinking when idle)
+            const nextBlink = 3000 + Math.random() * 2000
+            timeoutId = setTimeout(() => {
+                setCurrentState(GEMINI_EYE_STATES.BLINKING_LOOKING)
+                timeoutId = setTimeout(() => {
+                    blinkLoopLooking()
+                }, 150)
+            }, nextBlink)
+        }
+        blinkLoopLooking()
+        return () => clearTimeout(timeoutId)
+    }, [isThinking, isSpeaking])
+
+    return (
+        <div
+            style={{
+                transform: "scale(1.28)",
+                position: "relative",
+                width: 100,
+                height: 102,
+            }}
+        >
+            <div
+                style={{
+                    width: 100,
+                    height: 102,
+                    position: "relative",
+                    cursor: "pointer",
+                    transition: "transform 0.3s",
+                    boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.08)",
+                    borderRadius: 9999,
+                }}
+            >
+                {/* Layer: White Body */}
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        width: 100,
+                        height: 102,
+                        background: "white",
+                        borderRadius: 9999,
+                    }}
+                />
+
+                {/* Layer: Blue Blur */}
+                <div
+                    style={{
+                        position: "absolute",
+                        width: 76.66,
+                        height: 80,
+                        left: 11.66,
+                        top: 10.31,
+                        background:
+                            "linear-gradient(180deg, #0099FF 0%, rgba(255,255,255,0) 100%)",
+                        boxShadow: "0px 16px 24px rgba(0, 153, 255, 0.25)",
+                        borderRadius: 9999,
+                        filter: "blur(8px)",
+                    }}
+                />
+
+                {/* Layer: Eyes */}
+                <GeminiEye config={currentState.eye1} id="eye1" />
+                <GeminiEye config={currentState.eye2} id="eye2" />
+            </div>
+        </div>
+    )
 }
 
 // --- HELPER COMPONENT: VIDEO PLAYER ---
@@ -1854,97 +2523,153 @@ function setCaretPosition(element: HTMLElement, offset: number) {
     }
 }
 
-const HeaderActions = React.memo(({
-    themeColors,
-    onDownloadClick,
-    onCloseClick,
-    downloadRef,
-    isDownloadHovered,
-    onDownloadHoverChange,
-    isCloseHovered,
-    onCloseHoverChange,
-    downloadMenu,
-    downloadTooltip = "Download",
-    closeTooltip = "Close"
-}: {
-    themeColors: any,
-    onDownloadClick: (e: React.MouseEvent) => void,
-    onCloseClick: () => void,
-    downloadRef?: React.RefObject<HTMLDivElement>,
-    isDownloadHovered: boolean,
-    onDownloadHoverChange: (hovered: boolean) => void,
-    isCloseHovered: boolean,
-    onCloseHoverChange: (hovered: boolean) => void,
-    downloadMenu?: React.ReactNode,
-    downloadTooltip?: string,
-    closeTooltip?: string
-}) => {
-    return (
-        <div data-layer="right" className="Right" style={{
-            height: 40,
-            maxWidth: 808.89,
-            paddingLeft: 4,
-            paddingRight: 4,
-            background: themeColors.surface,
-            borderRadius: 28,
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            display: 'inline-flex',
-            flexShrink: 0,
-            alignContent: 'center'
-        }}>
-            <div data-svg-wrapper data-layer="download button" className="DownloadButton"
-                ref={downloadRef}
-                onClick={onDownloadClick}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseEnter={() => onDownloadHoverChange(true)}
-                onMouseLeave={() => onDownloadHoverChange(false)}
-                style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" }}
+const HeaderActions = React.memo(
+    ({
+        themeColors,
+        onDownloadClick,
+        onCloseClick,
+        downloadRef,
+        isDownloadHovered,
+        onDownloadHoverChange,
+        isCloseHovered,
+        onCloseHoverChange,
+        downloadMenu,
+        downloadTooltip = "Download",
+        closeTooltip = "Close",
+    }: {
+        themeColors: any
+        onDownloadClick: (e: React.MouseEvent) => void
+        onCloseClick: () => void
+        downloadRef?: React.RefObject<HTMLDivElement>
+        isDownloadHovered: boolean
+        onDownloadHoverChange: (hovered: boolean) => void
+        isCloseHovered: boolean
+        onCloseHoverChange: (hovered: boolean) => void
+        downloadMenu?: React.ReactNode
+        downloadTooltip?: string
+        closeTooltip?: string
+    }) => {
+        return (
+            <div
+                data-layer="right"
+                className="Right"
+                style={{
+                    height: 40,
+                    maxWidth: 808.89,
+                    paddingLeft: 4,
+                    paddingRight: 4,
+                    background: themeColors.surface,
+                    borderRadius: 28,
+                    justifyContent: "flex-start",
+                    alignItems: "center",
+                    display: "inline-flex",
+                    flexShrink: 0,
+                    alignContent: "center",
+                }}
             >
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {isDownloadHovered && (
-                    <Tooltip
-                        style={{
-                            top: "100%",
-                            left: "50%",
-                            transform: "translate(-50%, 8px)",
-                            zIndex: 100,
-                        }}
+                <div
+                    data-svg-wrapper
+                    data-layer="download button"
+                    className="DownloadButton"
+                    ref={downloadRef}
+                    onClick={onDownloadClick}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseEnter={() => onDownloadHoverChange(true)}
+                    onMouseLeave={() => onDownloadHoverChange(false)}
+                    style={{
+                        cursor: "pointer",
+                        position: "relative",
+                        width: 40,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "auto",
+                    }}
+                >
+                    <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 40 40"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
                     >
-                        {downloadTooltip}
-                    </Tooltip>
-                )}
-            </div>
+                        <path
+                            d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903"
+                            stroke={themeColors.text.primary}
+                            strokeOpacity="0.95"
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                    {isDownloadHovered && (
+                        <Tooltip
+                            style={{
+                                top: "100%",
+                                left: "50%",
+                                transform: "translate(-50%, 8px)",
+                                zIndex: 100,
+                            }}
+                        >
+                            {downloadTooltip}
+                        </Tooltip>
+                    )}
+                </div>
 
-            <div data-svg-wrapper data-layer="close button" className="CloseButton"
-                onClick={onCloseClick}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseEnter={() => onCloseHoverChange(true)}
-                onMouseLeave={() => onCloseHoverChange(false)}
-                style={{ cursor: 'pointer', position: 'relative', width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" }}
-            >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M11.1016 0.599998L0.601562 11.1M0.601562 0.599998L11.1016 11.1" stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {isCloseHovered && (
-                    <Tooltip
-                        style={{
-                            top: "100%",
-                            left: "50%",
-                            transform: "translate(-50%, 8px)",
-                            zIndex: 100,
-                        }}
+                <div
+                    data-svg-wrapper
+                    data-layer="close button"
+                    className="CloseButton"
+                    onClick={onCloseClick}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseEnter={() => onCloseHoverChange(true)}
+                    onMouseLeave={() => onCloseHoverChange(false)}
+                    style={{
+                        cursor: "pointer",
+                        position: "relative",
+                        width: 40,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "auto",
+                    }}
+                >
+                    <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
                     >
-                        {closeTooltip}
-                    </Tooltip>
-                )}
+                        <path
+                            d="M11.1016 0.599998L0.601562 11.1M0.601562 0.599998L11.1016 11.1"
+                            stroke={themeColors.text.primary}
+                            strokeOpacity="0.95"
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                    {isCloseHovered && (
+                        <Tooltip
+                            style={{
+                                top: "100%",
+                                left: "50%",
+                                transform: "translate(-50%, 8px)",
+                                zIndex: 100,
+                            }}
+                        >
+                            {closeTooltip}
+                        </Tooltip>
+                    )}
+                </div>
+                {downloadMenu}
             </div>
-            {downloadMenu}
-        </div>
-    )
-})
+        )
+    }
+)
 
 const DocEditor = React.memo(function DocEditor({
     content,
@@ -1962,7 +2687,7 @@ const DocEditor = React.memo(function DocEditor({
     const linkDropdownRef = React.useRef<HTMLDivElement>(null)
     const linkDropdownContentRef = React.useRef<HTMLDivElement>(null)
     const linkInputRef = React.useRef<HTMLInputElement>(null)
-    
+
     // Store the actual Range object, not just a cloned one
     const [savedRange, setSavedRange] = React.useState<Range | null>(null)
 
@@ -1975,22 +2700,29 @@ const DocEditor = React.memo(function DocEditor({
     const [isEditingFontSize, setIsEditingFontSize] = React.useState(false)
     const [showLinkDropdown, setShowLinkDropdown] = React.useState(false)
     const [showDownloadMenu, setShowDownloadMenu] = React.useState(false)
-    const [selectedDownloadMenuIndex, setSelectedDownloadMenuIndex] = React.useState(-1)
-    const [downloadMenuPosition, setDownloadMenuPosition] = React.useState({ top: 0, right: 0 })
+    const [selectedDownloadMenuIndex, setSelectedDownloadMenuIndex] =
+        React.useState(-1)
+    const [downloadMenuPosition, setDownloadMenuPosition] = React.useState({
+        top: 0,
+        right: 0,
+    })
     const downloadMenuRef = React.useRef<HTMLDivElement>(null)
     const [linkUrl, setLinkUrl] = React.useState("")
-    const [linkDropdownPosition, setLinkDropdownPosition] = React.useState<React.CSSProperties>({
-        position: "fixed", // Changed to fixed to avoid layout shift
-        top: 0,
-        left: 0,
-        visibility: "hidden", // Start hidden to calculate position
-    })
+    const [linkDropdownPosition, setLinkDropdownPosition] =
+        React.useState<React.CSSProperties>({
+            position: "fixed", // Changed to fixed to avoid layout shift
+            top: 0,
+            left: 0,
+            visibility: "hidden", // Start hidden to calculate position
+        })
     const [isLinkActive, setIsLinkActive] = React.useState(false)
     const [hoveredToolbarItem, setHoveredToolbarItem] = React.useState<
         string | null
     >(null)
-    const [isFontDecreaseHovered, setIsFontDecreaseHovered] = React.useState(false)
-    const [isFontIncreaseHovered, setIsFontIncreaseHovered] = React.useState(false)
+    const [isFontDecreaseHovered, setIsFontDecreaseHovered] =
+        React.useState(false)
+    const [isFontIncreaseHovered, setIsFontIncreaseHovered] =
+        React.useState(false)
     const [isDownloadHovered, setIsDownloadHovered] = React.useState(false)
     const [isCloseHovered, setIsCloseHovered] = React.useState(false)
 
@@ -2004,13 +2736,20 @@ const DocEditor = React.memo(function DocEditor({
                 "--doc-font-serif": '"Times New Roman", serif',
                 "--doc-font-sans": "Inter, sans-serif",
                 "--doc-accent": "#0099FF",
-                "--doc-border-color": themeColors.border?.subtle || "rgba(0,0,0,0.1)",
+                "--doc-border-color":
+                    themeColors.border?.subtle || "rgba(0,0,0,0.1)",
                 "--doc-current-font":
                     settings.fontStyle === "serif"
                         ? "var(--doc-font-serif)"
                         : "var(--doc-font-sans)",
             }) as React.CSSProperties,
-        [settings.h1Size, settings.h2Size, settings.pSize, settings.fontStyle, themeColors]
+        [
+            settings.h1Size,
+            settings.h2Size,
+            settings.pSize,
+            settings.fontStyle,
+            themeColors,
+        ]
     )
 
     // --- Core Editor Logic ---
@@ -2070,11 +2809,18 @@ const DocEditor = React.memo(function DocEditor({
         let node: Node | null = null
 
         // Try to get node from current selection
-        if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
+        if (
+            selection &&
+            selection.rangeCount > 0 &&
+            editorRef.current?.contains(selection.anchorNode)
+        ) {
             node = selection.anchorNode
-        } 
+        }
         // Fallback to savedRange
-        else if (savedRange && editorRef.current?.contains(savedRange.startContainer)) {
+        else if (
+            savedRange &&
+            editorRef.current?.contains(savedRange.startContainer)
+        ) {
             node = savedRange.startContainer
         }
 
@@ -2096,9 +2842,12 @@ const DocEditor = React.memo(function DocEditor({
     const updateFontSize = React.useCallback(
         (newSize: number) => {
             const size = Math.max(8, Math.min(72, newSize))
-            
+
             // Restore selection if needed (when clicking buttons outside editor)
-            if (editorRef.current && !editorRef.current.contains(document.activeElement)) {
+            if (
+                editorRef.current &&
+                !editorRef.current.contains(document.activeElement)
+            ) {
                 editorRef.current.focus()
                 const selection = window.getSelection()
                 if (selection && savedRange) {
@@ -2106,7 +2855,7 @@ const DocEditor = React.memo(function DocEditor({
                     selection.addRange(savedRange)
                 }
             }
-            
+
             // Always update the global setting for the current text category
             const info = getSelectionInfo()
             if (info.tag === "H1") {
@@ -2119,7 +2868,7 @@ const DocEditor = React.memo(function DocEditor({
 
             setSelectedFontSize(size)
             if (!isEditingFontSize) setFontSizeInput(size.toString())
-            
+
             // Save the selection after update
             saveSelection()
         },
@@ -2136,7 +2885,7 @@ const DocEditor = React.memo(function DocEditor({
     const handleSmartFormat = React.useCallback(
         (command: string) => {
             if (!editorRef.current) return
-            
+
             const selection = window.getSelection()
             if (!selection) return
 
@@ -2153,8 +2902,10 @@ const DocEditor = React.memo(function DocEditor({
             // apply formatting to the entire line/paragraph the cursor is on
             if (selection.isCollapsed) {
                 const range = selection.getRangeAt(0)
-                const originalOffset = getCaretCharacterOffsetWithin(editorRef.current)
-                
+                const originalOffset = getCaretCharacterOffsetWithin(
+                    editorRef.current
+                )
+
                 // Find the containing block element (P, LI, H1, H2, DIV)
                 let node = range.commonAncestorContainer as HTMLElement | null
                 while (node && node !== editorRef.current) {
@@ -2173,10 +2924,10 @@ const DocEditor = React.memo(function DocEditor({
                     newRange.selectNodeContents(node)
                     selection.removeAllRanges()
                     selection.addRange(newRange)
-                    
+
                     // Apply formatting to the entire block
                     document.execCommand(command, false, undefined)
-                    
+
                     // Restore the cursor to its original position
                     setCaretPosition(editorRef.current, originalOffset)
                 }
@@ -2184,7 +2935,7 @@ const DocEditor = React.memo(function DocEditor({
                 // Text is selected - apply formatting to selection only
                 document.execCommand(command, false, undefined)
             }
-            
+
             handleInput()
             saveSelection()
         },
@@ -2279,33 +3030,33 @@ const DocEditor = React.memo(function DocEditor({
 
                 // Check both anchor and focus nodes for links
                 const nodesToCheck = [selection.anchorNode, selection.focusNode]
-                
+
                 for (const startNode of nodesToCheck) {
                     if (!startNode) continue
-                    
+
                     let node: Node | null = startNode
-                while (node && node !== editorRef.current) {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const el = node as HTMLElement
-                        const tag = el.tagName
+                    while (node && node !== editorRef.current) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const el = node as HTMLElement
+                            const tag = el.tagName
 
-                        if (tag === "A") linkFound = true
+                            if (tag === "A") linkFound = true
 
-                        if (!size && el.style.fontSize) {
-                            const parsed = parseFloat(el.style.fontSize)
-                            if (!isNaN(parsed)) size = Math.round(parsed)
+                            if (!size && el.style.fontSize) {
+                                const parsed = parseFloat(el.style.fontSize)
+                                if (!isNaN(parsed)) size = Math.round(parsed)
+                            }
+
+                            if (!size) {
+                                if (tag === "H1") size = settings.h1Size
+                                else if (tag === "H2") size = settings.h2Size
+                                else if (["P", "LI", "DIV"].includes(tag))
+                                    size = settings.pSize
+                            }
                         }
+                        node = node.parentNode
+                    }
 
-                        if (!size) {
-                            if (tag === "H1") size = settings.h1Size
-                            else if (tag === "H2") size = settings.h2Size
-                            else if (["P", "LI", "DIV"].includes(tag))
-                                size = settings.pSize
-                        }
-                    }
-                    node = node.parentNode
-                    }
-                    
                     if (linkFound) break // Found a link, no need to check further
                 }
 
@@ -2328,26 +3079,35 @@ const DocEditor = React.memo(function DocEditor({
 
     // Adjust link dropdown position to prevent cutoff
     React.useLayoutEffect(() => {
-        if (!showLinkDropdown || !linkDropdownContentRef.current || !linkDropdownRef.current) return
+        if (
+            !showLinkDropdown ||
+            !linkDropdownContentRef.current ||
+            !linkDropdownRef.current
+        )
+            return
 
         const adjustPosition = () => {
             const buttonRect = linkDropdownRef.current!.getBoundingClientRect()
-            const dropdownRect = linkDropdownContentRef.current!.getBoundingClientRect()
+            const dropdownRect =
+                linkDropdownContentRef.current!.getBoundingClientRect()
             const EDGE_PADDING = 8
-            
+
             // Default position: below button, aligned left
             let top = buttonRect.bottom + 8
             let left = buttonRect.left
-            
+
             // Check right edge
             if (left + dropdownRect.width > window.innerWidth - EDGE_PADDING) {
                 // If overflows right, try aligning to right of button
                 left = buttonRect.right - dropdownRect.width
-                
+
                 // If still overflows right (unlikely with this logic, but checking edge case)
                 // or if aligning right pushes it off left edge:
-                if (left + dropdownRect.width > window.innerWidth - EDGE_PADDING) {
-                     left = window.innerWidth - dropdownRect.width - EDGE_PADDING
+                if (
+                    left + dropdownRect.width >
+                    window.innerWidth - EDGE_PADDING
+                ) {
+                    left = window.innerWidth - dropdownRect.width - EDGE_PADDING
                 }
             }
 
@@ -2370,7 +3130,7 @@ const DocEditor = React.memo(function DocEditor({
         }
 
         adjustPosition()
-        
+
         // Handle window resize
         window.addEventListener("resize", adjustPosition)
         return () => window.removeEventListener("resize", adjustPosition)
@@ -2391,29 +3151,38 @@ const DocEditor = React.memo(function DocEditor({
                         if (selection && selection.rangeCount > 0) {
                             const range = selection.getRangeAt(0)
                             setSavedRange(range)
-                            
+
                             // Check if we're in a link and pre-populate the URL
-                            const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
-                                while (node && editorRef.current?.contains(node)) {
-                                    if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                            const findLinkElement = (
+                                node: Node | null
+                            ): HTMLAnchorElement | null => {
+                                while (
+                                    node &&
+                                    editorRef.current?.contains(node)
+                                ) {
+                                    if (
+                                        node.nodeType === Node.ELEMENT_NODE &&
+                                        (node as HTMLElement).tagName === "A"
+                                    ) {
                                         return node as HTMLAnchorElement
                                     }
                                     node = node.parentNode
                                 }
                                 return null
                             }
-                            
-                            const existingLink = findLinkElement(range.startContainer) ||
-                                               findLinkElement(range.endContainer) ||
-                                               findLinkElement(range.commonAncestorContainer)
-                            
+
+                            const existingLink =
+                                findLinkElement(range.startContainer) ||
+                                findLinkElement(range.endContainer) ||
+                                findLinkElement(range.commonAncestorContainer)
+
                             if (existingLink) {
                                 setLinkUrl(existingLink.href)
                             } else {
                                 setLinkUrl("")
                             }
-                            
-                        setShowLinkDropdown(true)
+
+                            setShowLinkDropdown(true)
                             // Focus the input after a short delay
                             setTimeout(() => {
                                 linkInputRef.current?.focus()
@@ -2447,7 +3216,7 @@ const DocEditor = React.memo(function DocEditor({
                         }
                         break
                 }
-                
+
                 // Handle Cmd+Shift+8 for bullet list
                 if (e.shiftKey && e.key === "8") {
                     e.preventDefault()
@@ -2457,7 +3226,13 @@ const DocEditor = React.memo(function DocEditor({
         }
         document.addEventListener("keydown", handleKeyDown)
         return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [handleSmartFormat, handleFormat, handleInput, selectedFontSize, updateFontSize])
+    }, [
+        handleSmartFormat,
+        handleFormat,
+        handleInput,
+        selectedFontSize,
+        updateFontSize,
+    ])
 
     // Outside Click for Link Dropdown
     React.useEffect(() => {
@@ -2473,7 +3248,7 @@ const DocEditor = React.memo(function DocEditor({
                     position: "fixed",
                     top: 0,
                     left: 0,
-                    visibility: "hidden"
+                    visibility: "hidden",
                 })
             }
         }
@@ -2495,9 +3270,14 @@ const DocEditor = React.memo(function DocEditor({
         selection.addRange(savedRange)
 
         // Helper to find link element
-        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+        const findLinkElement = (
+            node: Node | null
+        ): HTMLAnchorElement | null => {
             while (node && editorRef.current?.contains(node)) {
-                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                if (
+                    node.nodeType === Node.ELEMENT_NODE &&
+                    (node as HTMLElement).tagName === "A"
+                ) {
                     return node as HTMLAnchorElement
                 }
                 node = node.parentNode
@@ -2506,16 +3286,17 @@ const DocEditor = React.memo(function DocEditor({
         }
 
         // Check if we're updating an existing link
-        const existingLink = findLinkElement(savedRange.startContainer) ||
-                           findLinkElement(savedRange.endContainer) ||
-                           findLinkElement(savedRange.commonAncestorContainer)
+        const existingLink =
+            findLinkElement(savedRange.startContainer) ||
+            findLinkElement(savedRange.endContainer) ||
+            findLinkElement(savedRange.commonAncestorContainer)
 
         const formattedUrl = url.startsWith("http") ? url : `https://${url}`
 
         if (existingLink) {
             // Update existing link and extend to selection
             existingLink.href = formattedUrl
-            
+
             // If selection extends beyond the link, expand the link to cover the selection
             const selectedText = savedRange.toString()
             if (selectedText && selectedText !== existingLink.textContent) {
@@ -2525,16 +3306,16 @@ const DocEditor = React.memo(function DocEditor({
                 newLink.target = "_blank"
                 newLink.rel = "noopener noreferrer"
                 newLink.textContent = selectedText
-                
+
                 savedRange.deleteContents()
                 savedRange.insertNode(newLink)
-                
+
                 // Move cursor after the link
                 savedRange.setStartAfter(newLink)
                 savedRange.setEndAfter(newLink)
                 selection.removeAllRanges()
                 selection.addRange(savedRange)
-        } else {
+            } else {
                 // Just update the URL, keep existing text
                 existingLink.target = "_blank"
                 existingLink.rel = "noopener noreferrer"
@@ -2567,9 +3348,9 @@ const DocEditor = React.memo(function DocEditor({
             position: "fixed",
             top: 0,
             left: 0,
-            visibility: "hidden"
+            visibility: "hidden",
         })
-        
+
         if (editorRef.current) {
             editorRef.current.focus()
         }
@@ -2585,9 +3366,14 @@ const DocEditor = React.memo(function DocEditor({
         selection.addRange(savedRange)
 
         // Find the link element by checking both start and end of selection
-        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
+        const findLinkElement = (
+            node: Node | null
+        ): HTMLAnchorElement | null => {
             while (node && node !== editorRef.current) {
-                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                if (
+                    node.nodeType === Node.ELEMENT_NODE &&
+                    (node as HTMLElement).tagName === "A"
+                ) {
                     return node as HTMLAnchorElement
                 }
                 node = node.parentNode
@@ -2596,23 +3382,24 @@ const DocEditor = React.memo(function DocEditor({
         }
 
         // Check start, end, and common ancestor
-        let linkElement = findLinkElement(savedRange.startContainer) ||
-                         findLinkElement(savedRange.endContainer) ||
-                         findLinkElement(savedRange.commonAncestorContainer)
+        let linkElement =
+            findLinkElement(savedRange.startContainer) ||
+            findLinkElement(savedRange.endContainer) ||
+            findLinkElement(savedRange.commonAncestorContainer)
 
         if (linkElement) {
             // Replace the entire link with its text content
             const text = document.createTextNode(linkElement.textContent || "")
             linkElement.parentNode?.replaceChild(text, linkElement)
-            
+
             // Update cursor position to the end of the text
             const newRange = document.createRange()
             newRange.setStartAfter(text)
             newRange.setEndAfter(text)
             selection.removeAllRanges()
             selection.addRange(newRange)
-            
-        handleInput()
+
+            handleInput()
         }
 
         setShowLinkDropdown(false)
@@ -2622,7 +3409,7 @@ const DocEditor = React.memo(function DocEditor({
             position: "fixed",
             top: 0,
             left: 0,
-            visibility: "hidden"
+            visibility: "hidden",
         })
 
         if (editorRef.current) {
@@ -2631,278 +3418,371 @@ const DocEditor = React.memo(function DocEditor({
     }, [savedRange, handleInput])
 
     // --- File Export ---
-    const handleDownload = React.useCallback(async (format: "pdf" | "docx") => {
-        if (format === "pdf") {
-            const iframe = document.createElement("iframe")
-            iframe.style.position = "fixed"
-            iframe.style.right = "0"
-            iframe.style.bottom = "0"
-            iframe.style.width = "0"
-            iframe.style.height = "0"
-            iframe.style.border = "0"
-            document.body.appendChild(iframe)
+    const handleDownload = React.useCallback(
+        async (format: "pdf" | "docx") => {
+            if (format === "pdf") {
+                const iframe = document.createElement("iframe")
+                iframe.style.position = "fixed"
+                iframe.style.right = "0"
+                iframe.style.bottom = "0"
+                iframe.style.width = "0"
+                iframe.style.height = "0"
+                iframe.style.border = "0"
+                document.body.appendChild(iframe)
 
-            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{margin:0;padding:0;font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${Math.max(1, settings.pSize - 5)}pt;line-height:1.6;}h1{font-size:${Math.max(1, settings.h1Size - 5)}px;font-weight:700;}h2{font-size:${Math.max(1, settings.h2Size - 5)}px;font-weight:700;border-bottom:1px solid #000;}a{color:#0099FF;text-decoration:underline;}</style></head><body>`
-            const footer = "</body></html>"
-            const sourceHTML = header + content + footer
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>@page{size:8.5in 11in;margin:0.5in;}body{margin:0;padding:0;font-family:${settings.fontStyle === "serif" ? '"Times New Roman", serif' : "Inter, sans-serif"};font-size:${Math.max(1, settings.pSize - 5)}pt;line-height:1.6;}h1{font-size:${Math.max(1, settings.h1Size - 5)}px;font-weight:700;}h2{font-size:${Math.max(1, settings.h2Size - 5)}px;font-weight:700;border-bottom:1px solid #000;}a{color:#0099FF;text-decoration:underline;}</style></head><body>`
+                const footer = "</body></html>"
+                const sourceHTML = header + content + footer
 
-            const doc = iframe.contentWindow?.document
-            if (doc) {
-                doc.open()
-                doc.write(sourceHTML)
-                doc.close()
-                
-                // Print after content is loaded
-                setTimeout(() => {
-                    iframe.contentWindow?.focus()
-                    iframe.contentWindow?.print()
-                    // Cleanup after print dialog closes (approximate)
+                const doc = iframe.contentWindow?.document
+                if (doc) {
+                    doc.open()
+                    doc.write(sourceHTML)
+                    doc.close()
+
+                    // Print after content is loaded
                     setTimeout(() => {
-                        document.body.removeChild(iframe)
-                    }, 1000)
-                }, 250)
-            }
-            
-            setShowDownloadMenu(false)
-            return
-        }
+                        iframe.contentWindow?.focus()
+                        iframe.contentWindow?.print()
+                        // Cleanup after print dialog closes (approximate)
+                        setTimeout(() => {
+                            document.body.removeChild(iframe)
+                        }, 1000)
+                    }, 250)
+                }
 
-        let filename = "Note.docx"
-        if (editorRef.current) {
-            const text = editorRef.current.innerText.trim()
-            const firstLine = text.split("\n")[0].trim()
-            if (firstLine) {
-                filename = `${firstLine.replace(/\s+/g, "_")}.docx`
-            }
-        }
-
-        try {
-            // Dynamically import docx library
-            const { Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink, UnderlineType } = await import("https://esm.sh/docx@8.5.0")
-            
-            // Parse HTML content to DOCX elements
-            const tempDiv = document.createElement("div")
-            tempDiv.innerHTML = content
-            
-            const docxChildren: any[] = []
-            
-            // Helper to get adjusted size (points * 2 for half-points)
-            // Subtract 4px from the visual size for better DOCX printing
-            const getAdjustedSize = (visualSize: number) => Math.max(1, visualSize - 4) * 2
-
-            // Styles context type
-            type StyleOptions = {
-                bold?: boolean
-                italics?: boolean
-                underline?: boolean
-                strike?: boolean
-                color?: string
-                font?: string
-                size?: number
+                setShowDownloadMenu(false)
+                return
             }
 
-            // Recursive function to process inline nodes
-            const processInlineNodes = (nodes: NodeList, styles: StyleOptions): any[] => {
-                const runs: any[] = []
-                
-                nodes.forEach(node => {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                        if (node.textContent) {
-                            runs.push(new TextRun({ 
-                                text: node.textContent,
-                                font: styles.font,
-                                size: styles.size,
-                                color: styles.color,
-                                bold: styles.bold,
-                                italics: styles.italics,
-                                underline: styles.underline ? { type: UnderlineType.SINGLE } : undefined,
-                                strike: styles.strike
-                            }))
-                        }
-                    } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const el = node as HTMLElement
-                        const tagName = el.tagName.toLowerCase()
+            let filename = "Note.docx"
+            if (editorRef.current) {
+                const text = editorRef.current.innerText.trim()
+                const firstLine = text.split("\n")[0].trim()
+                if (firstLine) {
+                    filename = `${firstLine.replace(/\s+/g, "_")}.docx`
+                }
+            }
 
-                        if (tagName === "br") {
-                            runs.push(new TextRun({ break: 1, text: "" }))
-                        } else if (tagName === "a") {
-                             // Create a specialized style for the link's text content
-                            const linkStyles = { 
-                                ...styles, 
-                                color: "0099FF", 
-                                underline: true 
+            try {
+                // Dynamically import docx library
+                const {
+                    Document,
+                    Packer,
+                    Paragraph,
+                    TextRun,
+                    HeadingLevel,
+                    ExternalHyperlink,
+                    UnderlineType,
+                } = await import("https://esm.sh/docx@8.5.0")
+
+                // Parse HTML content to DOCX elements
+                const tempDiv = document.createElement("div")
+                tempDiv.innerHTML = content
+
+                const docxChildren: any[] = []
+
+                // Helper to get adjusted size (points * 2 for half-points)
+                // Subtract 4px from the visual size for better DOCX printing
+                const getAdjustedSize = (visualSize: number) =>
+                    Math.max(1, visualSize - 4) * 2
+
+                // Styles context type
+                type StyleOptions = {
+                    bold?: boolean
+                    italics?: boolean
+                    underline?: boolean
+                    strike?: boolean
+                    color?: string
+                    font?: string
+                    size?: number
+                }
+
+                // Recursive function to process inline nodes
+                const processInlineNodes = (
+                    nodes: NodeList,
+                    styles: StyleOptions
+                ): any[] => {
+                    const runs: any[] = []
+
+                    nodes.forEach((node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            if (node.textContent) {
+                                runs.push(
+                                    new TextRun({
+                                        text: node.textContent,
+                                        font: styles.font,
+                                        size: styles.size,
+                                        color: styles.color,
+                                        bold: styles.bold,
+                                        italics: styles.italics,
+                                        underline: styles.underline
+                                            ? { type: UnderlineType.SINGLE }
+                                            : undefined,
+                                        strike: styles.strike,
+                                    })
+                                )
                             }
-                            // Recurse to get text runs for the link content
-                            const childRuns = processInlineNodes(el.childNodes, linkStyles)
-                            
-                            runs.push(new ExternalHyperlink({
-                                children: childRuns,
-                                link: el.getAttribute("href") || ""
-                            }))
-                        } else {
-                            // Update styles for nesting
-                            const newStyles = { ...styles }
-                            if (["b", "strong"].includes(tagName)) newStyles.bold = true
-                            if (["i", "em"].includes(tagName)) newStyles.italics = true
-                            if (tagName === "u") newStyles.underline = true
-                            if (tagName === "s", "strike".includes(tagName)) newStyles.strike = true
-                            
-                            runs.push(...processInlineNodes(el.childNodes, newStyles))
-                        }
-                    }
-                })
-                return runs
-            }
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            const el = node as HTMLElement
+                            const tagName = el.tagName.toLowerCase()
 
-            // docxChildren needs to be declared outside if we are using it (though it is declared below in current code, causing error)
-            // But actually we declared it twice in the previous block.
-            // Let's fix by removing the second declaration.
-            
-            // Helper to process block-level nodes
-            const processBlockNode = (node: Node) => {
-                if (node.nodeType !== Node.ELEMENT_NODE) {
-                    // Orphan text at root level? treat as paragraph
-                    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-                        const runs = processInlineNodes(document.createDocumentFragment().appendChild(node.cloneNode(true)).parentNode!.childNodes, {
-                            font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                            size: getAdjustedSize(settings.pSize),
-                            color: "000000"
+                            if (tagName === "br") {
+                                runs.push(new TextRun({ break: 1, text: "" }))
+                            } else if (tagName === "a") {
+                                // Create a specialized style for the link's text content
+                                const linkStyles = {
+                                    ...styles,
+                                    color: "0099FF",
+                                    underline: true,
+                                }
+                                // Recurse to get text runs for the link content
+                                const childRuns = processInlineNodes(
+                                    el.childNodes,
+                                    linkStyles
+                                )
+
+                                runs.push(
+                                    new ExternalHyperlink({
+                                        children: childRuns,
+                                        link: el.getAttribute("href") || "",
+                                    })
+                                )
+                            } else {
+                                // Update styles for nesting
+                                const newStyles = { ...styles }
+                                if (["b", "strong"].includes(tagName))
+                                    newStyles.bold = true
+                                if (["i", "em"].includes(tagName))
+                                    newStyles.italics = true
+                                if (tagName === "u") newStyles.underline = true
+                                if (
+                                    (tagName === "s",
+                                    "strike".includes(tagName))
+                                )
+                                    newStyles.strike = true
+
+                                runs.push(
+                                    ...processInlineNodes(
+                                        el.childNodes,
+                                        newStyles
+                                    )
+                                )
+                            }
+                        }
+                    })
+                    return runs
+                }
+
+                // docxChildren needs to be declared outside if we are using it (though it is declared below in current code, causing error)
+                // But actually we declared it twice in the previous block.
+                // Let's fix by removing the second declaration.
+
+                // Helper to process block-level nodes
+                const processBlockNode = (node: Node) => {
+                    if (node.nodeType !== Node.ELEMENT_NODE) {
+                        // Orphan text at root level? treat as paragraph
+                        if (
+                            node.nodeType === Node.TEXT_NODE &&
+                            node.textContent?.trim()
+                        ) {
+                            const runs = processInlineNodes(
+                                document
+                                    .createDocumentFragment()
+                                    .appendChild(node.cloneNode(true))
+                                    .parentNode!.childNodes,
+                                {
+                                    font:
+                                        settings.fontStyle === "serif"
+                                            ? "Times New Roman"
+                                            : "Inter",
+                                    size: getAdjustedSize(settings.pSize),
+                                    color: "000000",
+                                }
+                            )
+                            docxChildren.push(
+                                new Paragraph({
+                                    children: runs,
+                                    spacing: { after: 120 },
+                                })
+                            )
+                        }
+                        return
+                    }
+
+                    const el = node as HTMLElement
+                    const tagName = el.tagName.toLowerCase()
+
+                    if (tagName === "h1") {
+                        // For headings, we use specific sizing/bolding manually
+                        const runs = processInlineNodes(el.childNodes, {
+                            font:
+                                settings.fontStyle === "serif"
+                                    ? "Times New Roman"
+                                    : "Inter",
+                            size: getAdjustedSize(settings.h1Size),
+                            bold: true,
+                            color: "000000",
                         })
-                        docxChildren.push(new Paragraph({ children: runs, spacing: { after: 120 } }))
-                    }
-                    return
-                }
-
-                const el = node as HTMLElement
-                const tagName = el.tagName.toLowerCase()
-
-                if (tagName === "h1") {
-                     // For headings, we use specific sizing/bolding manually
-                    const runs = processInlineNodes(el.childNodes, {
-                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                        size: getAdjustedSize(settings.h1Size),
-                        bold: true,
-                        color: "000000"
-                    })
-                    docxChildren.push(new Paragraph({
-                        children: runs,
-                        spacing: { before: 240, after: 120 }
-                    }))
-                } else if (tagName === "h2") {
-                    const runs = processInlineNodes(el.childNodes, {
-                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                        size: getAdjustedSize(settings.h2Size),
-                        bold: true,
-                        color: "000000"
-                    })
-                    docxChildren.push(new Paragraph({
-                        children: runs,
-                        border: {
-                            bottom: {
-                                color: "000000",
-                                space: 1,
-                                value: "single",
-                                size: 6
+                        docxChildren.push(
+                            new Paragraph({
+                                children: runs,
+                                spacing: { before: 240, after: 120 },
+                            })
+                        )
+                    } else if (tagName === "h2") {
+                        const runs = processInlineNodes(el.childNodes, {
+                            font:
+                                settings.fontStyle === "serif"
+                                    ? "Times New Roman"
+                                    : "Inter",
+                            size: getAdjustedSize(settings.h2Size),
+                            bold: true,
+                            color: "000000",
+                        })
+                        docxChildren.push(
+                            new Paragraph({
+                                children: runs,
+                                border: {
+                                    bottom: {
+                                        color: "000000",
+                                        space: 1,
+                                        value: "single",
+                                        size: 6,
+                                    },
+                                },
+                                spacing: { before: 240, after: 120 },
+                            })
+                        )
+                    } else if (tagName === "ul") {
+                        el.childNodes.forEach((child) => {
+                            if (child.nodeName.toLowerCase() === "li") {
+                                const runs = processInlineNodes(
+                                    child.childNodes,
+                                    {
+                                        font:
+                                            settings.fontStyle === "serif"
+                                                ? "Times New Roman"
+                                                : "Inter",
+                                        size: getAdjustedSize(settings.pSize),
+                                        color: "000000",
+                                    }
+                                )
+                                docxChildren.push(
+                                    new Paragraph({
+                                        children: runs,
+                                        bullet: { level: 0 },
+                                        spacing: { after: 120 },
+                                    })
+                                )
                             }
-                        },
-                        spacing: { before: 240, after: 120 }
-                    }))
-                } else if (tagName === "ul") {
-                    el.childNodes.forEach(child => {
-                        if (child.nodeName.toLowerCase() === "li") {
-                             const runs = processInlineNodes(child.childNodes, {
-                                font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                                size: getAdjustedSize(settings.pSize),
-                                color: "000000"
-                             })
-                             docxChildren.push(new Paragraph({
-                                 children: runs,
-                                 bullet: { level: 0 },
-                                 spacing: { after: 120 }
-                             }))
+                        })
+                    } else if (tagName === "ol") {
+                        el.childNodes.forEach((child) => {
+                            if (child.nodeName.toLowerCase() === "li") {
+                                const runs = processInlineNodes(
+                                    child.childNodes,
+                                    {
+                                        font:
+                                            settings.fontStyle === "serif"
+                                                ? "Times New Roman"
+                                                : "Inter",
+                                        size: getAdjustedSize(settings.pSize),
+                                        color: "000000",
+                                    }
+                                )
+                                docxChildren.push(
+                                    new Paragraph({
+                                        children: runs,
+                                        numbering: {
+                                            reference: "default-numbering",
+                                            level: 0,
+                                        },
+                                        spacing: { after: 120 },
+                                    })
+                                )
+                            }
+                        })
+                    } else if (tagName === "p" || tagName === "div") {
+                        const runs = processInlineNodes(el.childNodes, {
+                            font:
+                                settings.fontStyle === "serif"
+                                    ? "Times New Roman"
+                                    : "Inter",
+                            size: getAdjustedSize(settings.pSize),
+                            color: "000000",
+                        })
+                        // Ensure empty paragraphs still take up space
+                        if (runs.length === 0) {
+                            runs.push(new TextRun(""))
                         }
-                    })
-                } else if (tagName === "ol") {
-                    el.childNodes.forEach(child => {
-                        if (child.nodeName.toLowerCase() === "li") {
-                             const runs = processInlineNodes(child.childNodes, {
-                                font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                                size: getAdjustedSize(settings.pSize),
-                                color: "000000"
-                             })
-                             docxChildren.push(new Paragraph({
-                                 children: runs,
-                                 numbering: { reference: "default-numbering", level: 0 },
-                                 spacing: { after: 120 }
-                             }))
-                        }
-                    })
-                } else if (tagName === "p" || tagName === "div") {
-                    const runs = processInlineNodes(el.childNodes, {
-                        font: settings.fontStyle === "serif" ? "Times New Roman" : "Inter",
-                        size: getAdjustedSize(settings.pSize),
-                        color: "000000"
-                    })
-                    // Ensure empty paragraphs still take up space
-                    if (runs.length === 0) {
-                        runs.push(new TextRun(""))
+                        docxChildren.push(
+                            new Paragraph({
+                                children: runs,
+                                spacing: { after: 120 },
+                            })
+                        )
+                    } else {
+                        // Fallback for unknown block containers, just process children as blocks
+                        el.childNodes.forEach((child) =>
+                            processBlockNode(child)
+                        )
                     }
-                    docxChildren.push(new Paragraph({
-                        children: runs,
-                        spacing: { after: 120 }
-                    }))
-                } else {
-                     // Fallback for unknown block containers, just process children as blocks
-                     el.childNodes.forEach(child => processBlockNode(child))
                 }
-            }
-            
-            // Process all root nodes
-            tempDiv.childNodes.forEach(node => processBlockNode(node))
 
-            const doc = new Document({
-                sections: [{
-                    properties: {
-                        page: {
-                            margin: {
-                                top: 720, // 0.5 inches (1440 twips = 1 inch)
-                                right: 720,
-                                bottom: 720,
-                                left: 720,
+                // Process all root nodes
+                tempDiv.childNodes.forEach((node) => processBlockNode(node))
+
+                const doc = new Document({
+                    sections: [
+                        {
+                            properties: {
+                                page: {
+                                    margin: {
+                                        top: 720, // 0.5 inches (1440 twips = 1 inch)
+                                        right: 720,
+                                        bottom: 720,
+                                        left: 720,
+                                    },
+                                },
                             },
+                            children: docxChildren.flat().filter((c) => c), // Ensure flattened and defined
                         },
-                    },
-                    children: docxChildren.flat().filter(c => c), // Ensure flattened and defined
-                }],
-            })
+                    ],
+                })
 
-            const blob = await Packer.toBlob(doc)
-            const url = window.URL.createObjectURL(blob)
-            const link = document.createElement("a")
-            link.href = url
-            link.download = filename
-            link.click()
-            window.URL.revokeObjectURL(url)
-        } catch (e) {
-            console.error("Docx generation failed", e)
-            alert("Failed to generate DOCX file. Please try again.")
-        }
-        
-        setShowDownloadMenu(false)
-    }, [content, settings.fontStyle, settings.pSize])
+                const blob = await Packer.toBlob(doc)
+                const url = window.URL.createObjectURL(blob)
+                const link = document.createElement("a")
+                link.href = url
+                link.download = filename
+                link.click()
+                window.URL.revokeObjectURL(url)
+            } catch (e) {
+                console.error("Docx generation failed", e)
+                alert("Failed to generate DOCX file. Please try again.")
+            }
 
-    const downloadMenuItems = React.useMemo(() => [
-        {
-            id: "pdf",
-            label: ".pdf",
-            onClick: () => handleDownload("pdf")
+            setShowDownloadMenu(false)
         },
-        {
-            id: "docx",
-            label: ".docx",
-            onClick: () => handleDownload("docx")
-        }
-    ], [handleDownload])
+        [content, settings.fontStyle, settings.pSize]
+    )
+
+    const downloadMenuItems = React.useMemo(
+        () => [
+            {
+                id: "pdf",
+                label: ".pdf",
+                onClick: () => handleDownload("pdf"),
+            },
+            {
+                id: "docx",
+                label: ".docx",
+                onClick: () => handleDownload("docx"),
+            },
+        ],
+        [handleDownload]
+    )
 
     const handleEditorPointerMove = React.useCallback(
         (e: React.PointerEvent) => {
@@ -3023,7 +3903,8 @@ const DocEditor = React.memo(function DocEditor({
                                         zIndex: 100,
                                     }}
                                 >
-                                    Decrease font size ({getModifierKey()}+Shift+,)
+                                    Decrease font size ({getModifierKey()}
+                                    +Shift+,)
                                 </Tooltip>
                             )}
                         </div>
@@ -3108,7 +3989,8 @@ const DocEditor = React.memo(function DocEditor({
                                         zIndex: 100,
                                     }}
                                 >
-                                    Increase font size ({getModifierKey()}+Shift+.)
+                                    Increase font size ({getModifierKey()}
+                                    +Shift+.)
                                 </Tooltip>
                             )}
                         </div>
@@ -3226,28 +4108,47 @@ const DocEditor = React.memo(function DocEditor({
                                     if (selection && selection.rangeCount > 0) {
                                         const range = selection.getRangeAt(0)
                                         setSavedRange(range)
-                                        
+
                                         // Check if we're in a link and pre-populate the URL
-                                        const findLinkElement = (node: Node | null): HTMLAnchorElement | null => {
-                                            while (node && editorRef.current?.contains(node)) {
-                                                if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "A") {
+                                        const findLinkElement = (
+                                            node: Node | null
+                                        ): HTMLAnchorElement | null => {
+                                            while (
+                                                node &&
+                                                editorRef.current?.contains(
+                                                    node
+                                                )
+                                            ) {
+                                                if (
+                                                    node.nodeType ===
+                                                        Node.ELEMENT_NODE &&
+                                                    (node as HTMLElement)
+                                                        .tagName === "A"
+                                                ) {
                                                     return node as HTMLAnchorElement
                                                 }
                                                 node = node.parentNode
                                             }
                                             return null
                                         }
-                                        
-                                        const existingLink = findLinkElement(range.startContainer) ||
-                                                           findLinkElement(range.endContainer) ||
-                                                           findLinkElement(range.commonAncestorContainer)
-                                        
+
+                                        const existingLink =
+                                            findLinkElement(
+                                                range.startContainer
+                                            ) ||
+                                            findLinkElement(
+                                                range.endContainer
+                                            ) ||
+                                            findLinkElement(
+                                                range.commonAncestorContainer
+                                            )
+
                                         if (existingLink) {
                                             setLinkUrl(existingLink.href)
                                         } else {
                                             setLinkUrl("")
                                         }
-                                        
+
                                         setShowLinkDropdown(true)
                                     }
                                 } else {
@@ -3259,7 +4160,7 @@ const DocEditor = React.memo(function DocEditor({
                                         position: "fixed",
                                         top: 0,
                                         left: 0,
-                                        visibility: "hidden"
+                                        visibility: "hidden",
                                     })
                                 }
                             }}
@@ -3294,7 +4195,7 @@ const DocEditor = React.memo(function DocEditor({
                                 setHoveredToolbarItem(hovered ? "link" : null)
                             }
                         />
-                            {showLinkDropdown && (
+                        {showLinkDropdown && (
                             <div // Portal-like container for link dropdown
                                 style={{
                                     position: "fixed",
@@ -3320,89 +4221,105 @@ const DocEditor = React.memo(function DocEditor({
                                     }}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
-                                <input
-                                    ref={linkInputRef}
-                                    autoFocus
-                                    type="text"
-                                    value={linkUrl}
-                                    onChange={(e) => setLinkUrl(e.target.value)}
-                                    placeholder="Type or paste a link"
-                                    className="link-input"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault()
-                                            handleInsertLink()
-                                        } else if (e.key === "Escape") {
-                                            e.preventDefault()
-                                            setShowLinkDropdown(false)
-                                            setLinkUrl("")
-                                            setSavedRange(null)
-                                            setLinkDropdownPosition({
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                visibility: "hidden"
-                                            })
+                                    <input
+                                        ref={linkInputRef}
+                                        autoFocus
+                                        type="text"
+                                        value={linkUrl}
+                                        onChange={(e) =>
+                                            setLinkUrl(e.target.value)
                                         }
-                                    }}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    style={{
-                                        width: "100%",
-                                        padding: "8px 10px",
-                                        borderRadius: 12,
-                                        border: `1px solid ${themeColors.border.subtle}`,
-                                        marginBottom: 6,
-                                        fontSize: 14,
-                                        fontFamily: "Inter",
-                                        outline: "none",
-                                        background: "transparent",
-                                        color: themeColors.text.primary,
-                                    }}
-                                />
-                                <div style={{ display: "flex", gap: 4 }}>
-                                    <button
-                                        onClick={handleInsertLink}
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        disabled={!linkUrl.trim()}
-                                        style={{
-                                            flex: 1,
-                                            padding: "6px 10px",
-                                            background: linkUrl.trim() ? "#0099FF" : themeColors.state.hoverSubtle,
-                                            color: linkUrl.trim() ? "white" : themeColors.text.tertiary,
-                                            border: "none",
-                                            borderRadius: 28,
-                                            cursor: linkUrl.trim() ? "pointer" : "not-allowed",
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            fontFamily: "Inter",
+                                        placeholder="Type or paste a link"
+                                        className="link-input"
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault()
+                                                handleInsertLink()
+                                            } else if (e.key === "Escape") {
+                                                e.preventDefault()
+                                                setShowLinkDropdown(false)
+                                                setLinkUrl("")
+                                                setSavedRange(null)
+                                                setLinkDropdownPosition({
+                                                    position: "fixed",
+                                                    top: 0,
+                                                    left: 0,
+                                                    visibility: "hidden",
+                                                })
+                                            }
                                         }}
-                                    >
-                                        Apply
-                                    </button>
-                                {isLinkActive && (
-                                    <button
-                                        onClick={handleRemoveLink}
-                                            onMouseDown={(e) => e.preventDefault()}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onPointerDown={(e) =>
+                                            e.stopPropagation()
+                                        }
                                         style={{
+                                            width: "100%",
+                                            padding: "8px 10px",
+                                            borderRadius: 12,
+                                            border: `1px solid ${themeColors.border.subtle}`,
+                                            marginBottom: 6,
+                                            fontSize: 14,
+                                            fontFamily: "Inter",
+                                            outline: "none",
+                                            background: "transparent",
+                                            color: themeColors.text.primary,
+                                        }}
+                                    />
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                        <button
+                                            onClick={handleInsertLink}
+                                            onMouseDown={(e) =>
+                                                e.preventDefault()
+                                            }
+                                            disabled={!linkUrl.trim()}
+                                            style={{
                                                 flex: 1,
                                                 padding: "6px 10px",
-                                            background: "rgba(239, 68, 68, 0.15)", // Red tint for delete
-                                            color: "#EF4444",
-                                            border: "none",
+                                                background: linkUrl.trim()
+                                                    ? "#0099FF"
+                                                    : themeColors.state
+                                                          .hoverSubtle,
+                                                color: linkUrl.trim()
+                                                    ? "white"
+                                                    : themeColors.text.tertiary,
+                                                border: "none",
                                                 borderRadius: 28,
-                                            cursor: "pointer",
+                                                cursor: linkUrl.trim()
+                                                    ? "pointer"
+                                                    : "not-allowed",
                                                 fontSize: 13,
                                                 fontWeight: 600,
                                                 fontFamily: "Inter",
-                                        }}
-                                    >
-                                            Remove
-                                    </button>
-                                )}
+                                            }}
+                                        >
+                                            Apply
+                                        </button>
+                                        {isLinkActive && (
+                                            <button
+                                                onClick={handleRemoveLink}
+                                                onMouseDown={(e) =>
+                                                    e.preventDefault()
+                                                }
+                                                style={{
+                                                    flex: 1,
+                                                    padding: "6px 10px",
+                                                    background:
+                                                        "rgba(239, 68, 68, 0.15)", // Red tint for delete
+                                                    color: "#EF4444",
+                                                    border: "none",
+                                                    borderRadius: 28,
+                                                    cursor: "pointer",
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    fontFamily: "Inter",
+                                                }}
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         )}
                     </div>
                 </div>
@@ -3413,10 +4330,11 @@ const DocEditor = React.memo(function DocEditor({
                     themeColors={themeColors}
                     onDownloadClick={() => {
                         if (!showDownloadMenu && downloadMenuRef.current) {
-                            const rect = downloadMenuRef.current.getBoundingClientRect()
+                            const rect =
+                                downloadMenuRef.current.getBoundingClientRect()
                             setDownloadMenuPosition({
                                 top: rect.bottom + 8,
-                                right: window.innerWidth - rect.right
+                                right: window.innerWidth - rect.right,
                             })
                         }
                         setShowDownloadMenu(!showDownloadMenu)
@@ -3427,89 +4345,106 @@ const DocEditor = React.memo(function DocEditor({
                     onDownloadHoverChange={setIsDownloadHovered}
                     isCloseHovered={isCloseHovered}
                     onCloseHoverChange={setIsCloseHovered}
-                    downloadMenu={showDownloadMenu && createPortal(
-                        <>
-                            <div
-                                style={{
-                                    position: "fixed",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 2000,
-                                }}
-                                onClick={() => setShowDownloadMenu(false)}
-                            />
-                            <div
-                                onMouseLeave={() => setSelectedDownloadMenuIndex(-1)}
-                                style={{
-                                    position: "fixed",
-                                    top: downloadMenuPosition.top,
-                                    right: downloadMenuPosition.right,
-                                    width: 128,
-                                    padding: 10,
-                                    background: themeColors.surfaceMenu,
-                                    boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
-                                    borderRadius: 28,
-                                    outline: `0.33px ${themeColors.border.subtle} solid`,
-                                    outlineOffset: "-0.33px",
-                                    flexDirection: "column",
-                                    justifyContent: "flex-start",
-                                    alignItems: "flex-start",
-                                    gap: 4,
-                                    display: "flex",
-                                    zIndex: 2001,
-                                }}
-                            >
+                    downloadMenu={
+                        showDownloadMenu &&
+                        createPortal(
+                            <>
                                 <div
                                     style={{
-                                        padding: "4px 12px",
-                                        color: themeColors.text.secondary,
-                                        fontSize: 12,
-                                        fontFamily: "Inter",
-                                        fontWeight: "500",
-                                        lineHeight: "16px",
+                                        position: "fixed",
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        zIndex: 2000,
+                                    }}
+                                    onClick={() => setShowDownloadMenu(false)}
+                                />
+                                <div
+                                    onMouseLeave={() =>
+                                        setSelectedDownloadMenuIndex(-1)
+                                    }
+                                    style={{
+                                        position: "fixed",
+                                        top: downloadMenuPosition.top,
+                                        right: downloadMenuPosition.right,
+                                        width: 128,
+                                        padding: 10,
+                                        background: themeColors.surfaceMenu,
+                                        boxShadow:
+                                            "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                                        borderRadius: 28,
+                                        outline: `0.33px ${themeColors.border.subtle} solid`,
+                                        outlineOffset: "-0.33px",
+                                        flexDirection: "column",
+                                        justifyContent: "flex-start",
+                                        alignItems: "flex-start",
+                                        gap: 4,
+                                        display: "flex",
+                                        zIndex: 2001,
                                     }}
                                 >
-                                    Save as
-                                </div>
-                                {downloadMenuItems.map((item, index) => (
                                     <div
-                                        key={item.id}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            item.onClick()
-                                        }}
-                                        onMouseEnter={() => setSelectedDownloadMenuIndex(index)}
                                         style={{
-                                            alignSelf: "stretch",
-                                            borderRadius: 20,
-                                            padding: "8px 12px",
-                                            background: index === selectedDownloadMenuIndex ? (themeColors.state?.hover || "rgba(0,0,0,0.04)") : "transparent",
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 12
+                                            padding: "4px 12px",
+                                            color: themeColors.text.secondary,
+                                            fontSize: 12,
+                                            fontFamily: "Inter",
+                                            fontWeight: "500",
+                                            lineHeight: "16px",
                                         }}
                                     >
+                                        Save as
+                                    </div>
+                                    {downloadMenuItems.map((item, index) => (
                                         <div
+                                            key={item.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                item.onClick()
+                                            }}
+                                            onMouseEnter={() =>
+                                                setSelectedDownloadMenuIndex(
+                                                    index
+                                                )
+                                            }
                                             style={{
-                                                flex: "1 1 0",
-                                                color: themeColors.text.primary,
-                                                fontSize: 14,
-                                                fontFamily: "Inter",
-                                                fontWeight: "500",
-                                                lineHeight: "20px",
+                                                alignSelf: "stretch",
+                                                borderRadius: 20,
+                                                padding: "8px 12px",
+                                                background:
+                                                    index ===
+                                                    selectedDownloadMenuIndex
+                                                        ? themeColors.state
+                                                              ?.hover ||
+                                                          "rgba(0,0,0,0.04)"
+                                                        : "transparent",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 12,
                                             }}
                                         >
-                                            {item.label}
+                                            <div
+                                                style={{
+                                                    flex: "1 1 0",
+                                                    color: themeColors.text
+                                                        .primary,
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "500",
+                                                    lineHeight: "20px",
+                                                }}
+                                            >
+                                                {item.label}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </>,
-                        document.body
-                    )}
+                                    ))}
+                                </div>
+                            </>,
+                            document.body
+                        )
+                    }
                 />
             </div>
 
@@ -3566,7 +4501,7 @@ const DocEditor = React.memo(function DocEditor({
                         style={{
                             outline: "none",
                             minHeight: "100%",
-                            paddingBottom: "48px", // adds padding bottom to the doc editor to end text less abruptly 
+                            paddingBottom: "48px", // adds padding bottom to the doc editor to end text less abruptly
                             fontSize: "var(--doc-p-size)",
                             fontFamily: "var(--doc-current-font)",
                             lineHeight: 1.6,
@@ -3587,18 +4522,20 @@ const DocEditor = React.memo(function DocEditor({
                 .DocEditor a { color: var(--doc-accent); text-decoration: underline; cursor: pointer; }
             `}</style>
 
-            {remoteCursors && Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
-                cursor.x >= 0 &&
-                cursor.x <= 1 &&
-                cursor.y >= 0 && (
-                    <LiveCursor
-                        key={peerId}
-                        x={cursor.x}
-                        y={cursor.y}
-                        color={cursor.color}
-                    />
-                )
-            ))}
+            {remoteCursors &&
+                Array.from(remoteCursors.entries()).map(
+                    ([peerId, cursor]) =>
+                        cursor.x >= 0 &&
+                        cursor.x <= 1 &&
+                        cursor.y >= 0 && (
+                            <LiveCursor
+                                key={peerId}
+                                x={cursor.x}
+                                y={cursor.y}
+                                color={cursor.color}
+                            />
+                        )
+                )}
         </div>
     )
 })
@@ -3689,7 +4626,8 @@ const ChatInput = React.memo(function ChatInput({
     // }, [isDocOpen, isWhiteboardOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
-    const [showAddPeopleOverlay, setShowAddPeopleOverlay] = React.useState(false)
+    const [showAddPeopleOverlay, setShowAddPeopleOverlay] =
+        React.useState(false)
     const [hasCopiedLink, setHasCopiedLink] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
     const menuRef = React.useRef<HTMLDivElement>(null)
@@ -3985,7 +4923,7 @@ const ChatInput = React.memo(function ChatInput({
         })
 
         // Show "New Chat" button logic removed as per user request
-        
+
         const showReport = isConnected && !isLiveMode
 
         items.push({
@@ -4029,10 +4967,16 @@ const ChatInput = React.memo(function ChatInput({
                     return
                 }
 
-                const url = typeof window !== "undefined" ? window.location.href : ""
-                const callId = (typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : ""
-                const shareTitle = callId ? `Join my call (${callId}) | #1 free mentorship` : "Join my call | #1 free mentorship"
-                
+                const url =
+                    typeof window !== "undefined" ? window.location.href : ""
+                const callId =
+                    typeof window !== "undefined" && window.location.hash
+                        ? window.location.hash.replace("#", "")
+                        : ""
+                const shareTitle = callId
+                    ? `Join my call (${callId}) | #1 free mentorship`
+                    : "Join my call | #1 free mentorship"
+
                 if (typeof document !== "undefined") {
                     document.title = shareTitle
                 }
@@ -4042,10 +4986,12 @@ const ChatInput = React.memo(function ChatInput({
                     // @ts-ignore
                     if (navigator.share) {
                         // @ts-ignore
-                        navigator.share({
-                            title: shareTitle,
-                            url: url,
-                        }).catch(console.error)
+                        navigator
+                            .share({
+                                title: shareTitle,
+                                url: url,
+                            })
+                            .catch(console.error)
                     }
                 }
                 setShowMenu(false)
@@ -4143,56 +5089,117 @@ const ChatInput = React.memo(function ChatInput({
             `}</style>
 
             {showAddPeopleOverlay && !isMobileLayout && (
-                <div 
-                    data-layer="add-people-overlay" 
-                    className="AddPeopleOverlay" 
+                <div
+                    data-layer="add-people-overlay"
+                    className="AddPeopleOverlay"
                     style={{
-                        alignSelf: 'stretch', 
-                        maxHeight: 384, 
-                        paddingTop: 14, 
-                        paddingBottom: 14, 
-                        paddingLeft: 20, 
-                        paddingRight: 16, 
+                        alignSelf: "stretch",
+                        maxHeight: 384,
+                        paddingTop: 14,
+                        paddingBottom: 14,
+                        paddingLeft: 20,
+                        paddingRight: 16,
                         background: themeColors.surface,
-                        outline: isDocOpen || isWhiteboardOpen ? `0.33px ${themeColors.border.subtle} solid` : "none",
-                        outlineOffset: isDocOpen || isWhiteboardOpen ? "-0.33px" : 0,
-                        overflow: 'hidden', 
-                        borderRadius: 28, 
-                        justifyContent: 'flex-start', 
-                        alignItems: 'center', 
-                        gap: 4, 
-                        display: 'inline-flex', 
-                        marginBottom: 0
+                        outline:
+                            isDocOpen || isWhiteboardOpen
+                                ? `0.33px ${themeColors.border.subtle} solid`
+                                : "none",
+                        outlineOffset:
+                            isDocOpen || isWhiteboardOpen ? "-0.33px" : 0,
+                        overflow: "hidden",
+                        borderRadius: 28,
+                        justifyContent: "flex-start",
+                        alignItems: "center",
+                        gap: 4,
+                        display: "inline-flex",
+                        marginBottom: 0,
                     }}
                 >
-                  <div data-layer="text-content" className="TextContent" style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
-                    <div data-layer="title" className="Title" style={{alignSelf: 'stretch', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>Add people</div>
-                    <div data-layer="description" className="Description" style={{alignSelf: 'stretch', color: themeColors.text.secondary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "22.5px", wordWrap: 'break-word'}}>{isDocOpen || isWhiteboardOpen ? "Learn together" : "Learn together, share ideas, and have fun"}</div>
-                  </div>
-                  <div
+                    <div
+                        data-layer="text-content"
+                        className="TextContent"
+                        style={{
+                            flex: "1 1 0",
+                            flexDirection: "column",
+                            justifyContent: "flex-start",
+                            alignItems: "flex-start",
+                            display: "inline-flex",
+                        }}
+                    >
+                        <div
+                            data-layer="title"
+                            className="Title"
+                            style={{
+                                alignSelf: "stretch",
+                                color: themeColors.text.primary,
+                                fontSize: 15,
+                                fontFamily: "Inter",
+                                fontWeight: "400",
+                                lineHeight: "22.5px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            Add people
+                        </div>
+                        <div
+                            data-layer="description"
+                            className="Description"
+                            style={{
+                                alignSelf: "stretch",
+                                color: themeColors.text.secondary,
+                                fontSize: 15,
+                                fontFamily: "Inter",
+                                fontWeight: "400",
+                                lineHeight: "22.5px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            {isDocOpen || isWhiteboardOpen
+                                ? "Learn together"
+                                : "Learn together, share ideas, and have fun"}
+                        </div>
+                    </div>
+                    <div
                         data-layer="copy-link-button"
                         className="CopyLinkButton"
                         onClick={() => {
-                            const url = typeof window !== "undefined" ? window.location.href : ""
-                            const callId = (typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : ""
-                            const shareTitle = callId ? `Join my call (${callId}) | #1 free mentorship` : "Join my call | #1 free mentorship"
+                            const url =
+                                typeof window !== "undefined"
+                                    ? window.location.href
+                                    : ""
+                            const callId =
+                                typeof window !== "undefined" &&
+                                window.location.hash
+                                    ? window.location.hash.replace("#", "")
+                                    : ""
+                            const shareTitle = callId
+                                ? `Join my call (${callId}) | #1 free mentorship`
+                                : "Join my call | #1 free mentorship"
 
                             if (typeof document !== "undefined") {
                                 document.title = shareTitle
                             }
 
                             if (typeof navigator !== "undefined") {
-                                navigator.clipboard.writeText(url).then(() => {
-                                    setHasCopiedLink(true)
-                                    setTimeout(() => setHasCopiedLink(false), 2000)
-                                }).catch(console.error)
+                                navigator.clipboard
+                                    .writeText(url)
+                                    .then(() => {
+                                        setHasCopiedLink(true)
+                                        setTimeout(
+                                            () => setHasCopiedLink(false),
+                                            2000
+                                        )
+                                    })
+                                    .catch(console.error)
                                 // @ts-ignore
                                 if (navigator.share) {
                                     // @ts-ignore
-                                    navigator.share({
-                                        title: shareTitle,
-                                        url: url,
-                                    }).catch(console.error)
+                                    navigator
+                                        .share({
+                                            title: shareTitle,
+                                            url: url,
+                                        })
+                                        .catch(console.error)
                                 }
                             }
                         }}
@@ -4202,44 +5209,119 @@ const ChatInput = React.memo(function ChatInput({
                             paddingLeft: 20,
                             paddingRight: 20,
                             borderRadius: 28,
-                            outline: '1px rgba(255, 255, 255, 0.20) solid',
-                            outlineOffset: '-1px',
-                            justifyContent: 'flex-start',
-                            alignItems: 'center',
+                            outline: "1px rgba(255, 255, 255, 0.20) solid",
+                            outlineOffset: "-1px",
+                            justifyContent: "flex-start",
+                            alignItems: "center",
                             gap: 8,
-                            display: 'flex',
+                            display: "flex",
                             cursor: "pointer",
                             transition: "background 0.2s ease",
                             backgroundColor: "transparent",
-                            boxSizing: "border-box"
+                            boxSizing: "border-box",
                         }}
                         onMouseEnter={(e) => {
-                             e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"
+                            e.currentTarget.style.backgroundColor =
+                                "rgba(255, 255, 255, 0.08)"
                         }}
                         onMouseLeave={(e) => {
-                             e.currentTarget.style.backgroundColor = "transparent"
+                            e.currentTarget.style.backgroundColor =
+                                "transparent"
                         }}
                     >
-                    <div data-layer="link-text" className="LinkText" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 14, fontFamily: 'Inter', fontWeight: '500', lineHeight: "19.32px", flex: 1, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", textAlign: "left", alignItems: "flex-start"}}>{hasCopiedLink ? "Copied link" : ((typeof window !== "undefined" && window.location.hash) ? window.location.hash.replace('#', '') : "tom-cat-fin")}</div>
-                    <div data-svg-wrapper data-layer="copy-icon" className="CopyIcon">
-                        {hasCopiedLink ? (
-                            <div data-svg-wrapper data-layer="checkmark-icon" className="CheckmarkIcon">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" clipRule="evenodd" d="M12.6256 1.57762C13.0167 1.84429 13.1177 2.37754 12.8509 2.76866L6.42242 12.1971C6.27868 12.4081 6.04836 12.5439 5.79431 12.5677C5.54015 12.5915 5.28864 12.5009 5.10816 12.3204L1.25105 8.46328C0.916318 8.12857 0.916318 7.58583 1.25105 7.25112C1.58578 6.91641 2.12849 6.91641 2.46323 7.25112L5.58884 10.3768L11.4346 1.80295C11.7013 1.41183 12.2345 1.31095 12.6256 1.57762Z" fill={themeColors.text.secondary} fillOpacity="1"/>
+                        <div
+                            data-layer="link-text"
+                            className="LinkText"
+                            style={{
+                                justifyContent: "center",
+                                display: "flex",
+                                flexDirection: "column",
+                                color: themeColors.text.primary,
+                                fontSize: 14,
+                                fontFamily: "Inter",
+                                fontWeight: "500",
+                                lineHeight: "19.32px",
+                                flex: 1,
+                                minWidth: 0,
+                                overflow: "hidden",
+                                whiteSpace: "nowrap",
+                                textOverflow: "ellipsis",
+                                textAlign: "left",
+                                alignItems: "flex-start",
+                            }}
+                        >
+                            {hasCopiedLink
+                                ? "Copied link"
+                                : typeof window !== "undefined" &&
+                                    window.location.hash
+                                  ? window.location.hash.replace("#", "")
+                                  : "tom-cat-fin"}
+                        </div>
+                        <div
+                            data-svg-wrapper
+                            data-layer="copy-icon"
+                            className="CopyIcon"
+                        >
+                            {hasCopiedLink ? (
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="checkmark-icon"
+                                    className="CheckmarkIcon"
+                                >
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 14 14"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            clipRule="evenodd"
+                                            d="M12.6256 1.57762C13.0167 1.84429 13.1177 2.37754 12.8509 2.76866L6.42242 12.1971C6.27868 12.4081 6.04836 12.5439 5.79431 12.5677C5.54015 12.5915 5.28864 12.5009 5.10816 12.3204L1.25105 8.46328C0.916318 8.12857 0.916318 7.58583 1.25105 7.25112C1.58578 6.91641 2.12849 6.91641 2.46323 7.25112L5.58884 10.3768L11.4346 1.80295C11.7013 1.41183 12.2345 1.31095 12.6256 1.57762Z"
+                                            fill={themeColors.text.secondary}
+                                            fillOpacity="1"
+                                        />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 14 14"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path
+                                        d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z"
+                                        fill={themeColors.text.secondary}
+                                        fillOpacity="1"
+                                    />
                                 </svg>
-                            </div>
-                        ) : (
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z" fill={themeColors.text.secondary} fillOpacity="1"/>
-                            </svg>
-                        )}
+                            )}
+                        </div>
                     </div>
-                  </div>
-                  <div data-svg-wrapper data-layer="close-button" className="CloseButton" onClick={() => setShowAddPeopleOverlay(false)} style={{cursor: "pointer"}}>
-                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.3182 23.3033L17.9994 18.9844L13.6805 23.3033C13.4087 23.5751 12.9679 23.5752 12.6961 23.3033C12.4242 23.0315 12.4242 22.5907 12.6961 22.3188L17.0149 18L12.6961 13.6812C12.4242 13.4093 12.4242 12.9685 12.6961 12.6967C12.9679 12.4248 13.4087 12.4249 13.6805 12.6967L17.9994 17.0155L22.3182 12.6967L22.4274 12.6078C22.6976 12.4293 23.0648 12.4588 23.3027 12.6967C23.5406 12.9346 23.5701 13.3018 23.3916 13.572L23.3027 13.6811L18.9838 18L23.3027 22.3189C23.5745 22.5907 23.5745 23.0314 23.3027 23.3033C23.0308 23.5751 22.5901 23.5752 22.3182 23.3033Z" fill={themeColors.text.secondary} fillOpacity="1"/>
-                    </svg>
-                  </div>
+                    <div
+                        data-svg-wrapper
+                        data-layer="close-button"
+                        className="CloseButton"
+                        onClick={() => setShowAddPeopleOverlay(false)}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <svg
+                            width="36"
+                            height="36"
+                            viewBox="0 0 36 36"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M22.3182 23.3033L17.9994 18.9844L13.6805 23.3033C13.4087 23.5751 12.9679 23.5752 12.6961 23.3033C12.4242 23.0315 12.4242 22.5907 12.6961 22.3188L17.0149 18L12.6961 13.6812C12.4242 13.4093 12.4242 12.9685 12.6961 12.6967C12.9679 12.4248 13.4087 12.4249 13.6805 12.6967L17.9994 17.0155L22.3182 12.6967L22.4274 12.6078C22.6976 12.4293 23.0648 12.4588 23.3027 12.6967C23.5406 12.9346 23.5701 13.3018 23.3916 13.572L23.3027 13.6811L18.9838 18L23.3027 22.3189C23.5745 22.5907 23.5745 23.0314 23.3027 23.3033C23.0308 23.5751 22.5901 23.5752 22.3182 23.3033Z"
+                                fill={themeColors.text.secondary}
+                                fillOpacity="1"
+                            />
+                        </svg>
+                    </div>
                 </div>
             )}
 
@@ -4249,13 +5331,14 @@ const ChatInput = React.memo(function ChatInput({
                 style={{
                     width: "100%",
                     padding: "10px 0 16px 0",
-                    background: (!hideGradient && showGradient)
-                        ? `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`
-                        : "transparent",
+                    background:
+                        !hideGradient && showGradient
+                            ? `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 35%)`
+                            : "transparent",
                     justifyContent: "center",
                     alignItems: "flex-end",
                     gap: 10,
-                    display: "flex"
+                    display: "flex",
                 }}
             >
                 {/* CHAT INPUT BAR */}
@@ -4345,7 +5428,10 @@ const ChatInput = React.memo(function ChatInput({
                                                 >
                                                     <path
                                                         d="M1 1L9 9M9 1L1 9"
-                                                        stroke={themeColors.text.primary}
+                                                        stroke={
+                                                            themeColors.text
+                                                                .primary
+                                                        }
                                                         strokeWidth="1.5"
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
@@ -4411,7 +5497,8 @@ const ChatInput = React.memo(function ChatInput({
                                 }
                             }}
                             onMouseEnter={() =>
-                                !showMenu && isHoverCapable() &&
+                                !showMenu &&
+                                isHoverCapable() &&
                                 setIsAddFilesTooltipHovered(true)
                             }
                             onMouseLeave={() =>
@@ -4434,136 +5521,173 @@ const ChatInput = React.memo(function ChatInput({
                                 zIndex: 1,
                             }}
                         >
-            {showMenu && (
-                <>
-                    {isMobileLayout && (
-                        <div
-                            style={{
-                                position: "fixed",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                background: "rgba(0, 0, 0, 0.7)",
-                                zIndex: 1004,
-                                pointerEvents: "auto",
-                            }}
-                            onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
-                        />
-                    )}
-                    <div
-                        ref={menuRef}
-                        style={{
-                            position: isMobileLayout ? "fixed" : "absolute",
-                            bottom: isMobileLayout ? 0 : "calc(100% + 4px)",
-                            left: isMobileLayout ? 0 : "calc(100% - 40px)",
-                            right: isMobileLayout ? 0 : "auto",
-                            zIndex: 2000, // Force very high z-index
-                            pointerEvents: "auto",
-                        }}
-                    >
-                        <div
-                            data-layer="conversation actions"
-                            className="ConversationActions"
-                            onMouseLeave={() => setSelectedMenuIndex(-1)}
-                            style={{
-                                width: isMobileLayout ? "auto" : 196,
-                                padding: 10,
-                                background: themeColors.surfaceMenu,
-                                boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.08)",
-                                borderRadius: isMobileLayout
-                                    ? "36px 36px 0px 0px"
-                                    : 28,
-                                outline: `0.33px ${themeColors.border.subtle} solid`,
-                                outlineOffset: "-0.33px",
-                                flexDirection: "column",
-                                justifyContent: "flex-start",
-                                alignItems: "flex-start",
-                                gap: 4,
-                                display: "flex",
-                            }}
-                        >
-                            {menuItems.map((item, index) => (
-                                <React.Fragment key={item.id}>
-                                    {item.hasSeparator && (
+                            {showMenu && (
+                                <>
+                                    {isMobileLayout && (
                                         <div
-                                            data-layer="separator"
-                                            className="Separator"
                                             style={{
-                                                alignSelf: "stretch",
-                                                marginLeft: 4,
-                                                marginRight: 4,
-                                                marginTop: 2,
-                                                marginBottom: 2,
-                                                height: 1,
-                                                position: "relative",
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
                                                 background:
-                                                    themeColors.border.subtle,
-                                                borderRadius: 4,
+                                                    "rgba(0, 0, 0, 0.7)",
+                                                zIndex: 1004,
+                                                pointerEvents: "auto",
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setShowMenu(false)
                                             }}
                                         />
                                     )}
                                     <div
-                                        className={item.className}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            item.onClick()
-                                        }}
+                                        ref={menuRef}
                                         style={{
-                                            ...localStyles.menuItem,
-                                            height: isMobileLayout ? 44 : 36,
-                                            transition: "none",
-                                            ...(index === selectedMenuIndex
-                                                ? item.isDestructive
-                                                    ? localStyles.menuItemDestructiveHover
-                                                    : localStyles.menuItemHover
-                                                : {}),
-                                        }}
-                                        onMouseEnter={() => {
-                                            if (isMobileLayout) return
-                                            setSelectedMenuIndex(index)
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            // Handled by parent container
+                                            position: isMobileLayout
+                                                ? "fixed"
+                                                : "absolute",
+                                            bottom: isMobileLayout
+                                                ? 0
+                                                : "calc(100% + 4px)",
+                                            left: isMobileLayout
+                                                ? 0
+                                                : "calc(100% - 40px)",
+                                            right: isMobileLayout ? 0 : "auto",
+                                            zIndex: 2000, // Force very high z-index
+                                            pointerEvents: "auto",
                                         }}
                                     >
                                         <div
-                                            data-svg-wrapper
-                                            className="Icon"
+                                            data-layer="conversation actions"
+                                            className="ConversationActions"
+                                            onMouseLeave={() =>
+                                                setSelectedMenuIndex(-1)
+                                            }
                                             style={{
-                                                width: 15,
-                                                display: "flex",
-                                                justifyContent: "center",
-                                            }}
-                                        >
-                                            {item.icon}
-                                        </div>
-                                        <div
-                                            className="Label"
-                                            style={{
-                                                flex: "1 1 0",
-                                                justifyContent: "center",
-                                                display: "flex",
+                                                width: isMobileLayout
+                                                    ? "auto"
+                                                    : 196,
+                                                padding: 10,
+                                                background:
+                                                    themeColors.surfaceMenu,
+                                                boxShadow:
+                                                    "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                                                borderRadius: isMobileLayout
+                                                    ? "36px 36px 0px 0px"
+                                                    : 28,
+                                                outline: `0.33px ${themeColors.border.subtle} solid`,
+                                                outlineOffset: "-0.33px",
                                                 flexDirection: "column",
-                                                color: item.isDestructive
-                                                    ? "#FB6A6A"
-                                                    : themeColors.text.primary,
-                                                fontSize: 14,
-                                                fontFamily: "Inter",
-                                                fontWeight: "400",
-                                                lineHeight: "19.32px",
-                                                wordWrap: "break-word",
+                                                justifyContent: "flex-start",
+                                                alignItems: "flex-start",
+                                                gap: 4,
+                                                display: "flex",
                                             }}
                                         >
-                                            {item.label}
+                                            {menuItems.map((item, index) => (
+                                                <React.Fragment key={item.id}>
+                                                    {item.hasSeparator && (
+                                                        <div
+                                                            data-layer="separator"
+                                                            className="Separator"
+                                                            style={{
+                                                                alignSelf:
+                                                                    "stretch",
+                                                                marginLeft: 4,
+                                                                marginRight: 4,
+                                                                marginTop: 2,
+                                                                marginBottom: 2,
+                                                                height: 1,
+                                                                position:
+                                                                    "relative",
+                                                                background:
+                                                                    themeColors
+                                                                        .border
+                                                                        .subtle,
+                                                                borderRadius: 4,
+                                                            }}
+                                                        />
+                                                    )}
+                                                    <div
+                                                        className={
+                                                            item.className
+                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            item.onClick()
+                                                        }}
+                                                        style={{
+                                                            ...localStyles.menuItem,
+                                                            height: isMobileLayout
+                                                                ? 44
+                                                                : 36,
+                                                            transition: "none",
+                                                            ...(index ===
+                                                            selectedMenuIndex
+                                                                ? item.isDestructive
+                                                                    ? localStyles.menuItemDestructiveHover
+                                                                    : localStyles.menuItemHover
+                                                                : {}),
+                                                        }}
+                                                        onMouseEnter={() => {
+                                                            if (isMobileLayout)
+                                                                return
+                                                            setSelectedMenuIndex(
+                                                                index
+                                                            )
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            // Handled by parent container
+                                                        }}
+                                                    >
+                                                        <div
+                                                            data-svg-wrapper
+                                                            className="Icon"
+                                                            style={{
+                                                                width: 15,
+                                                                display: "flex",
+                                                                justifyContent:
+                                                                    "center",
+                                                            }}
+                                                        >
+                                                            {item.icon}
+                                                        </div>
+                                                        <div
+                                                            className="Label"
+                                                            style={{
+                                                                flex: "1 1 0",
+                                                                justifyContent:
+                                                                    "center",
+                                                                display: "flex",
+                                                                flexDirection:
+                                                                    "column",
+                                                                color: item.isDestructive
+                                                                    ? "#FB6A6A"
+                                                                    : themeColors
+                                                                          .text
+                                                                          .primary,
+                                                                fontSize: 14,
+                                                                fontFamily:
+                                                                    "Inter",
+                                                                fontWeight:
+                                                                    "400",
+                                                                lineHeight:
+                                                                    "19.32px",
+                                                                wordWrap:
+                                                                    "break-word",
+                                                            }}
+                                                        >
+                                                            {item.label}
+                                                        </div>
+                                                    </div>
+                                                </React.Fragment>
+                                            ))}
                                         </div>
                                     </div>
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </div>
-                </>
-            )}
+                                </>
+                            )}
                             {/* Tooltip */}
                             {!showMenu && isAddFilesTooltipHovered && (
                                 <Tooltip
@@ -4578,7 +5702,13 @@ const ChatInput = React.memo(function ChatInput({
                                     Add files and more
                                 </Tooltip>
                             )}
-                            <div style={{ opacity: attachments.length >= 10 ? 0.3 : 0.95, display: "flex" }}>
+                            <div
+                                style={{
+                                    opacity:
+                                        attachments.length >= 10 ? 0.3 : 0.95,
+                                    display: "flex",
+                                }}
+                            >
                                 <svg
                                     width="24"
                                     height="24"
@@ -4610,9 +5740,9 @@ const ChatInput = React.memo(function ChatInput({
                                 paddingBottom: 6,
                             }}
                         >
-            <textarea
-                ref={textareaRef}
-                value={value}
+                            <textarea
+                                ref={textareaRef}
+                                value={value}
                                 onChange={(e) => {
                                     onChange(e)
                                     // Auto-open menu on trigger
@@ -4676,20 +5806,20 @@ const ChatInput = React.memo(function ChatInput({
                                         if (hasContent && !isLoading) onSend()
                                     }
                                 }}
-                placeholder={placeholder}
+                                placeholder={placeholder}
                                 disabled={false}
                                 className="ChatTextInput"
-                style={{
+                                style={{
                                     flex: "1 1 0",
                                     color: themeColors.text.primary,
                                     fontSize: 16,
                                     fontFamily: "Inter",
                                     fontWeight: "400",
                                     lineHeight: "24px",
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    resize: "none",
+                                    background: "transparent",
+                                    border: "none",
+                                    outline: "none",
+                                    resize: "none",
                                     height: 24,
                                     padding: 0,
                                     margin: 0,
@@ -4707,12 +5837,13 @@ const ChatInput = React.memo(function ChatInput({
                                 if (isLoading && onStop) {
                                     onStop()
                                 } else if (hasContent) {
-                        onSend()
-                    }
-                }}
+                                    onSend()
+                                }
+                            }}
                             style={{
                                 cursor: "pointer",
-                                display: (hasContent || isLoading) ? "block" : "none",
+                                display:
+                                    hasContent || isLoading ? "block" : "none",
                                 opacity: 1,
                                 width: 36,
                                 height: 36,
@@ -4777,52 +5908,52 @@ const ChatInput = React.memo(function ChatInput({
                                 <div
                                     data-svg-wrapper
                                     data-layer="start ai live call"
-                                className="StartAiLiveCall"
-                                onClick={onConnectWithAI}
-                                onMouseEnter={() =>
-                                    isHoverCapable() &&
-                                    setIsAiTooltipHovered(true)
-                                }
-                                onMouseLeave={() =>
-                                    setIsAiTooltipHovered(false)
-                                }
-                                style={{
-                                    cursor: "pointer",
-                                    width: 36,
-                                    height: 36,
-                                    display: "block",
-                                    position: "relative",
-                                    zIndex: 0, // Force lowest z-index
-                                }}
-                            >
-                                {isAiTooltipHovered && (
-                                    <Tooltip
-                                        style={{
-                                            bottom: "100%",
-                                            left: "50%",
-                                            transform: isMobileLayout
-                                                ? "translate(-70%, -17px)"
-                                                : "translate(-50%, -17px)",
-                                        }}
-                                    >
-                                        Connect with AI
-                                    </Tooltip>
-                                )}
-                                <svg
-                                    width="36"
-                                    height="36"
-                                    viewBox="0 0 36 36"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="StartAiLiveCall"
+                                    onClick={onConnectWithAI}
+                                    onMouseEnter={() =>
+                                        isHoverCapable() &&
+                                        setIsAiTooltipHovered(true)
+                                    }
+                                    onMouseLeave={() =>
+                                        setIsAiTooltipHovered(false)
+                                    }
+                                    style={{
+                                        cursor: "pointer",
+                                        width: 36,
+                                        height: 36,
+                                        display: "block",
+                                        position: "relative",
+                                        zIndex: 0, // Force lowest z-index
+                                    }}
                                 >
-                                    <path
-                                        d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z"
-                                        fill={themeColors.text.primary}
-                                        fillOpacity="0.95"
-                                    />
-                                </svg>
-                            </div>
-                        )}
+                                    {isAiTooltipHovered && (
+                                        <Tooltip
+                                            style={{
+                                                bottom: "100%",
+                                                left: "50%",
+                                                transform: isMobileLayout
+                                                    ? "translate(-70%, -17px)"
+                                                    : "translate(-50%, -17px)",
+                                            }}
+                                        >
+                                            Connect with AI
+                                        </Tooltip>
+                                    )}
+                                    <svg
+                                        width="36"
+                                        height="36"
+                                        viewBox="0 0 36 36"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z"
+                                            fill={themeColors.text.primary}
+                                            fillOpacity="0.95"
+                                        />
+                                    </svg>
+                                </div>
+                            )}
                     </div>
                 </div>
 
@@ -4891,7 +6022,15 @@ const ChatInput = React.memo(function ChatInput({
 })
 
 // --- HELPER COMPONENT: DEBUG CONSOLE ---
-function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; status: string }) {
+function DebugConsole({
+    logs,
+    role,
+    status,
+}: {
+    logs: string[]
+    role?: string
+    status: string
+}) {
     const scrollRef = React.useRef<HTMLDivElement>(null)
     const [copied, setCopied] = React.useState(false)
 
@@ -4902,13 +6041,16 @@ function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; s
     }, [logs])
 
     const handleCopy = () => {
-        const logsText = logs.join('\n')
-        navigator.clipboard.writeText(logsText).then(() => {
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        }).catch(err => {
-            console.error('Failed to copy logs:', err)
-        })
+        const logsText = logs.join("\n")
+        navigator.clipboard
+            .writeText(logsText)
+            .then(() => {
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+            })
+            .catch((err) => {
+                console.error("Failed to copy logs:", err)
+            })
     }
 
     return (
@@ -4933,51 +6075,94 @@ function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; s
                 borderRadius: 28,
                 display: "flex",
                 flexDirection: "column",
-                cursor: "grab"
+                cursor: "grab",
             }}
             whileDrag={{ cursor: "grabbing", scale: 1.01 }}
         >
             {/* Status Bar */}
-            <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                marginBottom: 8,
-                paddingBottom: 8,
-                flexShrink: 0
-            }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    marginBottom: 8,
+                    paddingBottom: 8,
+                    flexShrink: 0,
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        fontSize: 13,
+                    }}
+                >
                     <span style={{ opacity: 0.7 }}>🔗 Room:</span>
                     <span style={{ color: "#3b82f6", fontWeight: "bold" }}>
-                        {typeof window !== "undefined" ? window.location.hash || "(no hash)" : "(no hash)"}
+                        {typeof window !== "undefined"
+                            ? window.location.hash || "(no hash)"
+                            : "(no hash)"}
                     </span>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        fontSize: 13,
+                    }}
+                >
                     <span style={{ opacity: 0.7 }}>👤 Role:</span>
-                    <span style={{ color: role ? "#22c55e" : "#f59e0b", fontWeight: "bold" }}>
+                    <span
+                        style={{
+                            color: role ? "#22c55e" : "#f59e0b",
+                            fontWeight: "bold",
+                        }}
+                    >
                         {role || "None (Passive Mode)"}
                     </span>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        fontSize: 13,
+                    }}
+                >
                     <span style={{ opacity: 0.7 }}>📊 Status:</span>
-                    <span style={{
-                        color: status === "connected" ? "#22c55e" : status === "searching" ? "#f59e0b" : "#94a3b8",
-                        fontWeight: "bold"
-                    }}>
+                    <span
+                        style={{
+                            color:
+                                status === "connected"
+                                    ? "#22c55e"
+                                    : status === "searching"
+                                      ? "#f59e0b"
+                                      : "#94a3b8",
+                            fontWeight: "bold",
+                        }}
+                    >
                         {status}
                     </span>
                 </div>
             </div>
 
             {/* Header with copy button */}
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 6,
-                flexShrink: 0
-            }}>
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>🔍 Debug Logs</div>
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                    flexShrink: 0,
+                }}
+            >
+                <div
+                    style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}
+                >
+                    🔍 Debug Logs
+                </div>
                 <button
                     onClick={handleCopy}
                     style={{
@@ -4990,7 +6175,7 @@ function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; s
                         cursor: "pointer",
                         fontWeight: "600",
                         transition: "all 0.2s",
-                        flexShrink: 0
+                        flexShrink: 0,
                     }}
                 >
                     {copied ? "✓ Copied!" : "📋 Copy"}
@@ -4998,14 +6183,20 @@ function DebugConsole({ logs, role, status }: { logs: string[]; role?: string; s
             </div>
 
             {/* Logs */}
-            <div ref={scrollRef} style={{
-                flex: 1,
-                overflowY: "auto",
-                fontSize: 11,
-                lineHeight: 1.3
-            }}>
+            <div
+                ref={scrollRef}
+                style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    fontSize: 11,
+                    lineHeight: 1.3,
+                }}
+            >
                 {logs.slice(-100).map((log, i) => (
-                    <div key={i} style={{ marginBottom: 3, wordBreak: "break-word" }}>
+                    <div
+                        key={i}
+                        style={{ marginBottom: 3, wordBreak: "break-word" }}
+                    >
                         {log}
                     </div>
                 ))}
@@ -5022,7 +6213,12 @@ interface ReportModalProps {
     participantCount?: number
 }
 
-function ReportModal({ isOpen, onClose, onSubmit, participantCount = 2 }: ReportModalProps) {
+function ReportModal({
+    isOpen,
+    onClose,
+    onSubmit,
+    participantCount = 2,
+}: ReportModalProps) {
     const [selected, setSelected] = React.useState<string | null>(null)
     const [hoveredRow, setHoveredRow] = React.useState<string | null>(null)
 
@@ -5043,10 +6239,10 @@ function ReportModal({ isOpen, onClose, onSubmit, participantCount = 2 }: Report
     }
 
     if (!isOpen) return null
-    
+
     const isMultiParty = participantCount > 2
     const title = "Report user"
-    const question = isMultiParty 
+    const question = isMultiParty
         ? "Why are you reporting this user? User in violation will be banned."
         : "Why are you reporting this user?"
 
@@ -5124,9 +6320,9 @@ function ReportModal({ isOpen, onClose, onSubmit, participantCount = 2 }: Report
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
-                </svg>
+                        </svg>
                     </button>
-            </div>
+                </div>
 
                 <div
                     style={{
@@ -5832,26 +7028,28 @@ function LiveCursor({
 
         const update = () => {
             const screenPoint = editor.pageToScreen({ x, y })
-            
+
             // Get the offset between the parent container and the tldraw editor container
             const editorContainer = editor.getContainer()
             const parentContainer = containerRef.current
-            
+
             if (editorContainer && parentContainer) {
                 const editorRect = editorContainer.getBoundingClientRect()
                 const parentRect = parentContainer.getBoundingClientRect()
-                
+
                 // Adjust screen coordinates to be relative to parent container
-                const adjustedX = screenPoint.x + (editorRect.left - parentRect.left)
-                const adjustedY = screenPoint.y + (editorRect.top - parentRect.top)
-                
+                const adjustedX =
+                    screenPoint.x + (editorRect.left - parentRect.left)
+                const adjustedY =
+                    screenPoint.y + (editorRect.top - parentRect.top)
+
                 // Check if the cursor is within the visible canvas bounds
-                const isInBounds = 
-                    adjustedX >= 0 && 
+                const isInBounds =
+                    adjustedX >= 0 &&
                     adjustedX <= parentRect.width &&
-                    adjustedY >= 0 && 
+                    adjustedY >= 0 &&
                     adjustedY <= parentRect.height
-                
+
                 setPos({ x: adjustedX, y: adjustedY })
                 setIsVisible(isInBounds)
             } else {
@@ -5861,14 +7059,19 @@ function LiveCursor({
         }
 
         update()
-        
+
         // Listen specifically to camera changes (instance scope)
         const cleanup = editor.store.listen(
             (entry: any) => {
                 // Check if camera changed
                 if (entry.changes?.updated) {
-                    for (const [id, [from, to]] of Object.entries(entry.changes.updated)) {
-                        if ((from as any)?.typeName === 'instance' && (to as any)?.typeName === 'instance') {
+                    for (const [id, [from, to]] of Object.entries(
+                        entry.changes.updated
+                    )) {
+                        if (
+                            (from as any)?.typeName === "instance" &&
+                            (to as any)?.typeName === "instance"
+                        ) {
                             if ((from as any)?.camera !== (to as any)?.camera) {
                                 update()
                                 break
@@ -5877,7 +7080,7 @@ function LiveCursor({
                     }
                 }
             },
-            { scope: 'instance' }
+            { scope: "instance" }
         )
         return () => cleanup()
     }, [editor, x, y, containerRef])
@@ -5954,7 +7157,7 @@ function stripMarkdown(text: string): string {
     if (!text) return ""
     return text
         .replace(/```[\s\S]*?```/g, (match) => {
-             return match.replace(/^```.*\n?/, "").replace(/```$/, "")
+            return match.replace(/^```.*\n?/, "").replace(/```$/, "")
         })
         .replace(/`([^`]+)`/g, "$1")
         .replace(/(\*\*|__)(.*?)\1/g, "$2")
@@ -6036,8 +7239,9 @@ const MessageBubble = React.memo(
         const [isDislikeActive, setIsDislikeActive] = React.useState(false)
         const isSharing = React.useRef(false)
 
-    const [isDocHovered, setIsDocHovered] = React.useState(false)
-    const [isWhiteboardHovered, setIsWhiteboardHovered] = React.useState(false)
+        const [isDocHovered, setIsDocHovered] = React.useState(false)
+        const [isWhiteboardHovered, setIsWhiteboardHovered] =
+            React.useState(false)
 
         const actionButtonBaseStyle: React.CSSProperties = {
             width: 28,
@@ -6047,15 +7251,20 @@ const MessageBubble = React.memo(
             justifyContent: "center",
             cursor: "pointer",
             borderRadius: 10,
-            padding: 4
+            padding: 4,
         }
 
-        const hoverBackground = themeColors.background === "#FFFFFF" 
-            ? "rgba(0, 0, 0, 0.04)" 
-            : "rgba(255, 255, 255, 0.04)"
+        const hoverBackground =
+            themeColors.background === "#FFFFFF"
+                ? "rgba(0, 0, 0, 0.04)"
+                : "rgba(255, 255, 255, 0.04)"
 
         const handleShare = React.useCallback(async () => {
-            if (typeof window === "undefined" || typeof document === "undefined") return
+            if (
+                typeof window === "undefined" ||
+                typeof document === "undefined"
+            )
+                return
             if (isSharing.current) return
             isSharing.current = true
 
@@ -6063,12 +7272,12 @@ const MessageBubble = React.memo(
             const SCALE = 2
             const WIDTH = 320 * SCALE
             const HEIGHT = 400 * SCALE
-            
+
             const canvas = document.createElement("canvas")
             canvas.width = WIDTH
             canvas.height = HEIGHT
             const ctx = canvas.getContext("2d")
-            
+
             if (!ctx) return
 
             // Scale all context operations
@@ -6079,13 +7288,19 @@ const MessageBubble = React.memo(
             const BUBBLE_PADDING_X = 12
             const BUBBLE_PADDING_Y = 8
             const MAX_BUBBLE_WIDTH = 224
-            
+
             // Draw Background
             ctx.fillStyle = "white"
             ctx.fillRect(0, 0, 320, 400) // Logical coords
 
             // Helper: Rounded Rect
-            const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+            const roundRect = (
+                x: number,
+                y: number,
+                w: number,
+                h: number,
+                r: number
+            ) => {
                 if (w < 2 * r) r = w / 2
                 if (h < 2 * r) r = h / 2
                 ctx.beginPath()
@@ -6100,7 +7315,11 @@ const MessageBubble = React.memo(
             }
 
             // Helper: Text Wrapping with return metrics
-            const measureTextWrapped = (text: string, maxWidth: number, font: string) => {
+            const measureTextWrapped = (
+                text: string,
+                maxWidth: number,
+                font: string
+            ) => {
                 ctx.font = font
                 const words = text.split(" ")
                 let line = ""
@@ -6116,115 +7335,166 @@ const MessageBubble = React.memo(
                     }
                 }
                 lines.push(line)
-                return { 
+                return {
                     lines,
-                    width: Math.min(maxWidth, Math.max(...lines.map(l => ctx.measureText(l).width)))
+                    width: Math.min(
+                        maxWidth,
+                        Math.max(...lines.map((l) => ctx.measureText(l).width))
+                    ),
                 }
             }
 
             // 3. Prepare Content
-            const rawUserText = (previousMsg?.role === "user" ? previousMsg.text : "User Query") || "User Query"
+            const rawUserText =
+                (previousMsg?.role === "user"
+                    ? previousMsg.text
+                    : "User Query") || "User Query"
             const rawAiText = stripMarkdown(msg.text)
 
             // 4. Render User Bubble (Truncate to 3 lines max)
             ctx.font = "400 15px Inter, sans-serif"
-            const userMetrics = measureTextWrapped(rawUserText, MAX_BUBBLE_WIDTH - (BUBBLE_PADDING_X * 2), "400 15px Inter, sans-serif")
-            
+            const userMetrics = measureTextWrapped(
+                rawUserText,
+                MAX_BUBBLE_WIDTH - BUBBLE_PADDING_X * 2,
+                "400 15px Inter, sans-serif"
+            )
+
             const maxLines = 3
             const displayLines = userMetrics.lines.slice(0, maxLines)
             const isTruncated = userMetrics.lines.length > maxLines
-            
+
             // Add ellipsis to last line if truncated
             if (isTruncated && displayLines.length === maxLines) {
-                displayLines[maxLines - 1] = displayLines[maxLines - 1].trim() + "..."
+                displayLines[maxLines - 1] =
+                    displayLines[maxLines - 1].trim() + "..."
             }
-            
+
             const lineHeight = 22.5
-            const bubbleW = userMetrics.width + (BUBBLE_PADDING_X * 2)
-            
+            const bubbleW = userMetrics.width + BUBBLE_PADDING_X * 2
+
             // Use consistent padding for top and bottom
             const topPadding = BUBBLE_PADDING_Y
             const bottomPadding = BUBBLE_PADDING_Y
-            
+
             // Calculate bubble height: number of lines * line height + top padding + bottom padding
-            const bubbleH = (displayLines.length * lineHeight) + topPadding + bottomPadding
+            const bubbleH =
+                displayLines.length * lineHeight + topPadding + bottomPadding
             const bubbleX = 320 - PADDING - bubbleW
             const bubbleY = PADDING
 
             roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 24)
-            
+
             // Draw text with proper top-left alignment
             ctx.fillStyle = "rgba(0, 0, 0, 0.95)"
             ctx.textAlign = "left"
             ctx.textBaseline = "top"
-            
+
             // Position first line exactly at bubbleY + top padding
             // Ensure text is properly aligned at the top
             const fontSize = 15
             const verticalOffset = (lineHeight - fontSize) / 2 // Center text within line height
             const textStartY = bubbleY + topPadding + verticalOffset
-            
+
             displayLines.forEach((line, i) => {
-                const textY = textStartY + (i * lineHeight)
+                const textY = textStartY + i * lineHeight
                 ctx.fillText(line.trim(), bubbleX + BUBBLE_PADDING_X, textY)
             })
 
-            const renderMarkdownToCanvas = (text: string, startX: number, startY: number, maxWidth: number) => {
+            const renderMarkdownToCanvas = (
+                text: string,
+                startX: number,
+                startY: number,
+                maxWidth: number
+            ) => {
                 let currentY = startY
                 const baseFont = "400 16px Inter, sans-serif"
                 const baseColor = "rgba(0, 0, 0, 0.95)"
                 const lineHeight = 24
                 ctx.textAlign = "left"
                 ctx.textBaseline = "top"
-                
+
                 // Inline formatting parser with comprehensive regex matching the React component
-                const processInlineFormatting = (textSegment: string, x: number, maxW: number, isBullet = false) => {
-                    const combinedRegex = /(\*\*([\s\S]*?)\*\*|__([\s\S]*?)__|<strong>([\s\S]*?)<\/strong>|<b>([\s\S]*?)<\/b>|\`([^`]+)\`|~~([\s\S]*?)~~|(\*|_)([\s\S]*?)\8|<em>([\s\S]*?)<\/em>|<i>([\s\S]*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\))/gi
-                    
-                    let currentX = isBullet ? x + 12 : x  // Indent for bullet items
+                const processInlineFormatting = (
+                    textSegment: string,
+                    x: number,
+                    maxW: number,
+                    isBullet = false
+                ) => {
+                    const combinedRegex =
+                        /(\*\*([\s\S]*?)\*\*|__([\s\S]*?)__|<strong>([\s\S]*?)<\/strong>|<b>([\s\S]*?)<\/b>|\`([^`]+)\`|~~([\s\S]*?)~~|(\*|_)([\s\S]*?)\8|<em>([\s\S]*?)<\/em>|<i>([\s\S]*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\))/gi
+
+                    let currentX = isBullet ? x + 12 : x // Indent for bullet items
                     const lineStartX = isBullet ? x + 12 : x
                     let lastIndex = 0
                     let match
-                    
+
                     const renderWords = (txt: string, xPos: number) => {
                         if (!txt) return xPos
                         const words = txt.split(/(\s+)/)
                         let cx = xPos
-                        
+
                         words.forEach((word) => {
                             if (!word) return
                             const metrics = ctx.measureText(word)
-                            
-                            if (cx + metrics.width > lineStartX + maxW - (isBullet ? 12 : 0) && cx !== lineStartX) {
+
+                            if (
+                                cx + metrics.width >
+                                    lineStartX + maxW - (isBullet ? 12 : 0) &&
+                                cx !== lineStartX
+                            ) {
                                 currentY += lineHeight
                                 cx = lineStartX
                             }
-                            
+
                             ctx.fillText(word, cx, currentY)
                             cx += metrics.width
                         })
-                        
+
                         return cx
                     }
-                    
+
                     while ((match = combinedRegex.exec(textSegment)) !== null) {
                         // Render plain text before match
                         if (match.index > lastIndex) {
-                            const plainText = textSegment.substring(lastIndex, match.index)
+                            const plainText = textSegment.substring(
+                                lastIndex,
+                                match.index
+                            )
                             ctx.font = baseFont
                             ctx.fillStyle = baseColor
                             currentX = renderWords(plainText, currentX)
                         }
-                        
-                        const [fullMatch, , boldInner, boldInner2, strongInner, bInner, codeInner, strikeInner, , italicInner, emInner, iInner, linkText, linkUrl] = match
-                        
+
+                        const [
+                            fullMatch,
+                            ,
+                            boldInner,
+                            boldInner2,
+                            strongInner,
+                            bInner,
+                            codeInner,
+                            strikeInner,
+                            ,
+                            italicInner,
+                            emInner,
+                            iInner,
+                            linkText,
+                            linkUrl,
+                        ] = match
+
                         // Determine content and style
                         let content = ""
                         let font = baseFont
                         let color = baseColor
-                        
-                        if (boldInner !== undefined || boldInner2 !== undefined || strongInner !== undefined || bInner !== undefined) {
-                            content = boldInner || boldInner2 || strongInner || bInner
+
+                        if (
+                            boldInner !== undefined ||
+                            boldInner2 !== undefined ||
+                            strongInner !== undefined ||
+                            bInner !== undefined
+                        ) {
+                            content =
+                                boldInner || boldInner2 || strongInner || bInner
                             font = "600 16px Inter, sans-serif"
                         } else if (codeInner !== undefined) {
                             content = codeInner
@@ -6233,39 +7503,51 @@ const MessageBubble = React.memo(
                         } else if (strikeInner !== undefined) {
                             content = strikeInner
                             // Strikethrough not easily rendered on canvas, render as normal
-                        } else if (italicInner !== undefined || emInner !== undefined || iInner !== undefined) {
+                        } else if (
+                            italicInner !== undefined ||
+                            emInner !== undefined ||
+                            iInner !== undefined
+                        ) {
                             content = italicInner || emInner || iInner
                             font = "italic 16px Inter, sans-serif"
-                        } else if (linkText !== undefined && linkUrl !== undefined) {
+                        } else if (
+                            linkText !== undefined &&
+                            linkUrl !== undefined
+                        ) {
                             content = linkText
                             color = "#0066cc"
                         }
-                        
+
                         ctx.font = font
                         ctx.fillStyle = color
                         currentX = renderWords(content, currentX)
-                        
+
                         lastIndex = match.index + fullMatch.length
                     }
-                    
+
                     // Render remaining text
                     if (lastIndex < textSegment.length) {
                         ctx.font = baseFont
                         ctx.fillStyle = baseColor
-                        currentX = renderWords(textSegment.substring(lastIndex), currentX)
+                        currentX = renderWords(
+                            textSegment.substring(lastIndex),
+                            currentX
+                        )
                     }
-                    
+
                     currentY += lineHeight
                 }
-                
+
                 // Process code blocks first
                 const codeBlockRegex = /(```[\s\S]*?```)/g
                 const segments = text.split(codeBlockRegex)
-                
+
                 segments.forEach((segment) => {
                     if (segment.startsWith("```")) {
                         // Code block
-                        const content = segment.replace(/^```\w*\n?/, "").replace(/```$/, "")
+                        const content = segment
+                            .replace(/^```\w*\n?/, "")
+                            .replace(/```$/, "")
                         const lines = content.split("\n")
                         const blockHeight = lines.length * 20 + 8
                         ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
@@ -6280,13 +7562,14 @@ const MessageBubble = React.memo(
                     } else {
                         // Process blocks (paragraphs, lists, etc.)
                         const blocks = segment.split(/\n{2,}/)
-                        
+
                         blocks.forEach((block) => {
                             const trimmed = block.trim()
                             if (!trimmed) return
-                            
+
                             // Heading
-                            const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/)
+                            const headingMatch =
+                                trimmed.match(/^(#{1,6})\s+(.*)/)
                             if (headingMatch) {
                                 const level = headingMatch[1].length
                                 const content = headingMatch[2]
@@ -6295,7 +7578,11 @@ const MessageBubble = React.memo(
                                 const headingFont = `600 ${fontSize}px Inter, sans-serif`
                                 ctx.font = headingFont
                                 ctx.fillStyle = baseColor
-                                const headingMetrics = measureTextWrapped(content, maxWidth, headingFont)
+                                const headingMetrics = measureTextWrapped(
+                                    content,
+                                    maxWidth,
+                                    headingFont
+                                )
                                 headingMetrics.lines.forEach((line) => {
                                     ctx.fillText(line.trim(), startX, currentY)
                                     currentY += fontSize * 1.5
@@ -6303,7 +7590,7 @@ const MessageBubble = React.memo(
                                 currentY += 8
                                 return
                             }
-                            
+
                             // Horizontal rule
                             if (/^---+$|^\*\*\*+$/.test(trimmed)) {
                                 ctx.strokeStyle = "rgba(0, 0, 0, 0.15)"
@@ -6315,141 +7602,249 @@ const MessageBubble = React.memo(
                                 currentY += 24
                                 return
                             }
-                            
+
                             // Blockquote
                             if (trimmed.startsWith(">")) {
-                                const content = trimmed.replace(/^>\s?/gm, "").trim()
+                                const content = trimmed
+                                    .replace(/^>\s?/gm, "")
+                                    .trim()
                                 ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
                                 ctx.fillRect(startX, currentY, 4, 24)
                                 ctx.font = baseFont
                                 ctx.fillStyle = "rgba(0, 0, 0, 0.65)"
-                                processInlineFormatting(content, startX + 12, maxWidth - 12)
+                                processInlineFormatting(
+                                    content,
+                                    startX + 12,
+                                    maxWidth - 12
+                                )
                                 currentY += 8
                                 return
                             }
-                            
+
                             // Bullet list
                             if (/^[-*]\s/.test(trimmed)) {
-                                const items = trimmed.split("\n").map((l) => l.replace(/^[-*]\s+/, ""))
+                                const items = trimmed
+                                    .split("\n")
+                                    .map((l) => l.replace(/^[-*]\s+/, ""))
                                 items.forEach((item) => {
                                     if (!item.trim()) return
                                     // Draw bullet
                                     ctx.fillStyle = baseColor
                                     ctx.beginPath()
-                                    ctx.arc(startX + 4, currentY + 8, 2, 0, Math.PI * 2)
+                                    ctx.arc(
+                                        startX + 4,
+                                        currentY + 8,
+                                        2,
+                                        0,
+                                        Math.PI * 2
+                                    )
                                     ctx.fill()
                                     // Draw item text with formatting
-                                    processInlineFormatting(item, startX, maxWidth, true)
+                                    processInlineFormatting(
+                                        item,
+                                        startX,
+                                        maxWidth,
+                                        true
+                                    )
                                     currentY += 4
                                 })
                                 currentY += 4
                                 return
                             }
-                            
+
                             // Numbered list
                             if (/^\d+\.\s/.test(trimmed)) {
-                                const items = trimmed.split("\n").map((l) => ({ num: l.match(/^(\d+)\./)?.[1] || "1", text: l.replace(/^\d+\.\s+/, "") }))
+                                const items = trimmed
+                                    .split("\n")
+                                    .map((l) => ({
+                                        num: l.match(/^(\d+)\./)?.[1] || "1",
+                                        text: l.replace(/^\d+\.\s+/, ""),
+                                    }))
                                 items.forEach((item) => {
                                     if (!item.text.trim()) return
                                     ctx.font = baseFont
                                     ctx.fillStyle = baseColor
-                                    ctx.fillText(`${item.num}.`, startX, currentY)
-                                    processInlineFormatting(item.text, startX + 20, maxWidth - 20)
+                                    ctx.fillText(
+                                        `${item.num}.`,
+                                        startX,
+                                        currentY
+                                    )
+                                    processInlineFormatting(
+                                        item.text,
+                                        startX + 20,
+                                        maxWidth - 20
+                                    )
                                     currentY += 4
                                 })
                                 currentY += 4
                                 return
                             }
-                            
+
                             // Table
                             const tableRegex = /^\|.*\|$/m
                             if (tableRegex.test(trimmed)) {
-                                const lines = trimmed.split("\n").filter(l => l.trim().length > 0)
+                                const lines = trimmed
+                                    .split("\n")
+                                    .filter((l) => l.trim().length > 0)
                                 if (lines.length >= 2) {
                                     const headerLine = lines[0]
                                     const separatorLine = lines[1]
                                     const bodyLines = lines.slice(2)
-                                    
-                                    if (separatorLine.includes("-") && separatorLine.includes("|")) {
-                                        const headers = headerLine.split("|").filter(h => h.trim().length > 0).map(h => h.trim())
-                                        const rows = bodyLines.map(line => line.split("|").filter(c => c.trim().length > 0).map(c => c.trim()))
-                                        
+
+                                    if (
+                                        separatorLine.includes("-") &&
+                                        separatorLine.includes("|")
+                                    ) {
+                                        const headers = headerLine
+                                            .split("|")
+                                            .filter((h) => h.trim().length > 0)
+                                            .map((h) => h.trim())
+                                        const rows = bodyLines.map((line) =>
+                                            line
+                                                .split("|")
+                                                .filter(
+                                                    (c) => c.trim().length > 0
+                                                )
+                                                .map((c) => c.trim())
+                                        )
+
                                         // Basic layout: equal width columns
                                         const colCount = headers.length
                                         if (colCount > 0) {
                                             const cellPadding = 8
-                                            const colWidth = (maxWidth - (cellPadding * 2 * colCount)) / colCount
-                                            
+                                            const colWidth =
+                                                (maxWidth -
+                                                    cellPadding *
+                                                        2 *
+                                                        colCount) /
+                                                colCount
+
                                             // Draw headers
                                             let tableX = startX
                                             const headerHeight = 32 // Approximate header height
-                                            
+
                                             // Draw header background
-                                            ctx.fillStyle = "rgba(0, 0, 0, 0.05)"
-                                            ctx.fillRect(startX, currentY, maxWidth, headerHeight)
-                                            
+                                            ctx.fillStyle =
+                                                "rgba(0, 0, 0, 0.05)"
+                                            ctx.fillRect(
+                                                startX,
+                                                currentY,
+                                                maxWidth,
+                                                headerHeight
+                                            )
+
                                             // Draw header text
-                                            ctx.font = "600 14px Inter, sans-serif"
+                                            ctx.font =
+                                                "600 14px Inter, sans-serif"
                                             ctx.fillStyle = baseColor
                                             headers.forEach((header, i) => {
-                                                ctx.fillText(header, tableX + cellPadding, currentY + 8)
-                                                tableX += colWidth + (cellPadding * 2)
+                                                ctx.fillText(
+                                                    header,
+                                                    tableX + cellPadding,
+                                                    currentY + 8
+                                                )
+                                                tableX +=
+                                                    colWidth + cellPadding * 2
                                             })
-                                            
+
                                             currentY += headerHeight
-                                            
+
                                             // Draw rows
-                                            ctx.font = "400 14px Inter, sans-serif"
+                                            ctx.font =
+                                                "400 14px Inter, sans-serif"
                                             rows.forEach((row, i) => {
                                                 tableX = startX
                                                 // Alternating row background
                                                 if (i % 2 === 1) {
-                                                    ctx.fillStyle = "rgba(0, 0, 0, 0.02)"
-                                                    ctx.fillRect(startX, currentY, maxWidth, 24)
+                                                    ctx.fillStyle =
+                                                        "rgba(0, 0, 0, 0.02)"
+                                                    ctx.fillRect(
+                                                        startX,
+                                                        currentY,
+                                                        maxWidth,
+                                                        24
+                                                    )
                                                 }
                                                 ctx.fillStyle = baseColor
-                                                
+
                                                 row.forEach((cell, j) => {
                                                     if (j < colCount) {
                                                         // Simple truncation for cell text
                                                         let cellText = cell
-                                                        const maxCellW = colWidth
-                                                        if (ctx.measureText(cellText).width > maxCellW) {
-                                                            while (ctx.measureText(cellText + "...").width > maxCellW && cellText.length > 0) {
-                                                                cellText = cellText.slice(0, -1)
+                                                        const maxCellW =
+                                                            colWidth
+                                                        if (
+                                                            ctx.measureText(
+                                                                cellText
+                                                            ).width > maxCellW
+                                                        ) {
+                                                            while (
+                                                                ctx.measureText(
+                                                                    cellText +
+                                                                        "..."
+                                                                ).width >
+                                                                    maxCellW &&
+                                                                cellText.length >
+                                                                    0
+                                                            ) {
+                                                                cellText =
+                                                                    cellText.slice(
+                                                                        0,
+                                                                        -1
+                                                                    )
                                                             }
                                                             cellText += "..."
                                                         }
-                                                        ctx.fillText(cellText, tableX + cellPadding, currentY + 4)
-                                                        tableX += colWidth + (cellPadding * 2)
+                                                        ctx.fillText(
+                                                            cellText,
+                                                            tableX +
+                                                                cellPadding,
+                                                            currentY + 4
+                                                        )
+                                                        tableX +=
+                                                            colWidth +
+                                                            cellPadding * 2
                                                     }
                                                 })
                                                 currentY += 24
                                             })
-                                            
+
                                             // Draw borders
-                                            ctx.strokeStyle = "rgba(0, 0, 0, 0.1)"
+                                            ctx.strokeStyle =
+                                                "rgba(0, 0, 0, 0.1)"
                                             ctx.lineWidth = 1
-                                            ctx.strokeRect(startX, currentY - (rows.length * 24) - headerHeight, maxWidth, (rows.length * 24) + headerHeight)
-                                            
+                                            ctx.strokeRect(
+                                                startX,
+                                                currentY -
+                                                    rows.length * 24 -
+                                                    headerHeight,
+                                                maxWidth,
+                                                rows.length * 24 + headerHeight
+                                            )
+
                                             currentY += 16
                                             return
                                         }
                                     }
                                 }
                             }
-                            
+
                             // Regular paragraph with inline formatting
                             processInlineFormatting(trimmed, startX, maxWidth)
                             currentY += 8
                         })
                     }
                 })
-                
+
                 return currentY
             }
-            
-            renderMarkdownToCanvas(msg.text, PADDING, bubbleY + bubbleH + 24, 320 - (PADDING * 2))
+
+            renderMarkdownToCanvas(
+                msg.text,
+                PADDING,
+                bubbleY + bubbleH + 24,
+                320 - PADDING * 2
+            )
 
             // 6. Draw Gradient
             const grad = ctx.createLinearGradient(0, 400, 0, 250) // Bottom up to 250
@@ -6468,7 +7863,9 @@ const MessageBubble = React.memo(
                     }
                     const randomNum = Math.floor(10000 + Math.random() * 90000)
                     const filename = `curastem.org${randomNum}.png`
-                    const file = new File([blob], filename, { type: "image/png" })
+                    const file = new File([blob], filename, {
+                        type: "image/png",
+                    })
                     const downloadFallback = () => {
                         const link = document.createElement("a")
                         link.href = URL.createObjectURL(blob)
@@ -6479,7 +7876,11 @@ const MessageBubble = React.memo(
                         isSharing.current = false
                     }
 
-                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    if (
+                        navigator.share &&
+                        navigator.canShare &&
+                        navigator.canShare({ files: [file] })
+                    ) {
                         try {
                             await navigator.share({ files: [file] })
                             isSharing.current = false
@@ -6497,11 +7898,12 @@ const MessageBubble = React.memo(
             }
 
             // 8. Load Logo
-            const logoUrl = "https://framerusercontent.com/images/SIRCCFiD1J4uhNqtJAol7AEXQ4.png?width=764&height=128"
+            const logoUrl =
+                "https://framerusercontent.com/images/SIRCCFiD1J4uhNqtJAol7AEXQ4.png?width=764&height=128"
             const img = new Image()
             img.crossOrigin = "Anonymous"
             let logoDrawn = false
-            
+
             const onLogoReady = () => {
                 if (logoDrawn) return
                 logoDrawn = true
@@ -6512,14 +7914,19 @@ const MessageBubble = React.memo(
                 const targetW = 216
                 const scale = targetW / img.naturalWidth
                 const targetH = img.naturalHeight * scale
-                ctx.drawImage(img, PADDING, 400 - 32 - targetH, targetW, targetH)
+                ctx.drawImage(
+                    img,
+                    PADDING,
+                    400 - 32 - targetH,
+                    targetW,
+                    targetH
+                )
                 onLogoReady()
             }
             img.onerror = () => onLogoReady() // Proceed without logo
             setTimeout(onLogoReady, 2000) // Timeout fallback
-            
-            img.src = logoUrl
 
+            img.src = logoUrl
         }, [msg, previousMsg])
 
         return (
@@ -6734,153 +8141,417 @@ const MessageBubble = React.memo(
                     {(showDocButton || showWhiteboardButton) && (
                         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                             {showDocButton && (
-                                <div 
+                                <div
                                     onClick={onToggleDoc}
-                                    data-layer="notes" 
-                                    className="Notes" 
+                                    data-layer="notes"
+                                    className="Notes"
                                     onMouseEnter={() => setIsDocHovered(true)}
                                     onMouseLeave={() => setIsDocHovered(false)}
                                     style={{
-                                        height: 36, 
-                                        paddingLeft: 12, 
-                                        paddingRight: 12, 
-                                        paddingTop: 8, 
-                                        paddingBottom: 8, 
-                                        borderRadius: 28, 
-                                        outline: themeColors.background === "#FFFFFF" ? '1px solid rgba(0, 0, 0, 0.1)' : '0.33px rgba(255, 255, 255, 0.20) solid', 
-                                        outlineOffset: '-0.33px', 
-                                        justifyContent: 'flex-start', 
-                                        alignItems: 'center', 
-                                        gap: 8, 
-                                        display: 'inline-flex',
-                                        cursor: 'pointer',
-                                        background: isDocHovered ? (themeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)") : "transparent"
+                                        height: 36,
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        borderRadius: 28,
+                                        outline:
+                                            themeColors.background === "#FFFFFF"
+                                                ? "1px solid rgba(0, 0, 0, 0.1)"
+                                                : "0.33px rgba(255, 255, 255, 0.20) solid",
+                                        outlineOffset: "-0.33px",
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        display: "inline-flex",
+                                        cursor: "pointer",
+                                        background: isDocHovered
+                                            ? themeColors.background ===
+                                              "#FFFFFF"
+                                                ? "rgba(0,0,0,0.05)"
+                                                : "rgba(255,255,255,0.05)"
+                                            : "transparent",
                                     }}
                                 >
-                                    <div data-svg-wrapper style={{display: "flex", opacity: 0.65}}>
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d={isDocOpen ? "M14 2L2 14M2 2L14 14" : "M0.75 13.2011L8.63044 13.2007M0.75 7.84243H15.25M0.75 2.79895H15.25"} stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <div
+                                        data-svg-wrapper
+                                        style={{
+                                            display: "flex",
+                                            opacity: 0.65,
+                                        }}
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d={
+                                                    isDocOpen
+                                                        ? "M14 2L2 14M2 2L14 14"
+                                                        : "M0.75 13.2011L8.63044 13.2007M0.75 7.84243H15.25M0.75 2.79895H15.25"
+                                                }
+                                                stroke={
+                                                    themeColors.text.primary
+                                                }
+                                                strokeOpacity="0.95"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
                                         </svg>
                                     </div>
-                                    <div style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', opacity: 0.65}}>{isDocOpen ? "Close" : "Notes"}</div>
+                                    <div
+                                        style={{
+                                            justifyContent: "center",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            color: themeColors.text.primary,
+                                            fontSize: 15,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: "19.32px",
+                                            wordWrap: "break-word",
+                                            opacity: 0.65,
+                                        }}
+                                    >
+                                        {isDocOpen ? "Close" : "Notes"}
+                                    </div>
                                 </div>
                             )}
 
                             {showWhiteboardButton && (
-                                <div 
+                                <div
                                     onClick={onToggleWhiteboard}
-                                    data-layer="whiteboard" 
-                                    className="Whiteboard" 
-                                    onMouseEnter={() => setIsWhiteboardHovered(true)}
-                                    onMouseLeave={() => setIsWhiteboardHovered(false)}
+                                    data-layer="whiteboard"
+                                    className="Whiteboard"
+                                    onMouseEnter={() =>
+                                        setIsWhiteboardHovered(true)
+                                    }
+                                    onMouseLeave={() =>
+                                        setIsWhiteboardHovered(false)
+                                    }
                                     style={{
-                                        height: 36, 
-                                        paddingLeft: 12, 
-                                        paddingRight: 12, 
-                                        paddingTop: 8, 
-                                        paddingBottom: 8, 
-                                        borderRadius: 28, 
-                                        outline: themeColors.background === "#FFFFFF" ? '1px solid rgba(0, 0, 0, 0.1)' : '0.33px rgba(255, 255, 255, 0.20) solid', 
-                                        outlineOffset: '-0.33px', 
-                                        justifyContent: 'flex-start', 
-                                        alignItems: 'center', 
-                                        gap: 8, 
-                                        display: 'inline-flex',
-                                        cursor: 'pointer',
-                                        background: isWhiteboardHovered ? (themeColors.background === "#FFFFFF" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)") : "transparent"
+                                        height: 36,
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        borderRadius: 28,
+                                        outline:
+                                            themeColors.background === "#FFFFFF"
+                                                ? "1px solid rgba(0, 0, 0, 0.1)"
+                                                : "0.33px rgba(255, 255, 255, 0.20) solid",
+                                        outlineOffset: "-0.33px",
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        display: "inline-flex",
+                                        cursor: "pointer",
+                                        background: isWhiteboardHovered
+                                            ? themeColors.background ===
+                                              "#FFFFFF"
+                                                ? "rgba(0,0,0,0.05)"
+                                                : "rgba(255,255,255,0.05)"
+                                            : "transparent",
                                     }}
                                 >
-                                    <div data-svg-wrapper style={{display: "flex", opacity: 0.65}}>
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d={isWhiteboardOpen ? "M14 2L2 14M2 2L14 14" : "M7.91819 13.088C7.53422 13.4723 5.26158 15.3377 4.6271 15.2468L1.23792 14.759L0.75324 11.3917C0.661952 10.7575 2.52717 8.48441 2.91112 8.10046M7.91819 13.088L14.7683 6.23491C15.1527 5.85056 15.3172 5.27793 15.2258 4.643C15.1344 4.00806 14.7946 3.36283 14.281 2.84923L13.1525 1.72002C12.8981 1.4655 12.6086 1.251 12.3007 1.08877C11.9927 0.92655 11.6722 0.819785 11.3576 0.774584C11.0431 0.729383 10.7405 0.746632 10.4673 0.825345C10.194 0.904058 9.95547 1.04269 9.76523 1.23332L2.91112 8.10046M7.91819 13.088L2.91112 8.10046"} stroke={themeColors.text.primary} strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <div
+                                        data-svg-wrapper
+                                        style={{
+                                            display: "flex",
+                                            opacity: 0.65,
+                                        }}
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d={
+                                                    isWhiteboardOpen
+                                                        ? "M14 2L2 14M2 2L14 14"
+                                                        : "M7.91819 13.088C7.53422 13.4723 5.26158 15.3377 4.6271 15.2468L1.23792 14.759L0.75324 11.3917C0.661952 10.7575 2.52717 8.48441 2.91112 8.10046M7.91819 13.088L14.7683 6.23491C15.1527 5.85056 15.3172 5.27793 15.2258 4.643C15.1344 4.00806 14.7946 3.36283 14.281 2.84923L13.1525 1.72002C12.8981 1.4655 12.6086 1.251 12.3007 1.08877C11.9927 0.92655 11.6722 0.819785 11.3576 0.774584C11.0431 0.729383 10.7405 0.746632 10.4673 0.825345C10.194 0.904058 9.95547 1.04269 9.76523 1.23332L2.91112 8.10046M7.91819 13.088L2.91112 8.10046"
+                                                }
+                                                stroke={
+                                                    themeColors.text.primary
+                                                }
+                                                strokeOpacity="0.95"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
                                         </svg>
                                     </div>
-                                    <div style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: themeColors.text.primary, fontSize: 15, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', opacity: 0.65}}>{isWhiteboardOpen ? "Close" : "Whiteboard"}</div>
+                                    <div
+                                        style={{
+                                            justifyContent: "center",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            color: themeColors.text.primary,
+                                            fontSize: 15,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: "19.32px",
+                                            wordWrap: "break-word",
+                                            opacity: 0.65,
+                                        }}
+                                    >
+                                        {isWhiteboardOpen
+                                            ? "Close"
+                                            : "Whiteboard"}
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
 
                     {/* AI Message Actions */}
-                    {(msg.role !== "user" && msg.role !== "peer" && !isStreaming) && (
-                        <div data-layer="ai message actions" className="AiMessageActions" style={{justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', marginLeft: -10, gap: 2}}>
-                          <div 
-                            data-svg-wrapper 
-                            data-layer="share button" 
-                            style={{
-                                ...actionButtonBaseStyle,
-                                background: isShareHovered ? hoverBackground : "transparent",
-                            }}
-                            onMouseEnter={() => isHoverCapable() && setIsShareHovered(true)}
-                            onMouseLeave={() => setIsShareHovered(false)}
-                            onClick={handleShare}
-                          >
-                            <div data-svg-wrapper data-layer="share icon" className="ShareIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M6.60402e-07 9.54587V9.38738C6.60402e-07 9.03678 0.284305 8.75245 0.634966 8.75245C0.985626 8.75245 1.26993 9.03678 1.26993 9.38738V9.54587C1.26993 10.2246 1.2708 10.6958 1.3007 11.062C1.33 11.4206 1.38426 11.6225 1.46108 11.7734L1.52821 11.8946C1.69654 12.169 1.93812 12.3928 2.22657 12.5399L2.35058 12.5929C2.48785 12.6421 2.66879 12.6782 2.93799 12.7002C3.30417 12.7301 3.77519 12.7301 4.45407 12.7301H9.54595C10.2246 12.7301 10.6959 12.7301 11.062 12.7002C11.4204 12.6709 11.6226 12.6166 11.7734 12.5399L11.8946 12.4718C12.169 12.3035 12.3929 12.0618 12.5398 11.7734L12.593 11.6494C12.6421 11.5121 12.6782 11.331 12.7002 11.062C12.7301 10.6958 12.73 10.2246 12.73 9.54587V9.38738C12.73 9.03688 13.0145 8.75264 13.3651 8.75245C13.7156 8.75245 14 9.03678 14 9.38738V9.54587C14 10.2037 14.0006 10.7356 13.9655 11.1655C13.9342 11.5483 13.8721 11.8931 13.7343 12.2145L13.6709 12.3505C13.4174 12.848 13.0317 13.264 12.5585 13.5543L12.3506 13.6708C11.9908 13.8541 11.6028 13.9297 11.1654 13.9654C10.7356 14.0006 10.2038 14 9.54595 14H4.45407C3.79615 14 3.26437 14.0006 2.83449 13.9654C2.45207 13.9342 2.10749 13.8728 1.78648 13.7351L1.65035 13.6708C1.1528 13.4173 0.736038 13.0319 0.445691 12.5585L0.329141 12.3505C0.145852 11.9909 0.070234 11.6027 0.0345063 11.1655C-0.000600886 10.7356 6.60402e-07 10.2037 6.60402e-07 9.54587ZM6.3655 9.38738V2.16783L4.26666 4.26666C4.01876 4.51456 3.61673 4.51445 3.36876 4.26666C3.12081 4.0187 3.12081 3.61671 3.36876 3.36876L6.55104 0.185551L6.64801 0.106295C6.7515 0.0373605 6.87428 0 7.00042 0C7.16855 8.59299e-05 7.33 0.0667389 7.44897 0.185551L10.6322 3.36876C10.8798 3.61669 10.8799 4.0188 10.6322 4.26666C10.3842 4.51461 9.98123 4.51461 9.73327 4.26666L7.63544 2.16876V9.38738C7.63525 9.73778 7.35091 10.0222 7.00042 10.0224C6.6499 10.0224 6.36566 9.73788 6.3655 9.38738Z" fill={themeColors.text.tertiary}/>
-                              </svg>
-                            </div>
-                          </div>
-                          <div 
-                            data-svg-wrapper 
-                            data-layer="copy button (copy without markdown)" 
-                            style={{
-                                ...actionButtonBaseStyle,
-                                background: isCopyHovered ? hoverBackground : "transparent",
-                            }}
-                            onMouseEnter={() => isHoverCapable() && setIsCopyHovered(true)}
-                            onMouseLeave={() => setIsCopyHovered(false)}
-                            onClick={() => {
-                                if (typeof navigator !== "undefined" && navigator.clipboard) {
-                                    navigator.clipboard.writeText(stripMarkdown(msg.text))
-                                    if (onCopy && id) {
-                                        onCopy(id)
+                    {msg.role !== "user" &&
+                        msg.role !== "peer" &&
+                        !isStreaming && (
+                            <div
+                                data-layer="ai message actions"
+                                className="AiMessageActions"
+                                style={{
+                                    justifyContent: "flex-start",
+                                    alignItems: "flex-start",
+                                    display: "inline-flex",
+                                    marginLeft: -10,
+                                    gap: 2,
+                                }}
+                            >
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="share button"
+                                    style={{
+                                        ...actionButtonBaseStyle,
+                                        background: isShareHovered
+                                            ? hoverBackground
+                                            : "transparent",
+                                    }}
+                                    onMouseEnter={() =>
+                                        isHoverCapable() &&
+                                        setIsShareHovered(true)
                                     }
-                                }
-                            }}
-                          >
-                            {copiedMessageId === id ? (
-                              <div data-svg-wrapper data-layer="copy checkmark icon (show on successful copy to clipboard for 2 seconds)" className="CopyCheckmarkIconShowOnSuccessfulCopyToClipboardFor2Seconds" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" clipRule="evenodd" d="M11.6256 0.149029C12.0167 0.415701 12.1177 0.948951 11.8509 1.34007L5.42242 10.7686C5.27868 10.9795 5.04836 11.1153 4.79431 11.1391C4.54015 11.1629 4.28864 11.0723 4.10816 10.8918L0.251047 7.03469C-0.0836823 6.69998 -0.0836823 6.15724 0.251047 5.82253C0.585785 5.48782 1.12849 5.48782 1.46323 5.82253L4.58884 8.94816L10.4346 0.374361C10.7013 -0.016759 11.2345 -0.117644 11.6256 0.149029Z" fill={themeColors.text.tertiary}/>
-                                </svg>
-                              </div>
-                            ) : (
-                              <div data-svg-wrapper data-layer="copy icon" className="CopyIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z" fill={themeColors.text.tertiary}/>
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                          <div 
-                            data-svg-wrapper 
-                            data-layer="thumbs down button" 
-                            style={{
-                                ...actionButtonBaseStyle,
-                                background: isDislikeHovered ? hoverBackground : "transparent",
-                            }}
-                            onMouseEnter={() => isHoverCapable() && setIsDislikeHovered(true)}
-                            onMouseLeave={() => setIsDislikeHovered(false)}
-                            onClick={() => setIsDislikeActive(!isDislikeActive)}
-                          >
-                            {isDislikeActive ? (
-                              <div data-svg-wrapper data-layer="thumbs down icon (filled)" className="ThumbsDownIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                                <svg width="13" height="15" viewBox="0 0 13 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M11.91 8.00001L9.66002 10.57C9.00973 11.3222 8.50148 12.1862 8.16002 13.12L8.00002 13.63C7.85169 14.0388 7.57898 14.3908 7.22024 14.6365C6.86149 14.8822 6.43476 15.0094 6.00002 15C5.45184 14.9947 4.92791 14.7733 4.54215 14.3838C4.15639 13.9943 3.93999 13.4682 3.94002 12.92V11.75C3.93809 11.1072 4.04284 10.4685 4.25002 9.86001L4.53002 9.00001H1.38002C1.00596 8.97706 0.654781 8.81212 0.398279 8.53889C0.141776 8.26565 -0.000684511 7.90477 1.85001e-05 7.53001C-0.00118764 7.29121 0.0566006 7.05582 0.16825 6.84473C0.279899 6.63365 0.441954 6.4534 0.640018 6.32001C0.317791 6.09589 0.0977869 5.75295 0.0283991 5.36663C-0.0409886 4.98031 0.0459239 4.58225 0.270018 4.26001C0.42796 4.03818 0.641896 3.8622 0.890018 3.75001H0.940019C0.822449 3.53129 0.757399 3.28821 0.750018 3.04001C0.748445 2.68714 0.87386 2.34547 1.10336 2.07742C1.33285 1.80937 1.65112 1.63281 2.00002 1.58001V1.48001C1.99449 1.09952 2.13772 0.731909 2.39922 0.455468C2.66072 0.179028 3.01981 0.0156045 3.40002 6.67572e-06H8.23002C9.09022 0.000649631 9.93875 0.199097 10.71 0.580007L11.71 1.00001H13V8.00001H11.91ZM11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z" fill={themeColors.text.tertiary}/>
-                                <path d="M11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z" fill={themeColors.text.tertiary}/>
-                                </svg>
-                              </div>
-                            ) : (
-                              <div data-svg-wrapper data-layer="thumbs down icon (outline)" className="ThumbsDownIcon" style={{width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                                <svg width="13" height="15" viewBox="0 0 13 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M2.1748 1.73096L2.02637 1.75342C1.71909 1.79993 1.43849 1.95489 1.23633 2.19092C1.03514 2.4259 0.924514 2.72542 0.924805 3.03467C0.931378 3.25572 0.989039 3.47269 1.09375 3.66748L1.23242 3.92529H0.932617C0.726232 4.02478 0.547444 4.17317 0.414062 4.35986C0.216527 4.64391 0.139116 4.99491 0.200195 5.33545C0.261378 5.67609 0.456109 5.97865 0.740234 6.17627L0.950195 6.32275L0.737305 6.46533C0.563436 6.58253 0.421335 6.74095 0.323242 6.92627C0.225117 7.11179 0.173797 7.31894 0.174805 7.52881V7.53076C0.174294 7.86073 0.29956 8.17884 0.525391 8.41943C0.749322 8.65797 1.05564 8.80245 1.38184 8.82471H4.77148L4.69629 9.0542L4.41602 9.91455V9.9165L4.34473 10.1392C4.19073 10.6616 4.11359 11.2041 4.11523 11.7495V12.9204C4.11532 13.4222 4.31306 13.9037 4.66602 14.2603C5.01932 14.617 5.4999 14.8199 6.00195 14.8247H6.00391C6.40203 14.8333 6.79256 14.7167 7.12109 14.4917C7.40849 14.2948 7.63599 14.024 7.7793 13.7085L7.83594 13.5698L7.99316 13.0679L7.99609 13.0601C8.34481 12.1064 8.86326 11.2237 9.52734 10.4556L9.52832 10.4546L11.7783 7.88428L11.8311 7.82471H12.8252V1.17529H11.6748L11.6426 1.16162L10.6426 0.741699L10.6328 0.736816C9.8856 0.367789 9.06286 0.175916 8.22949 0.175293H3.40723C3.07261 0.189021 2.75652 0.332397 2.52637 0.575684C2.29631 0.818889 2.17005 1.14232 2.1748 1.47705V1.73096ZM11.1748 6.31982L11.127 6.37061L8.29199 9.36572C7.57642 10.1828 7.00166 11.1117 6.59082 12.1147L6.4248 12.5483L6.24512 13.0581L6.21875 13.1343L6.14355 13.1626L6.09277 13.1772C6.04262 13.1867 5.99085 13.1823 5.94238 13.1646V13.1655C5.91756 13.1568 5.89402 13.1438 5.87305 13.1284L5.81836 13.0737C5.78692 13.0318 5.76848 12.9815 5.76562 12.9292H5.76465V11.7495C5.76603 11.3037 5.83689 10.8604 5.97363 10.436V10.4351L7.05762 7.17529H2.26758L2.23828 7.16357C2.17835 7.14092 2.12357 7.10619 2.07812 7.06104C2.03278 7.01595 1.99763 6.96151 1.97461 6.90186C1.9516 6.84202 1.94088 6.7774 1.94434 6.71338C1.94781 6.64941 1.96484 6.58675 1.99414 6.52979L2.00391 6.51416L2.34375 5.99365L2.02832 5.43701C1.94672 5.29643 1.91422 5.13236 1.93555 4.97119C1.95698 4.81011 2.03111 4.66081 2.14648 4.54639L2.50293 4.18994L2.42676 3.71826V3.71533C2.40274 3.55333 2.43396 3.38812 2.51465 3.24561C2.59508 3.10367 2.7206 2.99301 2.87109 2.93018V2.9292L3.28418 2.75244L3.40137 2.35303V2.35205C3.44446 2.20015 3.53611 2.06634 3.66211 1.97119C3.78804 1.87615 3.94185 1.82559 4.09961 1.82568V1.82471H8.23047C8.80223 1.82589 9.36555 1.95886 9.87891 2.21045L9.87988 2.20947L11.0703 2.72998L11.1748 2.77588V6.31982Z" fill={themeColors.text.tertiary} stroke={themeColors.background} strokeWidth="0.35"/>
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                    )}
+                                    onMouseLeave={() =>
+                                        setIsShareHovered(false)
+                                    }
+                                    onClick={handleShare}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        data-layer="share icon"
+                                        className="ShareIcon"
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 14 14"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M6.60402e-07 9.54587V9.38738C6.60402e-07 9.03678 0.284305 8.75245 0.634966 8.75245C0.985626 8.75245 1.26993 9.03678 1.26993 9.38738V9.54587C1.26993 10.2246 1.2708 10.6958 1.3007 11.062C1.33 11.4206 1.38426 11.6225 1.46108 11.7734L1.52821 11.8946C1.69654 12.169 1.93812 12.3928 2.22657 12.5399L2.35058 12.5929C2.48785 12.6421 2.66879 12.6782 2.93799 12.7002C3.30417 12.7301 3.77519 12.7301 4.45407 12.7301H9.54595C10.2246 12.7301 10.6959 12.7301 11.062 12.7002C11.4204 12.6709 11.6226 12.6166 11.7734 12.5399L11.8946 12.4718C12.169 12.3035 12.3929 12.0618 12.5398 11.7734L12.593 11.6494C12.6421 11.5121 12.6782 11.331 12.7002 11.062C12.7301 10.6958 12.73 10.2246 12.73 9.54587V9.38738C12.73 9.03688 13.0145 8.75264 13.3651 8.75245C13.7156 8.75245 14 9.03678 14 9.38738V9.54587C14 10.2037 14.0006 10.7356 13.9655 11.1655C13.9342 11.5483 13.8721 11.8931 13.7343 12.2145L13.6709 12.3505C13.4174 12.848 13.0317 13.264 12.5585 13.5543L12.3506 13.6708C11.9908 13.8541 11.6028 13.9297 11.1654 13.9654C10.7356 14.0006 10.2038 14 9.54595 14H4.45407C3.79615 14 3.26437 14.0006 2.83449 13.9654C2.45207 13.9342 2.10749 13.8728 1.78648 13.7351L1.65035 13.6708C1.1528 13.4173 0.736038 13.0319 0.445691 12.5585L0.329141 12.3505C0.145852 11.9909 0.070234 11.6027 0.0345063 11.1655C-0.000600886 10.7356 6.60402e-07 10.2037 6.60402e-07 9.54587ZM6.3655 9.38738V2.16783L4.26666 4.26666C4.01876 4.51456 3.61673 4.51445 3.36876 4.26666C3.12081 4.0187 3.12081 3.61671 3.36876 3.36876L6.55104 0.185551L6.64801 0.106295C6.7515 0.0373605 6.87428 0 7.00042 0C7.16855 8.59299e-05 7.33 0.0667389 7.44897 0.185551L10.6322 3.36876C10.8798 3.61669 10.8799 4.0188 10.6322 4.26666C10.3842 4.51461 9.98123 4.51461 9.73327 4.26666L7.63544 2.16876V9.38738C7.63525 9.73778 7.35091 10.0222 7.00042 10.0224C6.6499 10.0224 6.36566 9.73788 6.3655 9.38738Z"
+                                                fill={themeColors.text.tertiary}
+                                            />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="copy button (copy without markdown)"
+                                    style={{
+                                        ...actionButtonBaseStyle,
+                                        background: isCopyHovered
+                                            ? hoverBackground
+                                            : "transparent",
+                                    }}
+                                    onMouseEnter={() =>
+                                        isHoverCapable() &&
+                                        setIsCopyHovered(true)
+                                    }
+                                    onMouseLeave={() => setIsCopyHovered(false)}
+                                    onClick={() => {
+                                        if (
+                                            typeof navigator !== "undefined" &&
+                                            navigator.clipboard
+                                        ) {
+                                            navigator.clipboard.writeText(
+                                                stripMarkdown(msg.text)
+                                            )
+                                            if (onCopy && id) {
+                                                onCopy(id)
+                                            }
+                                        }
+                                    }}
+                                >
+                                    {copiedMessageId === id ? (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="copy checkmark icon (show on successful copy to clipboard for 2 seconds)"
+                                            className="CopyCheckmarkIconShowOnSuccessfulCopyToClipboardFor2Seconds"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="12"
+                                                height="12"
+                                                viewBox="0 0 12 12"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    clipRule="evenodd"
+                                                    d="M11.6256 0.149029C12.0167 0.415701 12.1177 0.948951 11.8509 1.34007L5.42242 10.7686C5.27868 10.9795 5.04836 11.1153 4.79431 11.1391C4.54015 11.1629 4.28864 11.0723 4.10816 10.8918L0.251047 7.03469C-0.0836823 6.69998 -0.0836823 6.15724 0.251047 5.82253C0.585785 5.48782 1.12849 5.48782 1.46323 5.82253L4.58884 8.94816L10.4346 0.374361C10.7013 -0.016759 11.2345 -0.117644 11.6256 0.149029Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                            </svg>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="copy icon"
+                                            className="CopyIcon"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 14 14"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="thumbs down button"
+                                    style={{
+                                        ...actionButtonBaseStyle,
+                                        background: isDislikeHovered
+                                            ? hoverBackground
+                                            : "transparent",
+                                    }}
+                                    onMouseEnter={() =>
+                                        isHoverCapable() &&
+                                        setIsDislikeHovered(true)
+                                    }
+                                    onMouseLeave={() =>
+                                        setIsDislikeHovered(false)
+                                    }
+                                    onClick={() =>
+                                        setIsDislikeActive(!isDislikeActive)
+                                    }
+                                >
+                                    {isDislikeActive ? (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="thumbs down icon (filled)"
+                                            className="ThumbsDownIcon"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="13"
+                                                height="15"
+                                                viewBox="0 0 13 15"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M11.91 8.00001L9.66002 10.57C9.00973 11.3222 8.50148 12.1862 8.16002 13.12L8.00002 13.63C7.85169 14.0388 7.57898 14.3908 7.22024 14.6365C6.86149 14.8822 6.43476 15.0094 6.00002 15C5.45184 14.9947 4.92791 14.7733 4.54215 14.3838C4.15639 13.9943 3.93999 13.4682 3.94002 12.92V11.75C3.93809 11.1072 4.04284 10.4685 4.25002 9.86001L4.53002 9.00001H1.38002C1.00596 8.97706 0.654781 8.81212 0.398279 8.53889C0.141776 8.26565 -0.000684511 7.90477 1.85001e-05 7.53001C-0.00118764 7.29121 0.0566006 7.05582 0.16825 6.84473C0.279899 6.63365 0.441954 6.4534 0.640018 6.32001C0.317791 6.09589 0.0977869 5.75295 0.0283991 5.36663C-0.0409886 4.98031 0.0459239 4.58225 0.270018 4.26001C0.42796 4.03818 0.641896 3.8622 0.890018 3.75001H0.940019C0.822449 3.53129 0.757399 3.28821 0.750018 3.04001C0.748445 2.68714 0.87386 2.34547 1.10336 2.07742C1.33285 1.80937 1.65112 1.63281 2.00002 1.58001V1.48001C1.99449 1.09952 2.13772 0.731909 2.39922 0.455468C2.66072 0.179028 3.01981 0.0156045 3.40002 6.67572e-06H8.23002C9.09022 0.000649631 9.93875 0.199097 10.71 0.580007L11.71 1.00001H13V8.00001H11.91ZM11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                                <path
+                                                    d="M11 2.89001L9.81002 2.37001C9.31849 2.1277 8.77802 2.00113 8.23002 2.00001H4.10002C3.98016 1.99982 3.86352 2.0388 3.76785 2.111C3.67217 2.18321 3.60271 2.28469 3.57002 2.40001L3.43002 2.88001L2.94002 3.09001C2.82452 3.13774 2.72831 3.22273 2.6667 3.33146C2.60509 3.44019 2.58162 3.5664 2.60002 3.69001L2.69002 4.25001L2.27002 4.67001C2.18175 4.75734 2.12501 4.87152 2.10872 4.99461C2.09243 5.11771 2.11751 5.24272 2.18002 5.35001L2.55002 6.00001L2.15002 6.61001C2.13197 6.64509 2.12154 6.68359 2.11941 6.72299C2.11729 6.76238 2.12351 6.80178 2.13767 6.8386C2.15183 6.87542 2.17362 6.90884 2.2016 6.93665C2.22957 6.96447 2.26311 6.98606 2.30002 7.00001H7.30002L6.14002 10.49C6.00881 10.8972 5.94134 11.3222 5.94002 11.75V12.92C5.94099 12.9378 5.94721 12.9549 5.95789 12.9691C5.96857 12.9833 5.98323 12.9941 6.00002 13C6.02574 13.01 6.0543 13.01 6.08002 13L6.26002 12.49C6.68302 11.2997 7.32772 10.2003 8.16002 9.25001L11 6.25001V2.89001Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                            </svg>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="thumbs down icon (outline)"
+                                            className="ThumbsDownIcon"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="13"
+                                                height="15"
+                                                viewBox="0 0 13 15"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M2.1748 1.73096L2.02637 1.75342C1.71909 1.79993 1.43849 1.95489 1.23633 2.19092C1.03514 2.4259 0.924514 2.72542 0.924805 3.03467C0.931378 3.25572 0.989039 3.47269 1.09375 3.66748L1.23242 3.92529H0.932617C0.726232 4.02478 0.547444 4.17317 0.414062 4.35986C0.216527 4.64391 0.139116 4.99491 0.200195 5.33545C0.261378 5.67609 0.456109 5.97865 0.740234 6.17627L0.950195 6.32275L0.737305 6.46533C0.563436 6.58253 0.421335 6.74095 0.323242 6.92627C0.225117 7.11179 0.173797 7.31894 0.174805 7.52881V7.53076C0.174294 7.86073 0.29956 8.17884 0.525391 8.41943C0.749322 8.65797 1.05564 8.80245 1.38184 8.82471H4.77148L4.69629 9.0542L4.41602 9.91455V9.9165L4.34473 10.1392C4.19073 10.6616 4.11359 11.2041 4.11523 11.7495V12.9204C4.11532 13.4222 4.31306 13.9037 4.66602 14.2603C5.01932 14.617 5.4999 14.8199 6.00195 14.8247H6.00391C6.40203 14.8333 6.79256 14.7167 7.12109 14.4917C7.40849 14.2948 7.63599 14.024 7.7793 13.7085L7.83594 13.5698L7.99316 13.0679L7.99609 13.0601C8.34481 12.1064 8.86326 11.2237 9.52734 10.4556L9.52832 10.4546L11.7783 7.88428L11.8311 7.82471H12.8252V1.17529H11.6748L11.6426 1.16162L10.6426 0.741699L10.6328 0.736816C9.8856 0.367789 9.06286 0.175916 8.22949 0.175293H3.40723C3.07261 0.189021 2.75652 0.332397 2.52637 0.575684C2.29631 0.818889 2.17005 1.14232 2.1748 1.47705V1.73096ZM11.1748 6.31982L11.127 6.37061L8.29199 9.36572C7.57642 10.1828 7.00166 11.1117 6.59082 12.1147L6.4248 12.5483L6.24512 13.0581L6.21875 13.1343L6.14355 13.1626L6.09277 13.1772C6.04262 13.1867 5.99085 13.1823 5.94238 13.1646V13.1655C5.91756 13.1568 5.89402 13.1438 5.87305 13.1284L5.81836 13.0737C5.78692 13.0318 5.76848 12.9815 5.76562 12.9292H5.76465V11.7495C5.76603 11.3037 5.83689 10.8604 5.97363 10.436V10.4351L7.05762 7.17529H2.26758L2.23828 7.16357C2.17835 7.14092 2.12357 7.10619 2.07812 7.06104C2.03278 7.01595 1.99763 6.96151 1.97461 6.90186C1.9516 6.84202 1.94088 6.7774 1.94434 6.71338C1.94781 6.64941 1.96484 6.58675 1.99414 6.52979L2.00391 6.51416L2.34375 5.99365L2.02832 5.43701C1.94672 5.29643 1.91422 5.13236 1.93555 4.97119C1.95698 4.81011 2.03111 4.66081 2.14648 4.54639L2.50293 4.18994L2.42676 3.71826V3.71533C2.40274 3.55333 2.43396 3.38812 2.51465 3.24561C2.59508 3.10367 2.7206 2.99301 2.87109 2.93018V2.9292L3.28418 2.75244L3.40137 2.35303V2.35205C3.44446 2.20015 3.53611 2.06634 3.66211 1.97119C3.78804 1.87615 3.94185 1.82559 4.09961 1.82568V1.82471H8.23047C8.80223 1.82589 9.36555 1.95886 9.87891 2.21045L9.87988 2.20947L11.0703 2.72998L11.1748 2.77588V6.31982Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                    stroke={
+                                                        themeColors.background
+                                                    }
+                                                    strokeWidth="0.35"
+                                                />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                 </div>
             </div>
         )
@@ -6917,9 +8588,7 @@ const RoleSelectionButton = React.memo(
                         justifyContent: "center",
                         height: "100%",
                         width: "100%",
-                        background: isStudent
-                            ? colors.state.accent
-                            : undefined, // Dark mode: use surface color logic handled by parent or default transparent
+                        background: isStudent ? colors.state.accent : undefined, // Dark mode: use surface color logic handled by parent or default transparent
                         color: textColor,
                         fontSize: 15,
                         fontWeight: 600,
@@ -7084,15 +8753,17 @@ export default function OmegleMentorshipUI(props: Props) {
             localStorage.removeItem("user_role")
         }
     }, [])
-    
+
     // Hash Management - Generate hash on initial load for private room connections
     React.useEffect(() => {
         if (typeof window !== "undefined") {
             const currentHash = window.location.hash
             const hasHash = currentHash && currentHash.length > 1
-            
-            log(`🔗 Hash Check - Current: ${currentHash}, Has hash: ${hasHash}, Role: ${role}`)
-            
+
+            log(
+                `🔗 Hash Check - Current: ${currentHash}, Has hash: ${hasHash}, Role: ${role}`
+            )
+
             // Generate hash on first load if none exists (for private room mode)
             if (!hasHash && !role) {
                 const newHash = generateLinkHash()
@@ -7120,13 +8791,16 @@ export default function OmegleMentorshipUI(props: Props) {
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
-    const [isWhiteboardDownloadHovered, setIsWhiteboardDownloadHovered] = React.useState(false)
-    const [isWhiteboardCloseHovered, setIsWhiteboardCloseHovered] = React.useState(false)
+    const [isWhiteboardDownloadHovered, setIsWhiteboardDownloadHovered] =
+        React.useState(false)
+    const [isWhiteboardCloseHovered, setIsWhiteboardCloseHovered] =
+        React.useState(false)
     const [hasWhiteboardStarted, setHasWhiteboardStarted] =
         React.useState(false)
-    
+
     // Track if connection was made in private room mode (no roles)
-    const [isPrivateRoomConnection, setIsPrivateRoomConnection] = React.useState(false)
+    const [isPrivateRoomConnection, setIsPrivateRoomConnection] =
+        React.useState(false)
 
     // Helper ref to track manual hangups to prevent auto-reconnect loops
     const isManualHangupRef = React.useRef(false)
@@ -7134,28 +8808,28 @@ export default function OmegleMentorshipUI(props: Props) {
     // --- STATE: DOC EDITOR ---
     const [isDocOpen, setIsDocOpen] = React.useState(false)
     const isDocOpenRef = React.useRef(false)
-    
+
     // Sync ref for access inside callbacks/loops
     React.useEffect(() => {
         isDocOpenRef.current = isDocOpen
     }, [isDocOpen])
-    
+
     // Track pending connections (black tiles)
-    const [pendingPeerIds, setPendingPeerIds] = React.useState<Set<string>>(new Set())
+    const [pendingPeerIds, setPendingPeerIds] = React.useState<Set<string>>(
+        new Set()
+    )
 
     // --- THEME LOGIC ---
     // Always dark mode for shell
-    
+
     // Determine base theme (default dark)
     const baseTheme = darkColors
     const themeColors = baseTheme
-    
+
     // Determine Chat/Doc theme:
     // 1. Doc Open -> Pure Black
     // 2. Default -> Base Theme (Dark)
-    const chatThemeColors = isDocOpen 
-        ? pureBlackColors 
-        : themeColors
+    const chatThemeColors = isDocOpen ? pureBlackColors : themeColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
     const [docContent, setDocContent] = React.useState(
@@ -7179,7 +8853,9 @@ export default function OmegleMentorshipUI(props: Props) {
         h2Size: 18,
         pSize: 16,
     })
-    const [remoteCursors, setRemoteCursors] = React.useState<Map<string, { x: number; y: number; color: string }>>(new Map())
+    const [remoteCursors, setRemoteCursors] = React.useState<
+        Map<string, { x: number; y: number; color: string }>
+    >(new Map())
     const remoteCursor = null // Legacy support if needed, but we should remove usages
     const whiteboardContainerRef = React.useRef<HTMLDivElement>(null)
     const myCursorColor = React.useRef(getRandomRainbowColor())
@@ -7748,7 +9424,10 @@ Do not include markdown formatting or explanations.`
 
     const cleanup = React.useCallback(
         (isManualHangup = false) => {
-            if (statusRef.current === "connected" || statusRef.current === "searching") {
+            if (
+                statusRef.current === "connected" ||
+                statusRef.current === "searching"
+            ) {
                 saveChatHistoryRef.current()
             }
 
@@ -7759,24 +9438,28 @@ Do not include markdown formatting or explanations.`
 
             // CLEAR HASH ON HANGUP (Group Call Logic)
             // If manual hangup, we want to leave the "room" so we don't auto-reconnect to the same group.
-            // Exception: If we are the "owner" (first one) maybe we keep it? 
+            // Exception: If we are the "owner" (first one) maybe we keep it?
             // User request: "dont have it keep the same hash except for user #1... we want other ppl to make a new hash"
             // Determining user #1 is tricky in mesh without explicit state.
-            // SIMPLIFICATION: If *I* click end call, I leave the room. 
+            // SIMPLIFICATION: If *I* click end call, I leave the room.
             // So I should clear my hash to avoid re-joining the same mesh network immediately.
             // If I want to host again, I'll generate a new hash on next start.
-            
-            // However, the "owner" check is hard. 
+
+            // However, the "owner" check is hard.
             // Let's assume if I manually hangup, I always clear hash.
             // If I am the "owner" and I hang up, the room effectively dies or I make a new one next time.
-            
+
             if (isManualHangup && typeof window !== "undefined") {
-                 // Check if we have a hash
-                 // Clear hash if we are NOT a student (students keep their room/hash)
-                 if (roleRef.current !== "student" && window.location.hash && window.location.hash.length > 1) {
-                     log("Manual hangup - clearing group hash to exit room")
-                     window.history.replaceState(null, "", " ") 
-                 }
+                // Check if we have a hash
+                // Clear hash if we are NOT a student (students keep their room/hash)
+                if (
+                    roleRef.current !== "student" &&
+                    window.location.hash &&
+                    window.location.hash.length > 1
+                ) {
+                    log("Manual hangup - clearing group hash to exit room")
+                    window.history.replaceState(null, "", " ")
+                }
             }
 
             // Reset private room connection state
@@ -7810,15 +9493,15 @@ Do not include markdown formatting or explanations.`
                 activeCall.current = null
             }
             // Clear all active P2P calls
-            activeCalls.current.forEach(call => call.close())
+            activeCalls.current.forEach((call) => call.close())
             activeCalls.current.clear()
-            
+
             // Clear remote streams
             remoteStreamsRef.current.clear()
             setRemoteStreams(new Map())
             setRemoteStream(null)
             setPendingPeerIds(new Set())
-            
+
             if (dataConnectionRef.current) {
                 dataConnectionRef.current.close()
                 dataConnectionRef.current = null
@@ -7835,11 +9518,14 @@ Do not include markdown formatting or explanations.`
 
             // Clear state ONLY if it was NOT an AI session (P2P Reset)
             // AND not a multi-party private room call (preserve history for 3+)
-            const isMultiPartyHistory = (remoteStreamsRef.current.size + pendingPeerIds.size) >= 2 // 2 remotes + 1 local = 3 people
-            
+            const isMultiPartyHistory =
+                remoteStreamsRef.current.size + pendingPeerIds.size >= 2 // 2 remotes + 1 local = 3 people
+
             if (!isAiSession && !isMultiPartyHistory) {
                 // Check if volunteer is hanging up without ever connecting (draft state)
-                const isVolunteerDraft = roleRef.current === "volunteer" && statusRef.current !== "connected"
+                const isVolunteerDraft =
+                    roleRef.current === "volunteer" &&
+                    statusRef.current !== "connected"
 
                 // Only clear state if NOT a student (keep student history for reconnection)
                 // AND not a volunteer in draft state
@@ -7863,84 +9549,92 @@ Do not include markdown formatting or explanations.`
             }
 
             setStatus("idle")
-            
+
             // Explicitly force a UI refresh for the status change
             if (!isManualHangup && roleRef.current === "volunteer") {
-                 // If a volunteer gets disconnected remotely, we want them to feel like they are "waiting" again
-                 // But cleanup() stops the camera.
-                 // We need to restart it if we want continuous searching.
-                 // The handleCall.on('close') logic above handles the restart.
+                // If a volunteer gets disconnected remotely, we want them to feel like they are "waiting" again
+                // But cleanup() stops the camera.
+                // We need to restart it if we want continuous searching.
+                // The handleCall.on('close') logic above handles the restart.
             }
 
             // ROLE RESET LOGIC:
             // If manual hangup, ALWAYS reset role (so they can select again).
-                // If remote hangup (not manual), keep role to allow auto-reconnection for BOTH students and volunteers.
+            // If remote hangup (not manual), keep role to allow auto-reconnection for BOTH students and volunteers.
             if (isManualHangup) {
                 // If I am a VOLUNTEER, clear my hash when I hang up manually
                 let justClearedHash = false
-                
+
                 // ... (existing logic) ...
-                
-                // NOTE: For private room (no role), we just disconnected. 
+
+                // NOTE: For private room (no role), we just disconnected.
                 // We do NOT want to auto-search or generate new hash if we were in a group call and left.
                 // The hash clearing logic above handles the "exit room".
                 // The role set to null handles "return to lobby".
-                
+
                 if (roleRef.current === "volunteer") {
                     if (typeof window !== "undefined") {
-                        window.history.replaceState(null, "", " ") 
+                        window.history.replaceState(null, "", " ")
                         justClearedHash = true
                         log("Volunteer manual hangup - cleared hash")
                     }
                 }
-                
+
                 setRole(null)
                 if (typeof window !== "undefined") {
                     // localStorage.removeItem("user_role") // No longer needed as we don't save it
-                    
+
                     // If no role, ensure we have a hash for Private Room Mode
                     // Force generation if we just cleared it as a volunteer
                     // BUT: If we just left a multi-party call (isMultiPartyHistory), maybe we don't want to auto-generate/search immediately?
                     // Requirement: "if you hang up from a private room of 3+, it shouldnt start auto-searching just bc u hanged up"
-                    // If we clear hash, we are effectively "new". 
+                    // If we clear hash, we are effectively "new".
                     // To prevent auto-search (passive MQTT), we might need a flag or just let the user see the "Start" screen.
-                    // The "Start" screen appears when role is null. 
+                    // The "Start" screen appears when role is null.
                     // Passive MQTT starts automatically if there is a hash.
-                    
-                    if (justClearedHash || !window.location.hash || window.location.hash.length <= 1) {
-                         // Only generate new hash if we are NOT coming from a multi-party exit where we intentionally want to stop.
-                         // Actually, if we clear hash, we are just sitting on the page.
-                         // We DO want a hash so they can share it for a NEW room.
-                         const newHash = generateLinkHash()
-                         window.history.replaceState(null, "", newHash)
-                         log(`No role reset - Generated new private room hash: ${newHash}`)
-                         
-                 // Restart passive MQTT since we now have a room
-                         // UNLESS we just left a 3+ call (multi-party), then maybe we don't auto-start searching?
-                         // "it shouldnt start auto-searching just bc u hanged up"
-                         // Passive MQTT puts us in the lobby.
-                         // If we want to prevent auto-search, we should NOT call initPassiveMQTT immediately.
-                         // But we need a hash to be ready.
-                         
-                         if (!isMultiPartyHistory) {
+
+                    if (
+                        justClearedHash ||
+                        !window.location.hash ||
+                        window.location.hash.length <= 1
+                    ) {
+                        // Only generate new hash if we are NOT coming from a multi-party exit where we intentionally want to stop.
+                        // Actually, if we clear hash, we are just sitting on the page.
+                        // We DO want a hash so they can share it for a NEW room.
+                        const newHash = generateLinkHash()
+                        window.history.replaceState(null, "", newHash)
+                        log(
+                            `No role reset - Generated new private room hash: ${newHash}`
+                        )
+
+                        // Restart passive MQTT since we now have a room
+                        // UNLESS we just left a 3+ call (multi-party), then maybe we don't auto-start searching?
+                        // "it shouldnt start auto-searching just bc u hanged up"
+                        // Passive MQTT puts us in the lobby.
+                        // If we want to prevent auto-search, we should NOT call initPassiveMQTT immediately.
+                        // But we need a hash to be ready.
+
+                        if (!isMultiPartyHistory) {
                             if (mqttClient.current) mqttClient.current.end()
                             setTimeout(() => initPassiveMQTT(), 100)
-                         } else {
-                             log("Exited multi-party call - skipping auto-init of passive MQTT to prevent immediate re-search")
-                             // We still have a hash (newly generated), but we aren't broadcasting presence yet.
-                             // User must click something to start? 
-                             // Currently there is no "Start" button for private room mode, it just runs.
-                             // If we don't init MQTT, they are offline.
-                             // We probably want them to be able to share the link.
-                             // Let's just suppress the *search* part (active connection) but allow passive listening?
-                             // initPassiveMQTT does both (subscribes).
-                             // Let's respect the "don't start auto-searching" by skipping this.
-                         }
+                        } else {
+                            log(
+                                "Exited multi-party call - skipping auto-init of passive MQTT to prevent immediate re-search"
+                            )
+                            // We still have a hash (newly generated), but we aren't broadcasting presence yet.
+                            // User must click something to start?
+                            // Currently there is no "Start" button for private room mode, it just runs.
+                            // If we don't init MQTT, they are offline.
+                            // We probably want them to be able to share the link.
+                            // Let's just suppress the *search* part (active connection) but allow passive listening?
+                            // initPassiveMQTT does both (subscribes).
+                            // Let's respect the "don't start auto-searching" by skipping this.
+                        }
                     }
                 }
             } else {
                 // Remote hangup (peer disconnected)
-                
+
                 // If I am a VOLUNTEER and student hung up, clear my hash
                 if (roleRef.current === "volunteer") {
                     if (typeof window !== "undefined") {
@@ -7948,11 +9642,11 @@ Do not include markdown formatting or explanations.`
                         // But the requirement says "dont have it keep the same hash except for user #1".
                         // If volunteer joined user #1 (student), they are user #2.
                         // So clearing hash is correct for them too.
-                        window.history.replaceState(null, "", " ") 
+                        window.history.replaceState(null, "", " ")
                         log("Volunteer remote disconnect - cleared hash")
                     }
                 }
-                
+
                 // Not manual hangup (remote disconnect).
                 // Preserve role for everyone (Student AND Volunteer) so they auto-queue.
                 // We keep role in state (roleRef.current) which is enough for the session.
@@ -7965,12 +9659,12 @@ Do not include markdown formatting or explanations.`
                 // Refresh ID to prevent PeerJS "ID taken" errors on immediate reconnect
                 myId.current = "user_" + Math.random().toString(36).substr(2, 6)
             }
-            
+
             setLocalStream(null)
             setRemoteStream(null)
             setRemoteScreenStream(null)
             setIsScreenSharing(false) // Ensure screen share flag is cleared
-            
+
             // Clear refs to prevent stale references
             localStreamRef.current = null
             remoteStreamRef.current = null
@@ -8266,7 +9960,7 @@ Do not include markdown formatting or explanations.`
                                         playTime + buffer.duration
 
                                     activeAudioSourcesRef.current.push(source)
-                                    
+
                                     // Start visual pulse when audio is queued
                                     setIsAiSpeaking(true)
 
@@ -8275,9 +9969,13 @@ Do not include markdown formatting or explanations.`
                                             activeAudioSourcesRef.current.filter(
                                                 (s) => s !== source
                                             )
-                                        
+
                                         // If no more audio is playing AND the model is done generating (turn complete), stop visual
-                                        if (activeAudioSourcesRef.current.length === 0 && !isLiveGeneratingRef.current) {
+                                        if (
+                                            activeAudioSourcesRef.current
+                                                .length === 0 &&
+                                            !isLiveGeneratingRef.current
+                                        ) {
                                             setIsAiSpeaking(false)
                                         }
                                     }
@@ -8289,7 +9987,7 @@ Do not include markdown formatting or explanations.`
                     if (data.serverContent?.turnComplete) {
                         isLiveGeneratingRef.current = false
                         setIsLiveGenerating(false)
-                        
+
                         // If no audio is currently playing, stop visual immediately
                         if (activeAudioSourcesRef.current.length === 0) {
                             setIsAiSpeaking(false)
@@ -8400,7 +10098,9 @@ Do not include markdown formatting or explanations.`
             }
 
             ws.onclose = (ev) => {
-                log(`Gemini WebSocket Closed: Code=${ev.code}, Reason=${ev.reason}, WasClean=${ev.wasClean}`)
+                log(
+                    `Gemini WebSocket Closed: Code=${ev.code}, Reason=${ev.reason}, WasClean=${ev.wasClean}`
+                )
                 stopLiveSession()
             }
 
@@ -8510,15 +10210,17 @@ Do not include markdown formatting or explanations.`
         null
     )
     // Map of peerId -> MediaStream
-    const [remoteStreams, setRemoteStreams] = React.useState<Map<string, MediaStream>>(new Map())
-    
+    const [remoteStreams, setRemoteStreams] = React.useState<
+        Map<string, MediaStream>
+    >(new Map())
+
     // Legacy support for single-peer UI (keeps existing logic working during transition)
     const remoteStream = React.useMemo(() => {
         if (remoteStreams.size === 0) return null
         return remoteStreams.values().next().value || null
     }, [remoteStreams])
     const setRemoteStream = (stream: MediaStream | null) => {
-         // No-op or handle if needed for backward compat, but we rely on remoteStreams
+        // No-op or handle if needed for backward compat, but we rely on remoteStreams
     }
 
     const localStreamRef = React.useRef<MediaStream | null>(null) // Keep ref for PeerJS calls
@@ -8540,8 +10242,9 @@ Do not include markdown formatting or explanations.`
     // Unique session ID for the user (per tab/refresh)
     const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
     // Session ID (per tab) - used for anti-echo but allows multi-tab testing
-    const sessionId = React.useRef("session_" + Math.random().toString(36).substr(2, 9))
-
+    const sessionId = React.useRef(
+        "session_" + Math.random().toString(36).substr(2, 9)
+    )
 
     const enforceBan = () => {
         log("Enforcing ban locally due to violation.")
@@ -8650,15 +10353,21 @@ Do not include markdown formatting or explanations.`
                         }
                     }
                 } catch (e) {
-                    console.error(`Failed to capture moderation screenshots (${reason})`, e)
+                    console.error(
+                        `Failed to capture moderation screenshots (${reason})`,
+                        e
+                    )
                 }
             }
 
             // Initial check after 5 seconds
             const timer = setTimeout(() => runModeration("5s check"), 5000)
-            
+
             // Periodic check every 5 minutes
-            const interval = setInterval(() => runModeration("5m check"), 5 * 60 * 1000)
+            const interval = setInterval(
+                () => runModeration("5m check"),
+                5 * 60 * 1000
+            )
 
             return () => {
                 clearTimeout(timer)
@@ -8670,27 +10379,30 @@ Do not include markdown formatting or explanations.`
     // --- STATE: AI CHAT (GEMINI) ---
     const [messages, setMessages] = React.useState<Message[]>(() => {
         if (typeof window !== "undefined") {
-             // Try to restore messages synchronously to prevent empty state render
-             // Check if we have a valid timestamp
-             const savedTime = localStorage.getItem("student_data_timestamp")
-             if (savedTime) {
-                 const timeDiff = Date.now() - parseInt(savedTime, 10)
-                 if (timeDiff < 24 * 60 * 60 * 1000) {
-                     const savedMessages = localStorage.getItem("student_messages")
-                     if (savedMessages) {
-                         try {
-                             return JSON.parse(savedMessages)
-                         } catch (e) {
-                             console.error("Failed to parse saved messages", e)
-                         }
-                     }
-                 }
-             }
+            // Try to restore messages synchronously to prevent empty state render
+            // Check if we have a valid timestamp
+            const savedTime = localStorage.getItem("student_data_timestamp")
+            if (savedTime) {
+                const timeDiff = Date.now() - parseInt(savedTime, 10)
+                if (timeDiff < 24 * 60 * 60 * 1000) {
+                    const savedMessages =
+                        localStorage.getItem("student_messages")
+                    if (savedMessages) {
+                        try {
+                            return JSON.parse(savedMessages)
+                        } catch (e) {
+                            console.error("Failed to parse saved messages", e)
+                        }
+                    }
+                }
+            }
         }
         return []
     })
 
-    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<string[]>(() => {
+    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
+        string[]
+    >(() => {
         if (typeof window !== "undefined") {
             const saved = localStorage.getItem("ai_suggestions")
             return saved ? JSON.parse(saved) : []
@@ -8700,7 +10412,10 @@ Do not include markdown formatting or explanations.`
 
     React.useEffect(() => {
         if (typeof window !== "undefined") {
-            localStorage.setItem("ai_suggestions", JSON.stringify(aiGeneratedSuggestions))
+            localStorage.setItem(
+                "ai_suggestions",
+                JSON.stringify(aiGeneratedSuggestions)
+            )
         }
     }, [aiGeneratedSuggestions])
 
@@ -8708,11 +10423,20 @@ Do not include markdown formatting or explanations.`
     const [savedChats, setSavedChats] = React.useState<ChatSession[]>([])
 
     // --- SIDEBAR CHAT ACTIONS ---
-    const [menuOpenChatId, setMenuOpenChatId] = React.useState<string | null>(null)
-    const [menuPosition, setMenuPosition] = React.useState<{ top: number, left: number } | null>(null)
-    const [editingChatId, setEditingChatId] = React.useState<string | null>(null)
+    const [menuOpenChatId, setMenuOpenChatId] = React.useState<string | null>(
+        null
+    )
+    const [menuPosition, setMenuPosition] = React.useState<{
+        top: number
+        left: number
+    } | null>(null)
+    const [editingChatId, setEditingChatId] = React.useState<string | null>(
+        null
+    )
     const [editingTitle, setEditingTitle] = React.useState("")
-    const [hoveredActionId, setHoveredActionId] = React.useState<string | null>(null)
+    const [hoveredActionId, setHoveredActionId] = React.useState<string | null>(
+        null
+    )
     const renameInputRef = React.useRef<HTMLInputElement>(null)
 
     // Focus input when editing starts
@@ -8730,7 +10454,7 @@ Do not include markdown formatting or explanations.`
         }
         return Date.now().toString()
     })
-    
+
     React.useEffect(() => {
         if (typeof window !== "undefined") {
             localStorage.setItem("current_chat_id", currentChatId)
@@ -8754,9 +10478,12 @@ Do not include markdown formatting or explanations.`
         }
     }, [isSidebarOpen])
     const [isSidebarBtnHovered, setIsSidebarBtnHovered] = React.useState(false)
-    const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(null)
+    const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(
+        null
+    )
     const [isNewChatHovered, setIsNewChatHovered] = React.useState(false)
-    const [isCloseSidebarHovered, setIsCloseSidebarHovered] = React.useState(false)
+    const [isCloseSidebarHovered, setIsCloseSidebarHovered] =
+        React.useState(false)
     const [isTopNewChatHovered, setIsTopNewChatHovered] = React.useState(false)
     const [searchQuery, setSearchQuery] = React.useState("")
     const messagesRef = React.useRef(messages)
@@ -8768,146 +10495,193 @@ Do not include markdown formatting or explanations.`
 
     React.useEffect(() => {
         if (typeof window !== "undefined") {
-             const saved = localStorage.getItem("saved_chat_history")
-             if (saved) {
-                 try {
-                     setSavedChats(JSON.parse(saved))
-                 } catch (e) {
-                     console.error("Failed to load chat history", e)
-                 }
-             }
+            const saved = localStorage.getItem("saved_chat_history")
+            if (saved) {
+                try {
+                    setSavedChats(JSON.parse(saved))
+                } catch (e) {
+                    console.error("Failed to load chat history", e)
+                }
+            }
         }
     }, [])
 
-    const generateChatTitle = React.useCallback(async (firstMessageText: string) => {
-        if (!geminiApiKey || !currentChatId) return
+    const generateChatTitle = React.useCallback(
+        async (firstMessageText: string) => {
+            if (!geminiApiKey || !currentChatId) return
 
-        // Skip if title exists or generation is in progress
-        const existing = savedChats.find(c => c.id === currentChatId)
-        if ((existing && existing.title !== "New chat") || generatingTitleForRef.current.has(currentChatId)) return
+            // Skip if title exists or generation is in progress
+            const existing = savedChats.find((c) => c.id === currentChatId)
+            if (
+                (existing && existing.title !== "New chat") ||
+                generatingTitleForRef.current.has(currentChatId)
+            )
+                return
 
-        generatingTitleForRef.current.add(currentChatId)
-        
-        try {
-            const prompt = `Summarize this message into a short title (3-5 words). Just the title, no quotes: "${firstMessageText}"`
-            
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 1.0, maxOutputTokens: 20 },
-                        safetySettings: [
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                        ]
+            generatingTitleForRef.current.add(currentChatId)
+
+            try {
+                const prompt = `Summarize this message into a short title (3-5 words). Just the title, no quotes: "${firstMessageText}"`
+
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                temperature: 1.0,
+                                maxOutputTokens: 20,
+                            },
+                            safetySettings: [
+                                {
+                                    category: "HARM_CATEGORY_HARASSMENT",
+                                    threshold: "BLOCK_NONE",
+                                },
+                                {
+                                    category: "HARM_CATEGORY_HATE_SPEECH",
+                                    threshold: "BLOCK_NONE",
+                                },
+                                {
+                                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                                    threshold: "BLOCK_NONE",
+                                },
+                                {
+                                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                                    threshold: "BLOCK_NONE",
+                                },
+                            ],
+                        }),
+                    }
+                )
+
+                if (!response.ok) {
+                    generatingTitleForRef.current.delete(currentChatId)
+                    return
+                }
+
+                const data = await response.json()
+                const candidate = data.candidates?.[0]
+                const finishReason = candidate?.finishReason
+                const text = candidate?.content?.parts?.[0]?.text
+
+                let finalTitle = text
+                if (
+                    finishReason === "RECITATION" ||
+                    finishReason === "SAFETY" ||
+                    !text
+                ) {
+                    finalTitle = firstMessageText
+                        .split(" ")
+                        .slice(0, 4)
+                        .join(" ")
+                } else {
+                    finalTitle = text.trim().replace(/^["']|["']$/g, "")
+                }
+
+                // Save locally
+                saveChatHistoryRef.current(finalTitle)
+
+                // Broadcast title to peers so they don't have to generate it
+                if (dataConnectionsRef.current.size > 0) {
+                    broadcastData({
+                        type: "chat-title",
+                        payload: finalTitle,
                     })
                 }
-            )
-            
-            if (!response.ok) {
+            } catch (e) {
                 generatingTitleForRef.current.delete(currentChatId)
-                return
             }
-            
-            const data = await response.json()
-            const candidate = data.candidates?.[0]
-            const finishReason = candidate?.finishReason
-            const text = candidate?.content?.parts?.[0]?.text
-            
-            let finalTitle = text
-            if (finishReason === "RECITATION" || finishReason === "SAFETY" || !text) {
-                finalTitle = firstMessageText.split(' ').slice(0, 4).join(' ')
-            } else {
-                finalTitle = text.trim().replace(/^["']|["']$/g, '')
-            }
+        },
+        [geminiApiKey, currentChatId, savedChats]
+    )
 
-            // Save locally
-            saveChatHistoryRef.current(finalTitle)
+    const saveChatHistory = React.useCallback(
+        (overrideTitle?: string) => {
+            const msgs = messagesRef.current
+            if (!msgs || msgs.length === 0) return
 
-            // Broadcast title to peers so they don't have to generate it
-            if (dataConnectionsRef.current.size > 0) {
-                broadcastData({
-                    type: "chat-title",
-                    payload: finalTitle
-                })
-            }
-            
-        } catch (e) {
-            generatingTitleForRef.current.delete(currentChatId)
-        }
-    }, [geminiApiKey, currentChatId, savedChats])
+            const currentRole = roleRef.current
+            const isGroup = remoteStreams.size >= 2
+            const isAiSession =
+                statusRef.current === "connected" &&
+                (isLiveMode || !!liveClientRef.current)
 
-    const saveChatHistory = React.useCallback((overrideTitle?: string) => {
-        const msgs = messagesRef.current
-        if (!msgs || msgs.length === 0) return
+            const shouldSave =
+                currentRole === "student" ||
+                !currentRole ||
+                (currentRole === "volunteer" && (isGroup || isAiSession))
 
-        const currentRole = roleRef.current
-        const isGroup = remoteStreams.size >= 2
-        const isAiSession = statusRef.current === "connected" && (isLiveMode || !!liveClientRef.current) 
-        
-        const shouldSave = currentRole === "student" || 
-                          (!currentRole) || 
-                          (currentRole === "volunteer" && (isGroup || isAiSession))
+            if (!shouldSave) return
 
-        if (!shouldSave) return
-
-        let whiteboardData = null
-        if (editorRef.current) {
-             try {
-                 whiteboardData = editorRef.current.store.getSnapshot()
-             } catch(e) { console.error("Whiteboard snapshot failed", e) }
-        }
-
-        setSavedChats(prev => {
-            const existing = prev.find(c => c.id === currentChatId)
-            const titleToUse = overrideTitle || (existing ? existing.title : "New chat")
-
-            const sessionToSave: ChatSession = {
-                id: currentChatId,
-                title: titleToUse,
-                timestamp: Date.now(),
-                messages: msgs.map(m => ({ ...m, attachments: undefined })),
-                notes: docContentRef.current,
-                whiteboard: whiteboardData,
-                isPinned: existing?.isPinned,
-                pinnedAt: existing?.pinnedAt
-            }
-
-            const others = prev.filter(c => c.id !== currentChatId)
-            let updated = [sessionToSave, ...others]
-
-            updated.sort((a, b) => {
-                if (a.isPinned && !b.isPinned) return -1
-                if (!a.isPinned && b.isPinned) return 1
-                if (a.isPinned && b.isPinned) {
-                    return (b.pinnedAt || 0) - (a.pinnedAt || 0)
+            let whiteboardData = null
+            if (editorRef.current) {
+                try {
+                    whiteboardData = editorRef.current.store.getSnapshot()
+                } catch (e) {
+                    console.error("Whiteboard snapshot failed", e)
                 }
-                return b.timestamp - a.timestamp
-            })
+            }
 
-            updated = updated.slice(0, 25)
-            localStorage.setItem("saved_chat_history", JSON.stringify(updated))
-            return updated
-        })
-    }, [remoteStreams, isLiveMode, currentChatId])
+            setSavedChats((prev) => {
+                const existing = prev.find((c) => c.id === currentChatId)
+                const titleToUse =
+                    overrideTitle || (existing ? existing.title : "New chat")
+
+                const sessionToSave: ChatSession = {
+                    id: currentChatId,
+                    title: titleToUse,
+                    timestamp: Date.now(),
+                    messages: msgs.map((m) => ({
+                        ...m,
+                        attachments: undefined,
+                    })),
+                    notes: docContentRef.current,
+                    whiteboard: whiteboardData,
+                    isPinned: existing?.isPinned,
+                    pinnedAt: existing?.pinnedAt,
+                }
+
+                const others = prev.filter((c) => c.id !== currentChatId)
+                let updated = [sessionToSave, ...others]
+
+                updated.sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1
+                    if (!a.isPinned && b.isPinned) return 1
+                    if (a.isPinned && b.isPinned) {
+                        return (b.pinnedAt || 0) - (a.pinnedAt || 0)
+                    }
+                    return b.timestamp - a.timestamp
+                })
+
+                updated = updated.slice(0, 25)
+                localStorage.setItem(
+                    "saved_chat_history",
+                    JSON.stringify(updated)
+                )
+                return updated
+            })
+        },
+        [remoteStreams, isLiveMode, currentChatId]
+    )
 
     // Title Generation Effect
     React.useEffect(() => {
         const msgs = messages
-        const firstUserMsg = msgs.find(m => (m.role === 'user' || m.role === 'peer') && m.text)
-        
+        const firstUserMsg = msgs.find(
+            (m) => (m.role === "user" || m.role === "peer") && m.text
+        )
+
         if (firstUserMsg && currentChatId) {
-             const chatInHistory = savedChats.find(c => c.id === currentChatId)
-             const currentTitle = chatInHistory ? chatInHistory.title : "New chat"
-             
-             if (currentTitle === "New chat") {
-                 generateChatTitle(firstUserMsg.text)
-             }
+            const chatInHistory = savedChats.find((c) => c.id === currentChatId)
+            const currentTitle = chatInHistory
+                ? chatInHistory.title
+                : "New chat"
+
+            if (currentTitle === "New chat") {
+                generateChatTitle(firstUserMsg.text)
+            }
         }
     }, [messages, currentChatId, savedChats, generateChatTitle])
 
@@ -8924,7 +10698,7 @@ Do not include markdown formatting or explanations.`
                 const timeDiff = Date.now() - parseInt(savedTime, 10)
                 if (timeDiff < 24 * 60 * 60 * 1000) {
                     // Note: Messages are restored via lazy init now.
-                    
+
                     // Restore Doc if default
                     if (docContent.includes("Welcome to your notes")) {
                         const savedDoc = localStorage.getItem("student_doc")
@@ -8934,10 +10708,12 @@ Do not include markdown formatting or explanations.`
                     }
                     // Restore Whiteboard (pending snapshot)
                     if (!editor) {
-                        const savedWhiteboard = localStorage.getItem("student_whiteboard")
+                        const savedWhiteboard =
+                            localStorage.getItem("student_whiteboard")
                         if (savedWhiteboard) {
                             try {
-                                pendingSnapshotRef.current = JSON.parse(savedWhiteboard)
+                                pendingSnapshotRef.current =
+                                    JSON.parse(savedWhiteboard)
                             } catch (e) {
                                 console.error("Failed to restore whiteboard", e)
                             }
@@ -8963,36 +10739,42 @@ Do not include markdown formatting or explanations.`
             // Check if we are connected as a volunteer - if so, DO NOT overwrite the saved "student" data with empty volunteer state?
             // Actually, if I am a volunteer and I am chatting with a student, I DON'T want to save that chat history to my "personal" storage.
             // But the requirements say: "saves ur msgs until u become a volunteer then in which it deletes ur msgs ONCE u connect with a student"
-            
+
             // Refined Logic:
             // 1. If role is STUDENT: Always save.
             // 2. If role is NULL: Always save.
             // 3. If role is VOLUNTEER: Only save if NOT connected. (Preserve draft state).
             //    Once connected, we wiped the state in handleCall. If we save now, we save empty state (which effectively clears storage).
             //    That seems correct per "deletes ur msgs ONCE u connect".
-            
+
             // Wait, if I am a volunteer and I connect, handleCall wipes my state.
             // Then this effect runs (msg changed to empty).
             // Then it saves empty state to localStorage.
             // This effectively "deletes" the saved messages. This matches the requirement.
-            
+
             // Exception: If I am a volunteer connected to a student, do I want to save the *active* session to localStorage?
             // "Mentors get no chat history saved". So NO.
             // So if role is volunteer AND status is connected, do NOT save.
-            
+
             if (role === "volunteer" && status === "connected") {
-                return 
+                return
             }
 
             localStorage.setItem("student_messages", JSON.stringify(messages))
             localStorage.setItem("student_doc", docContent)
-            localStorage.setItem("student_data_timestamp", Date.now().toString())
+            localStorage.setItem(
+                "student_data_timestamp",
+                Date.now().toString()
+            )
 
             // Save whiteboard snapshot if editor exists
             if (editor) {
                 try {
                     const snapshot = editor.store.getSnapshot()
-                    localStorage.setItem("student_whiteboard", JSON.stringify(snapshot))
+                    localStorage.setItem(
+                        "student_whiteboard",
+                        JSON.stringify(snapshot)
+                    )
                 } catch (e) {
                     // Ignore errors during save
                 }
@@ -9010,7 +10792,8 @@ Do not include markdown formatting or explanations.`
                 if (timeDiff < 24 * 60 * 60 * 1000) {
                     // Restore Messages if empty
                     if (messages.length === 0) {
-                        const savedMessages = localStorage.getItem("student_messages")
+                        const savedMessages =
+                            localStorage.getItem("student_messages")
                         if (savedMessages) {
                             try {
                                 setMessages(JSON.parse(savedMessages))
@@ -9028,10 +10811,12 @@ Do not include markdown formatting or explanations.`
                     }
                     // Restore Whiteboard (pending snapshot)
                     if (!editor) {
-                        const savedWhiteboard = localStorage.getItem("student_whiteboard")
+                        const savedWhiteboard =
+                            localStorage.getItem("student_whiteboard")
                         if (savedWhiteboard) {
                             try {
-                                pendingSnapshotRef.current = JSON.parse(savedWhiteboard)
+                                pendingSnapshotRef.current =
+                                    JSON.parse(savedWhiteboard)
                             } catch (e) {
                                 console.error("Failed to restore whiteboard", e)
                             }
@@ -9057,36 +10842,42 @@ Do not include markdown formatting or explanations.`
             // Check if we are connected as a volunteer - if so, DO NOT overwrite the saved "student" data with empty volunteer state?
             // Actually, if I am a volunteer and I am chatting with a student, I DON'T want to save that chat history to my "personal" storage.
             // But the requirements say: "saves ur msgs until u become a volunteer then in which it deletes ur msgs ONCE u connect with a student"
-            
+
             // Refined Logic:
             // 1. If role is STUDENT: Always save.
             // 2. If role is NULL: Always save.
             // 3. If role is VOLUNTEER: Only save if NOT connected. (Preserve draft state).
             //    Once connected, we wiped the state in handleCall. If we save now, we save empty state (which effectively clears storage).
             //    That seems correct per "deletes ur msgs ONCE u connect".
-            
+
             // Wait, if I am a volunteer and I connect, handleCall wipes my state.
             // Then this effect runs (msg changed to empty).
             // Then it saves empty state to localStorage.
             // This effectively "deletes" the saved messages. This matches the requirement.
-            
+
             // Exception: If I am a volunteer connected to a student, do I want to save the *active* session to localStorage?
             // "Mentors get no chat history saved". So NO.
             // So if role is volunteer AND status is connected, do NOT save.
-            
+
             if (role === "volunteer" && status === "connected") {
-                return 
+                return
             }
 
             localStorage.setItem("student_messages", JSON.stringify(messages))
             localStorage.setItem("student_doc", docContent)
-            localStorage.setItem("student_data_timestamp", Date.now().toString())
+            localStorage.setItem(
+                "student_data_timestamp",
+                Date.now().toString()
+            )
 
             // Save whiteboard snapshot if editor exists
             if (editor) {
                 try {
                     const snapshot = editor.store.getSnapshot()
-                    localStorage.setItem("student_whiteboard", JSON.stringify(snapshot))
+                    localStorage.setItem(
+                        "student_whiteboard",
+                        JSON.stringify(snapshot)
+                    )
                 } catch (e) {
                     // Ignore errors during save
                 }
@@ -9094,9 +10885,10 @@ Do not include markdown formatting or explanations.`
         }
     }, [role, messages, docContent, editor, status]) // Triggers on message/doc change. Whiteboard might lag if no other activity.
 
-
     const hasMessages = messages.length > 0
-    const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null)
+    const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+        null
+    )
     const copyTimeoutRef = React.useRef<number | null>(null)
 
     const handleCopyMessage = React.useCallback((msgId: string) => {
@@ -9104,10 +10896,10 @@ Do not include markdown formatting or explanations.`
         if (copyTimeoutRef.current !== null) {
             clearTimeout(copyTimeoutRef.current)
         }
-        
+
         // Set the copied message ID
         setCopiedMessageId(msgId)
-        
+
         // Reset after 2 seconds
         copyTimeoutRef.current = window.setTimeout(() => {
             setCopiedMessageId(null)
@@ -9232,16 +11024,24 @@ Do not include markdown formatting or explanations.`
     // Default Suggestions Logic
     React.useEffect(() => {
         // Always set suggestions if messages are empty, regardless of how we got there
-        if (messages.length === 0 && defaultSuggestions && defaultSuggestions.length > 0) {
+        if (
+            messages.length === 0 &&
+            defaultSuggestions &&
+            defaultSuggestions.length > 0
+        ) {
             // Shuffle
-            const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
+            const shuffled = [...defaultSuggestions].sort(
+                () => 0.5 - Math.random()
+            )
             // Slice based on layout
             const count = 10
             setAiGeneratedSuggestions(shuffled.slice(0, count))
         }
     }, [isMobileLayout, defaultSuggestions, messages.length, currentChatId]) // Added currentChatId dependency
 
-    const peerMetadataRef = React.useRef<Map<string, { isMobile: boolean }>>(new Map())
+    const peerMetadataRef = React.useRef<Map<string, { isMobile: boolean }>>(
+        new Map()
+    )
     const isMobileLayoutRef = React.useRef(isMobileLayout)
 
     React.useEffect(() => {
@@ -9356,10 +11156,18 @@ Do not include markdown formatting or explanations.`
             // Calculate target ratio based on number of participants (re-using logic from renderTilesSection conceptually)
             // Ideally we'd pass this in, but we can access the state directly since this is inside the component.
             // Note: We need to add these to the dependency array.
-            const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
+            const numTiles = Math.max(
+                2,
+                1 + remoteStreams.size + pendingPeerIds.size
+            )
             const isMultiParty = numTiles > 2
-            const isContentOpen = _isScreenSharing || !!_remoteScreenStream || _isWhiteboardOpen || _isDocOpen
-            const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
+            const isContentOpen =
+                _isScreenSharing ||
+                !!_remoteScreenStream ||
+                _isWhiteboardOpen ||
+                _isDocOpen
+            const targetRatio =
+                isMultiParty || (isContentOpen && isMultiParty) ? 1.0 : 1.55
 
             // 1. Calculate Min Height (Max Video Height Constraint)
             let minHeight = MIN_CHAT_HEIGHT
@@ -9419,7 +11227,10 @@ Do not include markdown formatting or explanations.`
 
                     const calculatedMinChatHeight =
                         cHeight - chromeHeight - maxVideoHeightNeeded
-                    minHeight = Math.max(MIN_CHAT_HEIGHT, calculatedMinChatHeight)
+                    minHeight = Math.max(
+                        MIN_CHAT_HEIGHT,
+                        calculatedMinChatHeight
+                    )
                 }
             }
 
@@ -9434,7 +11245,10 @@ Do not include markdown formatting or explanations.`
                 !_isDocOpen
             ) {
                 const minVideoSectionHeight = 80
-                maxHeight = Math.max(MIN_CHAT_HEIGHT, cHeight - 40 - minVideoSectionHeight)
+                maxHeight = Math.max(
+                    MIN_CHAT_HEIGHT,
+                    cHeight - 40 - minVideoSectionHeight
+                )
             }
 
             if (
@@ -9446,12 +11260,12 @@ Do not include markdown formatting or explanations.`
                 let topRowHeight = 140
                 if (_isMobileLayout) {
                     const availableW = Math.max(0, cWidth - 32)
-                    
+
                     // We calculate the minimum video section height based on aspect ratio
                     // to ensure videos are not squashed beyond their target ratio.
                     // However, we allow the user to drag significantly higher than this default
                     // to enable minimizing the video view if desired.
-                    
+
                     // Default height assumption (2x2 grid approximation)
                     // If we use targetRatio here, we get a more accurate 'ideal' height.
                     const tileW = (availableW - 8) / 2
@@ -9466,9 +11280,9 @@ Do not include markdown formatting or explanations.`
                 }
 
                 const chromeHeight = 24 + 16 + topRowHeight + 8
-                const minVideoHeight = 0 
-                
-                maxHeight = cHeight - chromeHeight - minVideoHeight 
+                const minVideoHeight = 0
+
+                maxHeight = cHeight - chromeHeight - minVideoHeight
             }
 
             return { minHeight, maxHeight }
@@ -9550,7 +11364,7 @@ Do not include markdown formatting or explanations.`
         )
 
         setChatHeight((prev) => Math.max(minHeight, Math.min(prev, maxHeight)))
-        
+
         prevContainerSize.current = containerSize
     }, [
         containerSize,
@@ -9601,7 +11415,7 @@ Do not include markdown formatting or explanations.`
         // Calculate height that leaves appropriate space for tiles based on layout
         let targetTileHeight: number
         const topUIHeight = 16 + 8 + 24 // PaddingTop + Gap + DragBar
-        
+
         if (isMobileLayout) {
             // Mobile: tiles arranged horizontally side-by-side
             // Each tile width = (availableWidth - gap) / 2
@@ -9616,14 +11430,15 @@ Do not include markdown formatting or explanations.`
                 targetTileHeight += 248
             }
         }
-        
-        const targetChatHeight = containerSize.height - targetTileHeight - topUIHeight
-        
+
+        const targetChatHeight =
+            containerSize.height - targetTileHeight - topUIHeight
+
         // Ensure we don't exceed the absolute max allowed height
         const snapHeight = Math.min(targetChatHeight, maxHeight)
-        
+
         setChatHeight(Math.max(MIN_CHAT_HEIGHT, snapHeight))
-        
+
         // Only mark as snapped when we've done it with a full-size viewport
         if (containerSize.height > 500) {
             hasSnappedForMessages.current = true
@@ -9652,10 +11467,13 @@ Do not include markdown formatting or explanations.`
     React.useEffect(() => {
         if (isDocOpen || isWhiteboardOpen) {
             // Calculate proper initial height based on constraints
-            const containerHeight = containerRef.current?.clientHeight || window.innerHeight
-            const containerWidth = containerRef.current?.clientWidth || window.innerWidth
-            
-            const isSidebarMode = !isMobileLayout && (isWhiteboardOpen || isDocOpen)
+            const containerHeight =
+                containerRef.current?.clientHeight || window.innerHeight
+            const containerWidth =
+                containerRef.current?.clientWidth || window.innerWidth
+
+            const isSidebarMode =
+                !isMobileLayout && (isWhiteboardOpen || isDocOpen)
             const effectiveWidth = isSidebarMode ? 400 : containerWidth
             const effectiveMobile = isSidebarMode || isMobileLayout
 
@@ -9686,12 +11504,20 @@ Do not include markdown formatting or explanations.`
                 chatHeightBeforeOverlay.current = null
             }
         }
-    }, [isDocOpen, isWhiteboardOpen, calculateHeightConstraints, isMobileLayout, isScreenSharing, remoteScreenStream, sharedScreenSize])
+    }, [
+        isDocOpen,
+        isWhiteboardOpen,
+        calculateHeightConstraints,
+        isMobileLayout,
+        isScreenSharing,
+        remoteScreenStream,
+        sharedScreenSize,
+    ])
 
     const handleRoleSelect = React.useCallback(
         (selectedRole: "student" | "volunteer") => {
             log(`Role selected: ${selectedRole}`)
-            
+
             if (typeof window !== "undefined") {
                 const currentHash = window.location.hash
                 const hasHash = currentHash && currentHash.length > 1
@@ -9716,9 +11542,9 @@ Do not include markdown formatting or explanations.`
                     log(`Volunteer cleared hash, searching for students...`)
                 }
             }
-            
+
             setRole(selectedRole)
-            
+
             // Restart MQTT to subscribe to new topics based on role
             if (mqttClient.current) {
                 mqttClient.current.end()
@@ -9738,7 +11564,7 @@ Do not include markdown formatting or explanations.`
     // We do NOT set role based on #student or #volunteer anymore.
     React.useEffect(() => {
         if (typeof window === "undefined") return
-        // We leave the hash alone here. 
+        // We leave the hash alone here.
         // If it's a private room hash, the user acts based on their saved role.
     }, [])
 
@@ -9750,7 +11576,10 @@ Do not include markdown formatting or explanations.`
      */
     React.useEffect(() => {
         // Prevent auto-start on Framer Canvas
-        if (RenderTarget.current() === RenderTarget.canvas || RenderTarget.current() === RenderTarget.thumbnail) {
+        if (
+            RenderTarget.current() === RenderTarget.canvas ||
+            RenderTarget.current() === RenderTarget.thumbnail
+        ) {
             return
         }
 
@@ -9765,16 +11594,21 @@ Do not include markdown formatting or explanations.`
     // Loads required external dependencies and starts passive listening.
     React.useEffect(() => {
         // Prevent connection logic on Framer Canvas
-        if (RenderTarget.current() === RenderTarget.canvas || RenderTarget.current() === RenderTarget.thumbnail) {
+        if (
+            RenderTarget.current() === RenderTarget.canvas ||
+            RenderTarget.current() === RenderTarget.thumbnail
+        ) {
             return
         }
 
         log(`🚀 INITIALIZATION STARTED`)
         log(`🚀 Role: ${role}`)
-        log(`🚀 Hash: ${typeof window !== "undefined" ? window.location.hash : "none"}`)
+        log(
+            `🚀 Hash: ${typeof window !== "undefined" ? window.location.hash : "none"}`
+        )
         log(`🚀 Session ID: ${sessionId.current}`)
         log(`🚀 My ID: ${myId.current}`)
-        
+
         const loadDependencies = async () => {
             // @ts-ignore - window.mqtt and window.Peer are added via script tags
             if (!window.mqtt || !window.Peer) {
@@ -9787,14 +11621,16 @@ Do not include markdown formatting or explanations.`
             }
             setReady(true)
             log(`🚀 System initialized and ready.`)
-            
+
             // Start passive MQTT listening (no camera yet)
             // This will detect if someone joins our private room
             if (!roleRef.current) {
                 log(`🚀 No role detected - starting passive MQTT mode`)
                 initPassiveMQTT()
             } else {
-                log(`🚀 Role detected (${roleRef.current}) - will start camera immediately`)
+                log(
+                    `🚀 Role detected (${roleRef.current}) - will start camera immediately`
+                )
             }
         }
         loadDependencies()
@@ -9849,7 +11685,7 @@ Do not include markdown formatting or explanations.`
                 } else {
                     // On mobile, we only close locally. On desktop, we stop the session for everyone.
                     if (!isMobileLayout) {
-                    broadcastData({ type: "doc-stop" })
+                        broadcastData({ type: "doc-stop" })
                     }
                 }
             }
@@ -9859,7 +11695,7 @@ Do not include markdown formatting or explanations.`
                     setIsWhiteboardOpen(false)
                     // Notify peer to close whiteboard
                     if (!isMobileLayout) {
-                    broadcastData({ type: "tldraw-stop" })
+                        broadcastData({ type: "tldraw-stop" })
                     }
                 }
                 // Allow screenshare to remain open
@@ -9867,7 +11703,12 @@ Do not include markdown formatting or explanations.`
             }
             return willBeOpen
         })
-    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isMobileLayout])
+    }, [
+        isWhiteboardOpen,
+        isScreenSharing,
+        stopLocalScreenShare,
+        isMobileLayout,
+    ])
 
     const toggleWhiteboard = React.useCallback(() => {
         if (isWhiteboardOpen) {
@@ -9875,7 +11716,7 @@ Do not include markdown formatting or explanations.`
             setIsWhiteboardOpen(false)
             // On mobile, we only close locally. On desktop, we stop the session for everyone.
             if (!isMobileLayout) {
-            broadcastData({ type: "tldraw-stop" })
+                broadcastData({ type: "tldraw-stop" })
             }
         } else {
             log("Starting whiteboard...")
@@ -9906,7 +11747,13 @@ Do not include markdown formatting or explanations.`
                 )
             }
         }
-    }, [isWhiteboardOpen, isScreenSharing, stopLocalScreenShare, isDocOpen, isMobileLayout])
+    }, [
+        isWhiteboardOpen,
+        isScreenSharing,
+        stopLocalScreenShare,
+        isDocOpen,
+        isMobileLayout,
+    ])
 
     // Reset whiteboard tool and color when opened
     React.useEffect(() => {
@@ -9920,9 +11767,9 @@ Do not include markdown formatting or explanations.`
 
     const broadcastData = React.useCallback((data: any) => {
         dataConnectionsRef.current.forEach((conn) => {
-             if (conn.open) {
-                 conn.send(data)
-             }
+            if (conn.open) {
+                conn.send(data)
+            }
         })
     }, [])
 
@@ -9970,10 +11817,7 @@ Do not include markdown formatting or explanations.`
 
     const handleWhiteboardPointerMove = React.useCallback(
         (e: React.PointerEvent) => {
-            if (
-                !isWhiteboardOpen ||
-                dataConnectionsRef.current.size === 0
-            )
+            if (!isWhiteboardOpen || dataConnectionsRef.current.size === 0)
                 return
 
             const now = Date.now()
@@ -9981,7 +11825,6 @@ Do not include markdown formatting or explanations.`
             lastCursorUpdate.current = now
 
             if (editorRef.current) {
-
                 // Get the container element directly from the editor to ensure accurate coordinate conversion
                 const container = editorRef.current.getContainer()
                 if (!container) return
@@ -10002,7 +11845,8 @@ Do not include markdown formatting or explanations.`
                     },
                 })
             } else if (whiteboardContainerRef.current) {
-                const rect = whiteboardContainerRef.current.getBoundingClientRect()
+                const rect =
+                    whiteboardContainerRef.current.getBoundingClientRect()
                 const x = (e.clientX - rect.left) / rect.width
                 const y = (e.clientY - rect.top) / rect.height
 
@@ -10063,21 +11907,22 @@ Do not include markdown formatting or explanations.`
                 // If connected, start a second call for the screen to ALL peers
                 if (activeCalls.current.size > 0) {
                     activeCalls.current.forEach((call, peerId) => {
-                         log(`Starting screen share call to ${peerId}...`)
-                         const screenCall = peerInstance.current.call(
-                             peerId,
-                             screenStream,
-                             {
-                                 metadata: { type: "screen" },
-                             }
-                         )
-                         screenCall.on("error", (err: any) =>
-                             log(`Sender Screen Call Error to ${peerId}: ${err}`)
-                         )
-                         screenCallsRef.current.set(peerId, screenCall)
-                         
-                         // Legacy ref fallback
-                         if (!screenCallRef.current) screenCallRef.current = screenCall
+                        log(`Starting screen share call to ${peerId}...`)
+                        const screenCall = peerInstance.current.call(
+                            peerId,
+                            screenStream,
+                            {
+                                metadata: { type: "screen" },
+                            }
+                        )
+                        screenCall.on("error", (err: any) =>
+                            log(`Sender Screen Call Error to ${peerId}: ${err}`)
+                        )
+                        screenCallsRef.current.set(peerId, screenCall)
+
+                        // Legacy ref fallback
+                        if (!screenCallRef.current)
+                            screenCallRef.current = screenCall
                     })
                 } else if (activeCall.current && activeCall.current.peer) {
                     // Fallback for legacy single-call state if activeCalls is empty for some reason
@@ -10111,27 +11956,29 @@ Do not include markdown formatting or explanations.`
 
     const handleClearMessages = React.useCallback(() => {
         saveChatHistory()
-        
+
         // Reset state for new chat
         const newId = Date.now().toString()
         setCurrentChatId(newId)
         setMessages([])
-        
+
         // Reset suggestions with default ones if available
         if (defaultSuggestions && defaultSuggestions.length > 0) {
-            const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
+            const shuffled = [...defaultSuggestions].sort(
+                () => 0.5 - Math.random()
+            )
             setAiGeneratedSuggestions(shuffled.slice(0, 10))
         } else {
             setAiGeneratedSuggestions([])
         }
-        
+
         setDocContent("") // Reset docs too? Usually yes for new chat.
-        
+
         // Clear persistence
         localStorage.removeItem("student_messages")
         localStorage.removeItem("student_doc")
         localStorage.removeItem("student_whiteboard")
-        
+
         // Ensure new ID is saved
         if (typeof window !== "undefined") {
             localStorage.setItem("current_chat_id", newId)
@@ -10140,11 +11987,15 @@ Do not include markdown formatting or explanations.`
 
     // --- SIDEBAR ACTIONS ---
     const handlePinChat = React.useCallback((chatId: string) => {
-        setSavedChats(prev => {
-            const updated = prev.map(c => {
+        setSavedChats((prev) => {
+            const updated = prev.map((c) => {
                 if (c.id === chatId) {
                     const newPinned = !c.isPinned
-                    return { ...c, isPinned: newPinned, pinnedAt: newPinned ? Date.now() : undefined }
+                    return {
+                        ...c,
+                        isPinned: newPinned,
+                        pinnedAt: newPinned ? Date.now() : undefined,
+                    }
                 }
                 return c
             })
@@ -10165,15 +12016,18 @@ Do not include markdown formatting or explanations.`
         setHoveredActionId(null)
     }, [])
 
-    const handleDeleteChat = React.useCallback((chatId: string) => {
-        setSavedChats(prev => prev.filter(c => c.id !== chatId))
-        if (currentChatId === chatId) {
-            handleClearMessages()
-        }
-        setMenuOpenChatId(null)
-        setMenuPosition(null)
-        setHoveredActionId(null)
-    }, [currentChatId, handleClearMessages])
+    const handleDeleteChat = React.useCallback(
+        (chatId: string) => {
+            setSavedChats((prev) => prev.filter((c) => c.id !== chatId))
+            if (currentChatId === chatId) {
+                handleClearMessages()
+            }
+            setMenuOpenChatId(null)
+            setMenuPosition(null)
+            setHoveredActionId(null)
+        },
+        [currentChatId, handleClearMessages]
+    )
 
     const handleStartRename = React.useCallback((chat: ChatSession) => {
         setEditingChatId(chat.id)
@@ -10185,7 +12039,16 @@ Do not include markdown formatting or explanations.`
 
     const handleFinishRename = React.useCallback(() => {
         if (editingChatId) {
-            setSavedChats(prev => prev.map(c => c.id === editingChatId ? { ...c, title: editingTitle.trim() || "Untitled Chat" } : c))
+            setSavedChats((prev) =>
+                prev.map((c) =>
+                    c.id === editingChatId
+                        ? {
+                              ...c,
+                              title: editingTitle.trim() || "Untitled Chat",
+                          }
+                        : c
+                )
+            )
             setEditingChatId(null)
             setEditingTitle("")
         }
@@ -10193,15 +12056,18 @@ Do not include markdown formatting or explanations.`
 
     const handleShareChat = React.useCallback(async (chat: ChatSession) => {
         try {
-             if (typeof navigator !== "undefined" && navigator.share) {
-                 await navigator.share({
-                     title: chat.title,
-                     text: `Check out this chat on Curastem: ${chat.title}`,
-                     url: "https://curastem.org"
-                 })
-             } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-                 await navigator.clipboard.writeText("https://curastem.org")
-             }
+            if (typeof navigator !== "undefined" && navigator.share) {
+                await navigator.share({
+                    title: chat.title,
+                    text: `Check out this chat on Curastem: ${chat.title}`,
+                    url: "https://curastem.org",
+                })
+            } else if (
+                typeof navigator !== "undefined" &&
+                navigator.clipboard
+            ) {
+                await navigator.clipboard.writeText("https://curastem.org")
+            }
         } catch (e) {
             console.error("Share failed", e)
         }
@@ -10391,34 +12257,46 @@ Do not include markdown formatting or explanations.`
             handleDataConnection(conn)
 
             // If we have a chat title, share it with the new peer so they sync up
-            const currentHistory = savedChats.find(c => c.id === currentChatId)
-            if (currentHistory && currentHistory.title && currentHistory.title !== "New chat") {
+            const currentHistory = savedChats.find(
+                (c) => c.id === currentChatId
+            )
+            if (
+                currentHistory &&
+                currentHistory.title &&
+                currentHistory.title !== "New chat"
+            ) {
                 // Wait for open
                 conn.on("open", () => {
-                     conn.send(JSON.stringify({
-                        type: "chat-title",
-                        payload: currentHistory.title
-                    }))
+                    conn.send(
+                        JSON.stringify({
+                            type: "chat-title",
+                            payload: currentHistory.title,
+                        })
+                    )
                 })
             }
         })
 
         peer.on("call", (call: any) => {
             const incomingPeerId = call.peer
-            
+
             // Check for screen share metadata OR if we are already connected to this peer (assume secondary stream)
             // IMPORTANT: Only treat as screen share if explicitly marked OR if it's truly a second stream
-            const hasScreenMetadata = call.metadata && call.metadata.type === "screen"
-            
+            const hasScreenMetadata =
+                call.metadata && call.metadata.type === "screen"
+
             // Check if we already have a MAIN call with this peer
             const existingCall = activeCalls.current.get(incomingPeerId)
-            const isSecondaryStream = statusRef.current === "connected" &&
-                    existingCall &&
-                    existingCall !== call // Make sure it's not the same call object
-            
+            const isSecondaryStream =
+                statusRef.current === "connected" &&
+                existingCall &&
+                existingCall !== call // Make sure it's not the same call object
+
             const isScreenShare = hasScreenMetadata || isSecondaryStream
-            
-            log(`📞 Incoming call from ${incomingPeerId}. Screen share: ${isScreenShare}, Metadata: ${JSON.stringify(call.metadata)}`)
+
+            log(
+                `📞 Incoming call from ${incomingPeerId}. Screen share: ${isScreenShare}, Metadata: ${JSON.stringify(call.metadata)}`
+            )
 
             if (isScreenShare) {
                 log(
@@ -10455,7 +12333,7 @@ Do not include markdown formatting or explanations.`
                 return
             }
 
-            // For multi-party, we don't reject calls if already connected. 
+            // For multi-party, we don't reject calls if already connected.
             // We accept them and add to the mesh.
             /* 
             if (statusRef.current === "connected") {
@@ -10465,7 +12343,7 @@ Do not include markdown formatting or explanations.`
 
             log("Incoming call detected. Auto-answering...")
             call.answer(localStreamRef.current)
-            
+
             // If no role is set, this is a private room connection
             const isPrivateRoomCall = !roleRef.current
             handleCall(call, isPrivateRoomCall)
@@ -10479,15 +12357,19 @@ Do not include markdown formatting or explanations.`
                 // Try to find if we have a pending call for this peer or just failed.
                 // "e" object might not have the peer ID directly depending on PeerJS version/error.
                 // Usually it's e.message "Could not connect to peer X".
-                
+
                 const msg = e.message || ""
                 const unavailablePeerId = msg.split(" ").pop() // Hacky attempt to get ID if standard format
-                
-                if (unavailablePeerId && (activeCalls.current.has(unavailablePeerId) || remoteStreamsRef.current.has(unavailablePeerId))) {
-                     log(`Removing unavailable peer: ${unavailablePeerId}`)
-                     activeCalls.current.delete(unavailablePeerId)
-                     remoteStreamsRef.current.delete(unavailablePeerId)
-                     setRemoteStreams(prev => {
+
+                if (
+                    unavailablePeerId &&
+                    (activeCalls.current.has(unavailablePeerId) ||
+                        remoteStreamsRef.current.has(unavailablePeerId))
+                ) {
+                    log(`Removing unavailable peer: ${unavailablePeerId}`)
+                    activeCalls.current.delete(unavailablePeerId)
+                    remoteStreamsRef.current.delete(unavailablePeerId)
+                    setRemoteStreams((prev) => {
                         const newMap = new Map(prev)
                         newMap.delete(unavailablePeerId)
                         return newMap
@@ -10507,33 +12389,33 @@ Do not include markdown formatting or explanations.`
 
         // Add to active calls map
         activeCalls.current.set(peerId, call)
-        
+
         // Add to pending peers (show black tile)
-        setPendingPeerIds(prev => {
+        setPendingPeerIds((prev) => {
             const newSet = new Set(prev)
             newSet.add(peerId)
             return newSet
         })
-        
+
         // If this is a private room connection, mark it
         if (isPrivateRoom && !roleRef.current) {
             setIsPrivateRoomConnection(true)
             log(`Private room connection established with ${peerId}`)
         }
-        
+
         // Wait for stream to actually confirm connection
         call.on("stream", (remoteStreamIn: any) => {
             log(`Remote stream received from ${peerId}`)
-            
+
             // Remove from pending peers (video is now live)
-            setPendingPeerIds(prev => {
+            setPendingPeerIds((prev) => {
                 const newSet = new Set(prev)
                 newSet.delete(peerId)
                 return newSet
             })
-            
+
             // Add to remote streams map
-            setRemoteStreams(prev => {
+            setRemoteStreams((prev) => {
                 const newMap = new Map(prev)
                 newMap.set(peerId, remoteStreamIn)
                 return newMap
@@ -10543,22 +12425,22 @@ Do not include markdown formatting or explanations.`
             // Legacy support
             remoteStreamRef.current = remoteStreamIn
             setRemoteStream(remoteStreamIn) // Just sets the first one for now
-            
+
             // Only set connected ONCE we have a stream or at least confirmation
             if (statusRef.current !== "connected") {
                 setStatus("connected")
                 // NOTE: We do NOT end the MQTT client anymore to allow multi-party discovery
-                // if (mqttClient.current) mqttClient.current.end() 
-                
+                // if (mqttClient.current) mqttClient.current.end()
+
                 // VOLUNTEER WIPE LOGIC
                 // If I am a volunteer and I just connected to a student, wipe my local state to start fresh.
                 if (roleRef.current === "volunteer") {
-                     log("Volunteer connected - Wiping previous session data...")
-                     setMessages([])
-                     setAttachments([])
-                     setLogs([])
-                     setIsDocOpen(false)
-                     setDocContent(
+                    log("Volunteer connected - Wiping previous session data...")
+                    setMessages([])
+                    setAttachments([])
+                    setLogs([])
+                    setIsDocOpen(false)
+                    setDocContent(
                         `
 <h1>Welcome to your notes 🩵 </h1>
 <p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
@@ -10571,7 +12453,9 @@ Do not include markdown formatting or explanations.`
 
                 // If we are already screen sharing, start a call for that too
                 if (screenStreamRef.current && peerInstance.current) {
-                    log(`Connected. Starting existing screen share to ${peerId}...`)
+                    log(
+                        `Connected. Starting existing screen share to ${peerId}...`
+                    )
                     const screenCall = peerInstance.current.call(
                         peerId,
                         screenStreamRef.current,
@@ -10587,18 +12471,18 @@ Do not include markdown formatting or explanations.`
                 }
             }
         })
-        
+
         call.on("close", () => {
             log(`Session terminated by remote peer ${peerId}.`)
 
-            setPendingPeerIds(prev => {
+            setPendingPeerIds((prev) => {
                 const newSet = new Set(prev)
                 newSet.delete(peerId)
                 return newSet
             })
-            
+
             // Remove from maps (state update triggers re-render)
-            setRemoteStreams(prev => {
+            setRemoteStreams((prev) => {
                 const newMap = new Map(prev)
                 if (newMap.has(peerId)) {
                     log(`Removing remote stream for ${peerId}`)
@@ -10606,11 +12490,11 @@ Do not include markdown formatting or explanations.`
                 }
                 return newMap
             })
-            
+
             // Clean up refs
             activeCalls.current.delete(peerId)
             remoteStreamsRef.current.delete(peerId)
-            
+
             // Clean up screen share call if exists
             if (screenCallsRef.current.has(peerId)) {
                 try {
@@ -10621,42 +12505,48 @@ Do not include markdown formatting or explanations.`
 
             // If no more peers, set status to idle or searching?
             if (activeCalls.current.size === 0) {
-                 setIsPrivateRoomConnection(false)
-                 
-                 const wasVolunteer = roleRef.current === "volunteer"
-                 const wasStudent = roleRef.current === "student"
-                 
-                 // Check if this was a manual hangup (initiated by us)
-                 // If so, we do NOT want to auto-restart search.
-                 if (isManualHangupRef.current) {
-                     log("Manual hangup detected in close handler - skipping auto-reconnect")
-                     return
-                 }
-                 
-                 // Only full cleanup if EVERYONE left? 
-                 // Or if this specific call closed, we just remove the tile (already done above).
-                 // We only "cleanup()" if we want to reset the *entire* state (e.g. self disconnect).
-                 // If one peer leaves a group call, we stay connected to others.
-                 
-                 // However, if size IS 0, we are alone.
-                 cleanup()
-                 
-                 if (wasVolunteer) {
-                     log("All peers disconnected. Restarting search as volunteer...")
-                     setTimeout(() => {
-                         startChat()
-                     }, 500)
-                 } else if (wasStudent) {
-                     log("All peers disconnected. Restarting waiting as student...")
-                     setTimeout(() => {
-                         initPassiveMQTT()
-                     }, 500)
-                 }
+                setIsPrivateRoomConnection(false)
+
+                const wasVolunteer = roleRef.current === "volunteer"
+                const wasStudent = roleRef.current === "student"
+
+                // Check if this was a manual hangup (initiated by us)
+                // If so, we do NOT want to auto-restart search.
+                if (isManualHangupRef.current) {
+                    log(
+                        "Manual hangup detected in close handler - skipping auto-reconnect"
+                    )
+                    return
+                }
+
+                // Only full cleanup if EVERYONE left?
+                // Or if this specific call closed, we just remove the tile (already done above).
+                // We only "cleanup()" if we want to reset the *entire* state (e.g. self disconnect).
+                // If one peer leaves a group call, we stay connected to others.
+
+                // However, if size IS 0, we are alone.
+                cleanup()
+
+                if (wasVolunteer) {
+                    log(
+                        "All peers disconnected. Restarting search as volunteer..."
+                    )
+                    setTimeout(() => {
+                        startChat()
+                    }, 500)
+                } else if (wasStudent) {
+                    log(
+                        "All peers disconnected. Restarting waiting as student..."
+                    )
+                    setTimeout(() => {
+                        initPassiveMQTT()
+                    }, 500)
+                }
             }
         })
-        
+
         call.on("error", (err: any) => {
-             log(`Call Error with ${peerId}: ${err}`)
+            log(`Call Error with ${peerId}: ${err}`)
         })
     }
 
@@ -10670,40 +12560,41 @@ Do not include markdown formatting or explanations.`
         mqttClient.current = client
 
         client.on("connect", () => {
-            const hash = typeof window !== "undefined" ? window.location.hash : ""
-            
+            const hash =
+                typeof window !== "undefined" ? window.location.hash : ""
+
             log(`🟡 [Passive MQTT] Connected to broker`)
             log(`🟡 [Passive MQTT] My ID: ${myId.current}`)
             log(`🟡 [Passive MQTT] Hash: ${hash}`)
-            
+
             // Subscribe to private room topic to detect peers
             if (hash && hash.length > 1) {
                 const privateTopic = `${TOPIC_LOBBY}/${hash.replace("#", "")}`
                 client.subscribe(privateTopic)
                 log(`🟡 [Passive MQTT] Subscribed to: ${privateTopic}`)
-                
+
                 // Broadcast our presence periodically so others can find us
                 const passiveHeartbeat = setInterval(() => {
                     if (!client.connected || statusRef.current !== "idle") {
-                        log(`🟡 [Passive MQTT] Stopping heartbeat - connected: ${client.connected}, status: ${statusRef.current}`)
+                        log(
+                            `🟡 [Passive MQTT] Stopping heartbeat - connected: ${client.connected}, status: ${statusRef.current}`
+                        )
                         clearInterval(passiveHeartbeat)
                         return
                     }
-                    
+
                     const message = {
                         id: myId.current,
                         sessionId: sessionId.current, // Add Session ID
-                        role: null, 
+                        role: null,
                         hash: hash,
-                        isPassive: true, 
-                        timestamp: Date.now()
+                        isPassive: true,
+                        timestamp: Date.now(),
                     }
                     // log(`📡 [Passive MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
-                    client.publish(
-                        privateTopic,
-                        JSON.stringify(message),
-                        { retain: false }
-                    )
+                    client.publish(privateTopic, JSON.stringify(message), {
+                        retain: false,
+                    })
                 }, 2000)
             }
         })
@@ -10712,40 +12603,47 @@ Do not include markdown formatting or explanations.`
         client.on("message", (topic: string, msg: any) => {
             try {
                 const data = JSON.parse(msg.toString())
-                
+
                 // log(`[Passive] Received message: ${JSON.stringify(data)}`)
-                
+
                 // Ignore self by Session ID (prevents echo from same tab)
                 if (data.sessionId && data.sessionId === sessionId.current) {
                     // log(`[Passive] Ignoring own message (Session match)`)
                     return
                 }
-                
+
                 // Check timestamp (allow 5 second window)
                 if (data.timestamp && Date.now() - data.timestamp > 5000) {
                     // log(`[Passive] Message too old (${Date.now() - data.timestamp}ms)`)
                     return
                 }
 
-                const currentHash = typeof window !== "undefined" ? window.location.hash : ""
-                const isMyPrivateRoom = topic.includes(currentHash.replace("#", "")) && currentHash.length > 1
-                
+                const currentHash =
+                    typeof window !== "undefined" ? window.location.hash : ""
+                const isMyPrivateRoom =
+                    topic.includes(currentHash.replace("#", "")) &&
+                    currentHash.length > 1
+
                 // Someone with our hash detected!
                 if (isMyPrivateRoom && data.hash === currentHash) {
-                    log(`🎉 Peer detected in private room ${currentHash}! Peer ID: ${data.id}`)
-                    
+                    log(
+                        `🎉 Peer detected in private room ${currentHash}! Peer ID: ${data.id}`
+                    )
+
                     // Mark as private room connection
                     setIsPrivateRoomConnection(true)
-                    
+
                     // KEEP LISTENING - do not end client
                     // client.end()
-                    
+
                     // Start camera now
                     if (statusRef.current === "idle") {
                         log(`Starting camera for private room connection...`)
                         startChat()
                     } else {
-                        log(`Cannot start chat, status is: ${statusRef.current}`)
+                        log(
+                            `Cannot start chat, status is: ${statusRef.current}`
+                        )
                     }
                 } else {
                     // log(`[Passive] Not my room. Topic: ${topic}, My hash: ${currentHash}`)
@@ -10766,20 +12664,21 @@ Do not include markdown formatting or explanations.`
         mqttClient.current = client
 
         client.on("connect", () => {
-            const hash = typeof window !== "undefined" ? window.location.hash : ""
+            const hash =
+                typeof window !== "undefined" ? window.location.hash : ""
             const currentRole = roleRef.current
-            
+
             log(
                 `Connected to lobby. Mode: ${currentRole || "private room"}, Hash: ${hash}`
             )
-            
+
             // ALWAYS subscribe to private room topic (for hash-based connections)
             if (hash && hash.length > 1) {
                 const privateTopic = `${TOPIC_LOBBY}/${hash.replace("#", "")}`
                 client.subscribe(privateTopic)
                 log(`Subscribed to private room: ${privateTopic}`)
             }
-            
+
             // If role is selected, ALSO subscribe to role-based matching topics
             if (currentRole === "student") {
                 const studentTopic = `${TOPIC_LOBBY}/students-waiting`
@@ -10793,7 +12692,8 @@ Do not include markdown formatting or explanations.`
 
             // Periodic heartbeat to broadcast presence to other users
             const heartbeat = setInterval(() => {
-                const currentHash = typeof window !== "undefined" ? window.location.hash : ""
+                const currentHash =
+                    typeof window !== "undefined" ? window.location.hash : ""
                 const isPrivateRoom = currentHash && currentHash.length > 1
 
                 // Stop if client disconnected
@@ -10804,16 +12704,16 @@ Do not include markdown formatting or explanations.`
 
                 // If connected...
                 if (statusRef.current === "connected") {
-                     // If NOT in private room (i.e. random pairing), stop heartbeat to avoid noise/re-pairing
-                     if (!isPrivateRoom) {
-                         clearInterval(heartbeat)
-                         return
-                     }
-                     // If IN private room, CONTINUE broadcasting so new peers (3rd, 4th) can find us
+                    // If NOT in private room (i.e. random pairing), stop heartbeat to avoid noise/re-pairing
+                    if (!isPrivateRoom) {
+                        clearInterval(heartbeat)
+                        return
+                    }
+                    // If IN private room, CONTINUE broadcasting so new peers (3rd, 4th) can find us
                 }
-                
+
                 const currentRole = roleRef.current
-                
+
                 // 1. ALWAYS broadcast to private room (hash-based matching)
                 if (currentHash && currentHash.length > 1) {
                     const privateTopic = `${TOPIC_LOBBY}/${currentHash.replace("#", "")}`
@@ -10822,20 +12722,21 @@ Do not include markdown formatting or explanations.`
                         sessionId: sessionId.current,
                         role: currentRole,
                         hash: currentHash,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     }
                     // log(`📡 [Active MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
-                    client.publish(
-                        privateTopic,
-                        JSON.stringify(message),
-                        { retain: false }
-                    )
+                    client.publish(privateTopic, JSON.stringify(message), {
+                        retain: false,
+                    })
                 }
-                
+
                 // 2. If Student role, ALSO broadcast to student matching database
-                // Only if NOT connected? Or keep broadcasting? 
+                // Only if NOT connected? Or keep broadcasting?
                 // For role-based 1-on-1, we usually stop.
-                if (statusRef.current !== "connected" && currentRole === "student") {
+                if (
+                    statusRef.current !== "connected" &&
+                    currentRole === "student"
+                ) {
                     const studentTopic = `${TOPIC_LOBBY}/students-waiting`
                     client.publish(
                         studentTopic,
@@ -10844,7 +12745,7 @@ Do not include markdown formatting or explanations.`
                             sessionId: sessionId.current,
                             role: "student",
                             hash: currentHash,
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
                         }),
                         { retain: false }
                     )
@@ -10862,18 +12763,18 @@ Do not include markdown formatting or explanations.`
             */
 
             const data = JSON.parse(msg.toString())
-            
+
             if (data.id === myId.current) {
                 // log(`🔵 [Active MQTT] Ignoring own message (ID match)`)
                 return
             }
-            
+
             // IGNORE SELF (Session Check)
             if (data.sessionId && data.sessionId === sessionId.current) {
                 // log(`🔵 [Active MQTT] Ignoring own message (Session match)`)
                 return
             }
-            
+
             // Check timestamp to avoid stale peers (5 second window)
             // if (data.timestamp && Date.now() - data.timestamp > 5000) {
             //    log(`🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`)
@@ -10882,13 +12783,15 @@ Do not include markdown formatting or explanations.`
 
             // Check if we are already connected to this peer
             if (activeCalls.current.has(data.id)) {
-                 // log(`🔵 [Active MQTT] Already connected to ${data.id}`)
-                 return
+                // log(`🔵 [Active MQTT] Already connected to ${data.id}`)
+                return
             }
 
             // Check timestamp to avoid stale peers (5 second window)
             if (data.timestamp && Date.now() - data.timestamp > 5000) {
-                log(`🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`)
+                log(
+                    `🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`
+                )
                 return
             }
 
@@ -10897,32 +12800,49 @@ Do not include markdown formatting or explanations.`
                 // If we are in the process of starting, we might have peer but not stream yet?
                 // Or stream but not peer?
                 // If we are receiving MQTT messages, we *should* be ready.
-                log(`🔵 [Active MQTT] Not ready - peer: ${!!peerInstance.current}, stream: ${!!localStreamRef.current}`)
+                log(
+                    `🔵 [Active MQTT] Not ready - peer: ${!!peerInstance.current}, stream: ${!!localStreamRef.current}`
+                )
                 return
             }
 
-            const currentHash = typeof window !== "undefined" ? window.location.hash : ""
+            const currentHash =
+                typeof window !== "undefined" ? window.location.hash : ""
             const currentRole = roleRef.current
-            log(`🔵 [Active MQTT] Current hash: ${currentHash}, Current role: ${currentRole}`)
-            
+            log(
+                `🔵 [Active MQTT] Current hash: ${currentHash}, Current role: ${currentRole}`
+            )
+
             // PRIORITY 1: PRIVATE ROOM MATCHING (Hash-based, no role required)
             // If message is from our private room topic, connect immediately
-            const isMyPrivateRoom = topic.includes(currentHash.replace("#", "")) && currentHash.length > 1
+            const isMyPrivateRoom =
+                topic.includes(currentHash.replace("#", "")) &&
+                currentHash.length > 1
             if (isMyPrivateRoom && data.hash === currentHash) {
-                 log(`🔵 [Active MQTT] Peer found in private room ${currentHash}: ${data.id}`)
-                 log(`🔵 [Active MQTT] My ID: ${myId.current}, Peer ID: ${data.id}`)
-                 log(`🔵 [Active MQTT] My Role: ${currentRole}, Peer Role: ${data.role}`)
-                 
-                 // Determine if this is a private room connection (both without roles)
-                 const isPrivateRoomConnection = !currentRole && !data.role
-                 log(`🔵 [Active MQTT] Is Private Room Connection: ${isPrivateRoomConnection}`)
-                 
-                 // Connect regardless of roles
-                 if (myId.current > data.id) {
-                    log(`🔵 [Active MQTT] I have higher ID, initiating call to ${data.id}`)
+                log(
+                    `🔵 [Active MQTT] Peer found in private room ${currentHash}: ${data.id}`
+                )
+                log(
+                    `🔵 [Active MQTT] My ID: ${myId.current}, Peer ID: ${data.id}`
+                )
+                log(
+                    `🔵 [Active MQTT] My Role: ${currentRole}, Peer Role: ${data.role}`
+                )
+
+                // Determine if this is a private room connection (both without roles)
+                const isPrivateRoomConnection = !currentRole && !data.role
+                log(
+                    `🔵 [Active MQTT] Is Private Room Connection: ${isPrivateRoomConnection}`
+                )
+
+                // Connect regardless of roles
+                if (myId.current > data.id) {
+                    log(
+                        `🔵 [Active MQTT] I have higher ID, initiating call to ${data.id}`
+                    )
                     // Add a small delay to avoid race conditions if both peers try to call simultaneously?
                     // Actually ID check prevents simultaneous calls.
-                    
+
                     try {
                         const call = peerInstance.current.call(
                             data.id,
@@ -10932,13 +12852,17 @@ Do not include markdown formatting or explanations.`
                             handleCall(call, isPrivateRoomConnection)
                             connectToDataPeer(data.id)
                         } else {
-                             log(`🔵 [Active MQTT] Call creation failed (returned null/undefined)`)
+                            log(
+                                `🔵 [Active MQTT] Call creation failed (returned null/undefined)`
+                            )
                         }
                     } catch (err) {
                         log(`🔵 [Active MQTT] Error initiating call: ${err}`)
                     }
                 } else {
-                    log(`🔵 [Active MQTT] Peer has higher ID, waiting for their call...`)
+                    log(
+                        `🔵 [Active MQTT] Peer has higher ID, waiting for their call...`
+                    )
                 }
                 return
             }
@@ -10949,24 +12873,24 @@ Do not include markdown formatting or explanations.`
             // Or just log it and move on.
             // For now, let's log it.
             if (statusRef.current === "connected" && data.id) {
-                // If we were trying to call them and they are unavailable, 
+                // If we were trying to call them and they are unavailable,
                 // we might want to clean up any pending state?
             }
             const isStudentDatabase = topic.includes("students-waiting")
-            
+
             // For role based, we currently stick to 1-on-1 for simplicity unless requested otherwise.
             // But if we want multi-party role based, we'd need similar logic.
             // Assuming strict 1-on-1 for role-based matching for now as per "hash URL" requirement being the multi-party trigger.
-            if (statusRef.current === "connected") return 
-            
+            if (statusRef.current === "connected") return
+
             if (isStudentDatabase && currentRole === "volunteer") {
                 // I am a volunteer looking for students
                 if (data.role !== "student") {
                     return
                 }
-                
+
                 log(`Volunteer found student: ${data.id}`)
-                
+
                 // Adopt student's hash for the connection
                 if (data.hash && data.hash.length > 1) {
                     log(`Adopting student hash: ${data.hash}`)
@@ -11144,7 +13068,16 @@ Do not include markdown formatting or explanations.`
     }, [isLiveMode, stopLiveSession])
 
     // --- COLOR GENERATION ---
-    const CURSOR_COLORS = ["#FF5733", "#33FF57", "#3357FF", "#F033FF", "#FF33A8", "#33FFF5", "#FF8C33", "#33FF8C"]
+    const CURSOR_COLORS = [
+        "#FF5733",
+        "#33FF57",
+        "#3357FF",
+        "#F033FF",
+        "#FF33A8",
+        "#33FFF5",
+        "#FF8C33",
+        "#33FF8C",
+    ]
     const getPeerColor = (peerId: string) => {
         let hash = 0
         for (let i = 0; i < peerId.length; i++) {
@@ -11152,7 +13085,7 @@ Do not include markdown formatting or explanations.`
         }
         return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length]
     }
-    
+
     // --- DATA CHANNEL & AI HELPERS ---
 
     const connectToDataPeer = (peerId: string) => {
@@ -11173,7 +13106,7 @@ Do not include markdown formatting or explanations.`
             // SYNC STRATEGY:
             // If I have content open (Doc or Whiteboard), I am the source of truth for this connection.
             // This ensures late joiners receive the current state from whoever they connect to.
-            
+
             if (conn.open) {
                 // Send metadata
                 conn.send({
@@ -11182,14 +13115,21 @@ Do not include markdown formatting or explanations.`
                 })
 
                 // If we have a chat title, share it with the new peer so they sync up
-                const currentHistory = savedChats.find(c => c.id === currentChatId)
-                if (currentHistory && currentHistory.title && currentHistory.title !== "New chat") {
-                    conn.send(JSON.stringify({
-                        type: "chat-title",
-                        payload: currentHistory.title
-                    }))
+                const currentHistory = savedChats.find(
+                    (c) => c.id === currentChatId
+                )
+                if (
+                    currentHistory &&
+                    currentHistory.title &&
+                    currentHistory.title !== "New chat"
+                ) {
+                    conn.send(
+                        JSON.stringify({
+                            type: "chat-title",
+                            payload: currentHistory.title,
+                        })
+                    )
                 }
-
 
                 // 1. Sync Document
                 if (isDocOpenRef.current) {
@@ -11354,7 +13294,7 @@ Do not include markdown formatting or explanations.`
                 }
             } else if (data.type === "cursor-update") {
                 const peerId = conn.peer
-                setRemoteCursors(prev => {
+                setRemoteCursors((prev) => {
                     const newMap = new Map(prev)
                     // If coordinates are invalid, remove cursor (hide it)
                     if (data.payload.x === -9999) {
@@ -11423,7 +13363,7 @@ Do not include markdown formatting or explanations.`
         conn.on("close", () => {
             log("Data connection closed")
             // Remove cursor for this peer
-            setRemoteCursors(prev => {
+            setRemoteCursors((prev) => {
                 const newMap = new Map(prev)
                 newMap.delete(conn.peer)
                 return newMap
@@ -11432,81 +13372,99 @@ Do not include markdown formatting or explanations.`
         })
     }
 
-    const generateSuggestedReplies = React.useCallback(async (lastAiText: string) => {
-        if (!geminiApiKey || !lastAiText.trim()) {
-            setAiGeneratedSuggestions([])
-            return
-        }
-
-        setAiGeneratedSuggestions([])
-
-        const isAnyMobile = isMobileLayoutRef.current || Array.from(peerMetadataRef.current.values()).some((p: any) => p.isMobile)
-        const count = isAnyMobile ? 5 : 3
-        const countWord = isAnyMobile ? "five" : "three"
-
-        const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiText}"\n\nSuggest ${countWord} helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
-
-        try {
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: suggestionPrompt }] }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            maxOutputTokens: 100,
-                            stopSequences: ["\n\n"],
-                        },
-                    }),
-                }
-            )
-
-            if (!response.ok) {
-                console.warn("Failed to generate suggestions")
+    const generateSuggestedReplies = React.useCallback(
+        async (lastAiText: string) => {
+            if (!geminiApiKey || !lastAiText.trim()) {
                 setAiGeneratedSuggestions([])
                 return
             }
 
-            const data = await response.json()
-            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+            setAiGeneratedSuggestions([])
 
-            if (responseText) {
-                try {
-                    const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
-                    if (jsonMatch && jsonMatch[0]) {
-                        const suggestionsArray = JSON.parse(jsonMatch[0])
-                        if (Array.isArray(suggestionsArray) && suggestionsArray.every((s) => typeof s === "string")) {
-                            console.log("Generated suggestions:", suggestionsArray)
-                            const finalSuggestions = suggestionsArray.slice(0, count).filter((s) => s.trim() !== "")
-                            setAiGeneratedSuggestions(finalSuggestions)
-                            
-                            // Broadcast suggestions to peers so everyone sees them
-                            if (dataConnectionsRef.current.size > 0) {
-                                broadcastData({
-                                    type: "ai-suggestions",
-                                    payload: finalSuggestions,
-                                })
+            const isAnyMobile =
+                isMobileLayoutRef.current ||
+                Array.from(peerMetadataRef.current.values()).some(
+                    (p: any) => p.isMobile
+                )
+            const count = isAnyMobile ? 5 : 3
+            const countWord = isAnyMobile ? "five" : "three"
+
+            const suggestionPrompt = `Based on the last AI message:\n\n"${lastAiText}"\n\nSuggest ${countWord} helpful, short (max 5 words) follow-up questions that make sense at a glance and the user might ask or say next. Present them as a JSON array of strings. For example: ["Tell me more.", "How does it work?", "What is that?"]`
+
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: suggestionPrompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 100,
+                                stopSequences: ["\n\n"],
+                            },
+                        }),
+                    }
+                )
+
+                if (!response.ok) {
+                    console.warn("Failed to generate suggestions")
+                    setAiGeneratedSuggestions([])
+                    return
+                }
+
+                const data = await response.json()
+                const responseText =
+                    data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+
+                if (responseText) {
+                    try {
+                        const jsonMatch = responseText.match(/(\[[\s\S]*?\])/)
+                        if (jsonMatch && jsonMatch[0]) {
+                            const suggestionsArray = JSON.parse(jsonMatch[0])
+                            if (
+                                Array.isArray(suggestionsArray) &&
+                                suggestionsArray.every(
+                                    (s) => typeof s === "string"
+                                )
+                            ) {
+                                console.log(
+                                    "Generated suggestions:",
+                                    suggestionsArray
+                                )
+                                const finalSuggestions = suggestionsArray
+                                    .slice(0, count)
+                                    .filter((s) => s.trim() !== "")
+                                setAiGeneratedSuggestions(finalSuggestions)
+
+                                // Broadcast suggestions to peers so everyone sees them
+                                if (dataConnectionsRef.current.size > 0) {
+                                    broadcastData({
+                                        type: "ai-suggestions",
+                                        payload: finalSuggestions,
+                                    })
+                                }
+                            } else {
+                                setAiGeneratedSuggestions([])
                             }
                         } else {
                             setAiGeneratedSuggestions([])
                         }
-                    } else {
+                    } catch (e) {
+                        console.error("Failed to parse suggestions", e)
                         setAiGeneratedSuggestions([])
                     }
-                } catch (e) {
-                    console.error("Failed to parse suggestions", e)
+                } else {
                     setAiGeneratedSuggestions([])
                 }
-            } else {
+            } catch (e) {
+                console.error("Failed to generate suggestions", e)
                 setAiGeneratedSuggestions([])
             }
-        } catch (e) {
-            console.error("Failed to generate suggestions", e)
-            setAiGeneratedSuggestions([])
-        }
-    }, [geminiApiKey])
+        },
+        [geminiApiKey]
+    )
 
     const generateAIResponse = React.useCallback(
         async (
@@ -11569,11 +13527,10 @@ Do not include markdown formatting or explanations.`
                 }
 
                 // Map peer messages to 'user' for Gemini context
-                const history = await Promise.all(messages
-                    .slice(-MAX_HISTORY_MESSAGES)
-                    .map(async (m) => {
+                const history = await Promise.all(
+                    messages.slice(-MAX_HISTORY_MESSAGES).map(async (m) => {
                         const parts: any[] = []
-                        
+
                         let textContent = m.text || ""
                         if (m.role === "peer") {
                             textContent = `[Partner]: ${textContent}`
@@ -11587,24 +13544,40 @@ Do not include markdown formatting or explanations.`
                         if (m.attachments && m.attachments.length > 0) {
                             for (const att of m.attachments) {
                                 let base64 = ""
-                                let mimeType = att.mimeType || "application/octet-stream"
+                                let mimeType =
+                                    att.mimeType || "application/octet-stream"
 
                                 if (att.file) {
                                     try {
-                                        base64 = await new Promise<string>((resolve, reject) => {
-                                            const reader = new FileReader()
-                                            reader.onload = () => {
-                                                const result = reader.result as string
-                                                resolve(result.substring(result.indexOf(",") + 1))
+                                        base64 = await new Promise<string>(
+                                            (resolve, reject) => {
+                                                const reader = new FileReader()
+                                                reader.onload = () => {
+                                                    const result =
+                                                        reader.result as string
+                                                    resolve(
+                                                        result.substring(
+                                                            result.indexOf(
+                                                                ","
+                                                            ) + 1
+                                                        )
+                                                    )
+                                                }
+                                                reader.onerror = reject
+                                                reader.readAsDataURL(att.file!)
                                             }
-                                            reader.onerror = reject
-                                            reader.readAsDataURL(att.file!)
-                                        })
+                                        )
                                         mimeType = att.file.type || mimeType
                                     } catch (e) {
-                                        console.warn("Failed to read history attachment", e)
+                                        console.warn(
+                                            "Failed to read history attachment",
+                                            e
+                                        )
                                     }
-                                } else if (att.url && att.url.startsWith("data:")) {
+                                } else if (
+                                    att.url &&
+                                    att.url.startsWith("data:")
+                                ) {
                                     // Handle pre-converted data URLs (e.g. screenshots)
                                     base64 = att.url.split(",")[1]
                                 }
@@ -11633,7 +13606,8 @@ Do not include markdown formatting or explanations.`
                             role: m.role === "model" ? "model" : "user",
                             parts: parts,
                         }
-                    }))
+                    })
+                )
 
                 // Define Tools
                 const tools = [
@@ -11680,7 +13654,8 @@ Do not include markdown formatting or explanations.`
                                         },
                                         removed: {
                                             type: "ARRAY",
-                                            description: "Array of shape IDs to remove.",
+                                            description:
+                                                "Array of shape IDs to remove.",
                                             items: {
                                                 type: "STRING",
                                             },
@@ -11695,7 +13670,10 @@ Do not include markdown formatting or explanations.`
 
                 // Detect if user intends to use whiteboard
                 const userText = userContent?.[0]?.parts?.[0]?.text || ""
-                const isWhiteboardIntent = /draw|whiteboard|diagram|chart|mind map|flowchart/i.test(userText)
+                const isWhiteboardIntent =
+                    /draw|whiteboard|diagram|chart|mind map|flowchart/i.test(
+                        userText
+                    )
                 const useThinking = isWhiteboardOpen || isWhiteboardIntent
 
                 const payload: any = {
@@ -11707,21 +13685,23 @@ Do not include markdown formatting or explanations.`
                     generationConfig: {
                         temperature: 1.0,
                         maxOutputTokens: 2048,
-                        ...(useThinking ? {
-                            thinkingConfig: {
-                                includeThoughts: false, 
-                            }
-                        } : {
-                            thinkingConfig: {
-                                thinkingBudget: 0,
-                            }
-                        })
+                        ...(useThinking
+                            ? {
+                                  thinkingConfig: {
+                                      includeThoughts: false,
+                                  },
+                              }
+                            : {
+                                  thinkingConfig: {
+                                      thinkingBudget: 0,
+                                  },
+                              }),
                     },
                     toolConfig: {
                         functionCallingConfig: {
                             mode: "AUTO",
-                        }
-                    }
+                        },
+                    },
                 }
 
                 if (debugMode) {
@@ -11774,7 +13754,10 @@ Do not include markdown formatting or explanations.`
                     console.error("Gemini API Error:", data)
                     setMessages((prev) => [
                         ...prev,
-                        { role: "model", text: "Message not sent. Please try again. If this issue persists, please contact support@curastem.org" },
+                        {
+                            role: "model",
+                            text: "Message not sent. Please try again. If this issue persists, please contact support@curastem.org",
+                        },
                     ])
                     return
                 }
@@ -11816,10 +13799,13 @@ Do not include markdown formatting or explanations.`
                                     if (part.text) {
                                         accumulatedText += part.text
                                         // Broadcast streaming text to peers
-                                        if (dataConnectionsRef.current.size > 0) {
+                                        if (
+                                            dataConnectionsRef.current.size > 0
+                                        ) {
                                             const now = Date.now()
                                             if (
-                                                now - lastAISendTimeRef.current >
+                                                now -
+                                                    lastAISendTimeRef.current >
                                                 50
                                             ) {
                                                 broadcastData({
@@ -11852,49 +13838,64 @@ Do not include markdown formatting or explanations.`
                                     }
                                     // Aggressively check for function call start even if args are empty
                                     // Handle potential snake_case from raw API
-                                    const fnCall = part.functionCall || (part as any).function_call
-                                    
+                                    const fnCall =
+                                        part.functionCall ||
+                                        (part as any).function_call
+
                                     if (fnCall) {
                                         // Initialize if needed
                                         if (!accumulatedFunctionCall) {
-                                            accumulatedFunctionCall = { name: "", args: {} }
+                                            accumulatedFunctionCall = {
+                                                name: "",
+                                                args: {},
+                                            }
                                         }
 
                                         // Merge Name
                                         if (fnCall.name) {
-                                            accumulatedFunctionCall.name = fnCall.name
+                                            accumulatedFunctionCall.name =
+                                                fnCall.name
                                         }
 
                                         // Merge/Update Args
                                         // Check for standard 'args' OR 'partial_args' (Vertex style)
                                         // Note: In standard API, 'args' is usually the full object at the end.
                                         // In streaming mode (if supported), 'partial_args' might be sent.
-                                        const newArgs = (fnCall as any).partial_args || fnCall.args
+                                        const newArgs =
+                                            (fnCall as any).partial_args ||
+                                            fnCall.args
                                         if (newArgs) {
-                                            accumulatedFunctionCall.args = newArgs
+                                            accumulatedFunctionCall.args =
+                                                newArgs
                                         }
-                                        
+
                                         // Streaming Tool Call Support:
                                         // If it's the `update_doc` tool, OPEN IMMEDIATELY.
-                                        if (accumulatedFunctionCall.name === "update_doc") {
+                                        if (
+                                            accumulatedFunctionCall.name ===
+                                            "update_doc"
+                                        ) {
                                             // TODO: Fix real-time streaming of doc content.
                                             // ISSUE: The Doc Editor is NOT opening immediately when the tool call starts, and text is NOT streaming.
                                             // It appears the standard Gemini API (v1beta) buffers the entire function call and sends it only when complete,
                                             // preventing real-time updates. 'partial_args' is likely only available in Vertex AI.
                                             // We are aggressively checking for 'update_doc' to force the editor open, but if the API doesn't send the name early, we can't open it.
-                                            
+
                                             // Force open state via ref to bypass closure staleness if needed
                                             if (!isDocOpenRef.current) {
                                                 setIsDocOpen(true)
                                                 // Optimistically update ref so we don't spam the setter
                                                 isDocOpenRef.current = true
                                             }
-                                            
+
                                             // Update Content
                                             if (accumulatedFunctionCall.args) {
-                                                const args = accumulatedFunctionCall.args as any
-                                                const newContent = args.content || ""
-                                                if (newContent) setDocContent(newContent)
+                                                const args =
+                                                    accumulatedFunctionCall.args as any
+                                                const newContent =
+                                                    args.content || ""
+                                                if (newContent)
+                                                    setDocContent(newContent)
                                             }
                                         }
                                     }
@@ -11950,7 +13951,9 @@ Do not include markdown formatting or explanations.`
                                 return newArr
                             })
                         }
-                    } else if (accumulatedFunctionCall.name === "update_whiteboard") {
+                    } else if (
+                        accumulatedFunctionCall.name === "update_whiteboard"
+                    ) {
                         const args = accumulatedFunctionCall.args as any
                         console.log("AI Whiteboard Update:", args) // Debug logging
 
@@ -11970,136 +13973,234 @@ Do not include markdown formatting or explanations.`
                         }
 
                         // Helper to ensure valid shape IDs
-                        const sanitizeId = (id: string) => 
+                        const sanitizeId = (id: string) =>
                             id.startsWith("shape:") ? id : `shape:${id}`
 
                         // Validate shape record
                         const validateShape = (s: any) => {
                             try {
-                                if (!s || typeof s !== 'object') return null;
-                                
+                                if (!s || typeof s !== "object") return null
+
                                 // Ensure required base fields
                                 const sanitized = {
                                     ...s,
-                                    id: s.id ? sanitizeId(s.id) : `shape:${Math.random().toString(36).substr(2, 9)}`,
+                                    id: s.id
+                                        ? sanitizeId(s.id)
+                                        : `shape:${Math.random().toString(36).substr(2, 9)}`,
                                     x: Number(s.x) || 0,
                                     y: Number(s.y) || 0,
                                     rotation: Number(s.rotation) || 0,
                                     isLocked: Boolean(s.isLocked),
                                     opacity: Number(s.opacity) || 1,
-                                    typeName: 'shape', // Tldraw v2 requirement
-                                    parentId: 'page:page', // Default to current page
-                                    index: s.index || 'a1', // Tldraw index string
+                                    typeName: "shape", // Tldraw v2 requirement
+                                    parentId: "page:page", // Default to current page
+                                    index: s.index || "a1", // Tldraw index string
                                 }
 
                                 // If type is missing, infer or drop
                                 if (!sanitized.type) {
-                                    if (s.geo) sanitized.type = 'geo';
-                                    else if (s.text) sanitized.type = 'text';
-                                    else return null; // Can't determine type
+                                    if (s.geo) sanitized.type = "geo"
+                                    else if (s.text) sanitized.type = "text"
+                                    else return null // Can't determine type
                                 }
 
                                 // Ensure props object exists
-                                if (!sanitized.props || typeof sanitized.props !== 'object') {
-                                    sanitized.props = {};
+                                if (
+                                    !sanitized.props ||
+                                    typeof sanitized.props !== "object"
+                                ) {
+                                    sanitized.props = {}
                                 }
 
                                 // Type-specific defaults AND strict whitelisting to prevent crashes
-                                if (sanitized.type === 'geo') {
-                                    const validGeoProps = ['w', 'h', 'geo', 'color', 'size', 'fill', 'dash', 'labelColor', 'font', 'align', 'verticalAlign', 'growY', 'url']
+                                if (sanitized.type === "geo") {
+                                    const validGeoProps = [
+                                        "w",
+                                        "h",
+                                        "geo",
+                                        "color",
+                                        "size",
+                                        "fill",
+                                        "dash",
+                                        "labelColor",
+                                        "font",
+                                        "align",
+                                        "verticalAlign",
+                                        "growY",
+                                        "url",
+                                    ]
                                     sanitized.props = {
-                                        w: 100, h: 100,
-                                        geo: 'rectangle',
-                                        color: 'black',
-                                        size: 'm',
-                                        fill: 'none',
-                                        dash: 'draw',
-                                        ...sanitized.props
+                                        w: 100,
+                                        h: 100,
+                                        geo: "rectangle",
+                                        color: "black",
+                                        size: "m",
+                                        fill: "none",
+                                        dash: "draw",
+                                        ...sanitized.props,
                                     }
                                     // Remove unknown properties
-                                    Object.keys(sanitized.props).forEach(key => {
-                                        if (!validGeoProps.includes(key)) delete sanitized.props[key]
-                                    })
-                                } else if (sanitized.type === 'text') {
-                                    const validTextProps = ['text', 'color', 'size', 'font', 'align', 'autoSize', 'scale', 'w', 'h']
+                                    Object.keys(sanitized.props).forEach(
+                                        (key) => {
+                                            if (!validGeoProps.includes(key))
+                                                delete sanitized.props[key]
+                                        }
+                                    )
+                                } else if (sanitized.type === "text") {
+                                    const validTextProps = [
+                                        "text",
+                                        "color",
+                                        "size",
+                                        "font",
+                                        "align",
+                                        "autoSize",
+                                        "scale",
+                                        "w",
+                                        "h",
+                                    ]
                                     sanitized.props = {
-                                        text: 'Text',
-                                        color: 'black',
-                                        size: 'm',
-                                        font: 'draw',
-                                        align: 'start',
+                                        text: "Text",
+                                        color: "black",
+                                        size: "m",
+                                        font: "draw",
+                                        align: "start",
                                         autoSize: true,
                                         scale: 1,
-                                        ...sanitized.props
+                                        ...sanitized.props,
                                     }
                                     if (sanitized.props.textAlign) {
-                                        sanitized.props.align = sanitized.props.textAlign === 'left' ? 'start' : 
-                                                              sanitized.props.textAlign === 'right' ? 'end' : 
-                                                              sanitized.props.textAlign === 'center' ? 'middle' : 'start'
+                                        sanitized.props.align =
+                                            sanitized.props.textAlign === "left"
+                                                ? "start"
+                                                : sanitized.props.textAlign ===
+                                                    "right"
+                                                  ? "end"
+                                                  : sanitized.props
+                                                          .textAlign ===
+                                                      "center"
+                                                    ? "middle"
+                                                    : "start"
                                     }
-                                    Object.keys(sanitized.props).forEach(key => {
-                                        if (!validTextProps.includes(key)) delete sanitized.props[key]
-                                    })
-                                } else if (sanitized.type === 'arrow') {
-                                    const validArrowProps = ['arrowheadStart', 'arrowheadEnd', 'color', 'size', 'fill', 'dash', 'labelColor', 'font', 'start', 'end', 'bend', 'isPrecise']
-                                     sanitized.props = {
-                                        arrowheadStart: 'none',
-                                        arrowheadEnd: 'arrow',
-                                        color: 'black',
-                                        size: 'm',
-                                        ...sanitized.props
+                                    Object.keys(sanitized.props).forEach(
+                                        (key) => {
+                                            if (!validTextProps.includes(key))
+                                                delete sanitized.props[key]
+                                        }
+                                    )
+                                } else if (sanitized.type === "arrow") {
+                                    const validArrowProps = [
+                                        "arrowheadStart",
+                                        "arrowheadEnd",
+                                        "color",
+                                        "size",
+                                        "fill",
+                                        "dash",
+                                        "labelColor",
+                                        "font",
+                                        "start",
+                                        "end",
+                                        "bend",
+                                        "isPrecise",
+                                    ]
+                                    sanitized.props = {
+                                        arrowheadStart: "none",
+                                        arrowheadEnd: "arrow",
+                                        color: "black",
+                                        size: "m",
+                                        ...sanitized.props,
                                     }
-                                    if (sanitized.props.start && !sanitized.props.start.type) sanitized.props.start = { type: 'point', x: 0, y: 0 }
-                                    if (sanitized.props.end && !sanitized.props.end.type) sanitized.props.end = { type: 'point', x: 100, y: 100 }
-                                    
-                                    Object.keys(sanitized.props).forEach(key => {
-                                        if (!validArrowProps.includes(key)) delete sanitized.props[key]
-                                    })
+                                    if (
+                                        sanitized.props.start &&
+                                        !sanitized.props.start.type
+                                    )
+                                        sanitized.props.start = {
+                                            type: "point",
+                                            x: 0,
+                                            y: 0,
+                                        }
+                                    if (
+                                        sanitized.props.end &&
+                                        !sanitized.props.end.type
+                                    )
+                                        sanitized.props.end = {
+                                            type: "point",
+                                            x: 100,
+                                            y: 100,
+                                        }
+
+                                    Object.keys(sanitized.props).forEach(
+                                        (key) => {
+                                            if (!validArrowProps.includes(key))
+                                                delete sanitized.props[key]
+                                        }
+                                    )
                                 }
 
-                                return sanitized;
+                                return sanitized
                             } catch (e) {
-                                console.error("Invalid shape record from AI", s, e);
-                                return null;
+                                console.error(
+                                    "Invalid shape record from AI",
+                                    s,
+                                    e
+                                )
+                                return null
                             }
                         }
-                        
+
                         // Sanitize inputs
-                        const sanitizedAdded = added.map(validateShape).filter(Boolean)
+                        const sanitizedAdded = added
+                            .map(validateShape)
+                            .filter(Boolean)
                         const sanitizedUpdated = updated.map((s: any) => ({
                             id: sanitizeId(s.id),
                             ...s,
                             // Only include valid updates props if present
                             ...(s.props ? { props: s.props } : {}),
                             ...(s.x !== undefined ? { x: Number(s.x) } : {}),
-                            ...(s.y !== undefined ? { y: Number(s.y) } : {})
+                            ...(s.y !== undefined ? { y: Number(s.y) } : {}),
                         }))
-                        const sanitizedRemoved = removed.map((id: string) => sanitizeId(id))
+                        const sanitizedRemoved = removed.map((id: string) =>
+                            sanitizeId(id)
+                        )
 
                         if (debugMode) {
-                            console.log("[Gemini Whiteboard] Raw:", { added, updated, removed })
-                            console.log("[Gemini Whiteboard] Sanitized:", { sanitizedAdded, sanitizedUpdated, sanitizedRemoved })
+                            console.log("[Gemini Whiteboard] Raw:", {
+                                added,
+                                updated,
+                                removed,
+                            })
+                            console.log("[Gemini Whiteboard] Sanitized:", {
+                                sanitizedAdded,
+                                sanitizedUpdated,
+                                sanitizedRemoved,
+                            })
                         }
 
-                        const changes = { 
-                            added: sanitizedAdded, 
-                            updated: sanitizedUpdated, 
-                            removed: sanitizedRemoved 
+                        const changes = {
+                            added: sanitizedAdded,
+                            updated: sanitizedUpdated,
+                            removed: sanitizedRemoved,
                         }
 
                         // Apply changes locally using high-level editor APIs
                         if (editorRef.current) {
-                            if (debugMode) console.log("Applying changes to editor", changes)
+                            if (debugMode)
+                                console.log(
+                                    "Applying changes to editor",
+                                    changes
+                                )
                             try {
                                 editorRef.current.batch(() => {
                                     // Handle Added shapes
                                     if (sanitizedAdded.length > 0) {
                                         const shapesToCreate: any[] = []
                                         const shapesToUpdate: any[] = []
-                                        
-                                        sanitizedAdded.forEach(s => {
+
+                                        sanitizedAdded.forEach((s) => {
                                             // Check if shape already exists
-                                            if (editorRef.current.getShape(s.id)) {
+                                            if (
+                                                editorRef.current.getShape(s.id)
+                                            ) {
                                                 // If exists, treat as update
                                                 shapesToUpdate.push(s)
                                             } else {
@@ -12108,25 +14209,45 @@ Do not include markdown formatting or explanations.`
                                         })
 
                                         if (shapesToCreate.length > 0)
-                                            editorRef.current.createShapes(shapesToCreate)
+                                            editorRef.current.createShapes(
+                                                shapesToCreate
+                                            )
                                         if (shapesToUpdate.length > 0)
-                                            editorRef.current.updateShapes(shapesToUpdate)
+                                            editorRef.current.updateShapes(
+                                                shapesToUpdate
+                                            )
                                     }
 
                                     // Handle Updated shapes
                                     if (sanitizedUpdated.length > 0) {
                                         // Only update existing shapes
-                                        const validUpdates = sanitizedUpdated.filter(s => !!editorRef.current.getShape(s.id))
+                                        const validUpdates =
+                                            sanitizedUpdated.filter(
+                                                (s) =>
+                                                    !!editorRef.current.getShape(
+                                                        s.id
+                                                    )
+                                            )
                                         if (validUpdates.length > 0)
-                                            editorRef.current.updateShapes(validUpdates)
+                                            editorRef.current.updateShapes(
+                                                validUpdates
+                                            )
                                     }
 
                                     // Handle Removed shapes
                                     if (sanitizedRemoved.length > 0) {
-                                         // Only remove existing shapes
-                                        const validRemovals = sanitizedRemoved.filter(id => !!editorRef.current.getShape(id))
+                                        // Only remove existing shapes
+                                        const validRemovals =
+                                            sanitizedRemoved.filter(
+                                                (id) =>
+                                                    !!editorRef.current.getShape(
+                                                        id
+                                                    )
+                                            )
                                         if (validRemovals.length > 0)
-                                            editorRef.current.deleteShapes(validRemovals)
+                                            editorRef.current.deleteShapes(
+                                                validRemovals
+                                            )
                                     }
                                 })
                             } catch (e) {
@@ -12136,20 +14257,40 @@ Do not include markdown formatting or explanations.`
                                 )
                                 // Fallback: Try one by one if batch fails
                                 try {
-                                     if (sanitizedAdded.length > 0)
-                                        sanitizedAdded.forEach(s => {
-                                            try { 
-                                                if (editorRef.current.getShape(s.id)) {
-                                                    editorRef.current.updateShapes([s])
+                                    if (sanitizedAdded.length > 0)
+                                        sanitizedAdded.forEach((s) => {
+                                            try {
+                                                if (
+                                                    editorRef.current.getShape(
+                                                        s.id
+                                                    )
+                                                ) {
+                                                    editorRef.current.updateShapes(
+                                                        [s]
+                                                    )
                                                 } else {
-                                                    editorRef.current.createShapes([s])
+                                                    editorRef.current.createShapes(
+                                                        [s]
+                                                    )
                                                 }
-                                            } catch (err) { console.error("Failed to process shape", s, err) }
+                                            } catch (err) {
+                                                console.error(
+                                                    "Failed to process shape",
+                                                    s,
+                                                    err
+                                                )
+                                            }
                                         })
-                                } catch (retryErr) { console.error("Retry failed", retryErr) }
+                                } catch (retryErr) {
+                                    console.error("Retry failed", retryErr)
+                                }
                             }
                         } else {
-                            if (debugMode) console.log("Queueing changes (editor not ready)", changes)
+                            if (debugMode)
+                                console.log(
+                                    "Queueing changes (editor not ready)",
+                                    changes
+                                )
                             // Queue updates if editor not ready
                             pendingWhiteboardUpdates.current.push(changes)
                         }
@@ -12169,8 +14310,7 @@ Do not include markdown formatting or explanations.`
                                         functionResponse: {
                                             name: "update_whiteboard",
                                             response: {
-                                                result:
-                                                    "Whiteboard updated successfully",
+                                                result: "Whiteboard updated successfully",
                                             },
                                         },
                                     }
@@ -12194,7 +14334,10 @@ Do not include markdown formatting or explanations.`
                         }
                         return newArr
                     })
-                } else if (accumulatedText && dataConnectionsRef.current.size > 0) {
+                } else if (
+                    accumulatedText &&
+                    dataConnectionsRef.current.size > 0
+                ) {
                     // BROADCAST FINAL AI RESPONSE
                     broadcastData({
                         type: "ai-response",
@@ -12246,7 +14389,7 @@ Do not include markdown formatting or explanations.`
         }
 
         setMessages((prev) => [...prev, peerMsg])
-        
+
         // Clear suggestions when a new peer message arrives
         setAiGeneratedSuggestions([])
 
@@ -12257,208 +14400,231 @@ Do not include markdown formatting or explanations.`
     /**
      * Handles message delivery to the Google Gemini API.
      */
-    const handleSendMessage = React.useCallback(async (overrideText?: string) => {
-        fetchLocation()
-        const textToCheck = overrideText !== undefined ? overrideText : inputText
+    const handleSendMessage = React.useCallback(
+        async (overrideText?: string) => {
+            fetchLocation()
+            const textToCheck =
+                overrideText !== undefined ? overrideText : inputText
 
-        if (textToCheck.trim() === "unban-admin-logiebear") { // Secret code to unban yourself
-            setIsBanned(false)
-            if (typeof window !== "undefined") {
-                localStorage.removeItem("curastem_ban_expiry")
+            if (textToCheck.trim() === "unban-admin-logiebear") {
+                // Secret code to unban yourself
+                setIsBanned(false)
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("curastem_ban_expiry")
+                }
+                setInputText("")
+                return
             }
-            setInputText("")
-            return
-        }
 
-        if (!textToCheck.trim() && attachments.length === 0) return
+            if (!textToCheck.trim() && attachments.length === 0) return
 
-        // Clear AI suggestions when user sends a message
-        setAiGeneratedSuggestions([])
+            // Clear AI suggestions when user sends a message
+            setAiGeneratedSuggestions([])
 
-        const textToSend = sanitizeMessage(textToCheck)
+            const textToSend = sanitizeMessage(textToCheck)
 
-        // Input length check
-        if (textToSend.length > MAX_INPUT_LENGTH) {
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "model",
-                    text: `Message too long (max ${MAX_INPUT_LENGTH} characters).`,
-                },
-            ])
-            return
-        }
+            // Input length check
+            if (textToSend.length > MAX_INPUT_LENGTH) {
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        role: "model",
+                        text: `Message too long (max ${MAX_INPUT_LENGTH} characters).`,
+                    },
+                ])
+                return
+            }
 
-        // Daily Limit Check
-        if (typeof window !== "undefined" && window.localStorage) {
-            try {
-                const today = new Date().toISOString().split("T")[0]
-                const stored = localStorage.getItem("gemini-daily-usage")
-                let usage = { date: today, count: 0 }
+            // Daily Limit Check
+            if (typeof window !== "undefined" && window.localStorage) {
+                try {
+                    const today = new Date().toISOString().split("T")[0]
+                    const stored = localStorage.getItem("gemini-daily-usage")
+                    let usage = { date: today, count: 0 }
 
-                if (stored) {
-                    const parsed = JSON.parse(stored)
-                    if (parsed.date === today) {
-                        usage = parsed
+                    if (stored) {
+                        const parsed = JSON.parse(stored)
+                        if (parsed.date === today) {
+                            usage = parsed
+                        }
                     }
-                }
 
-                if (usage.count >= DAILY_MESSAGE_LIMIT) {
-                    setMessages((prev) => [
-                        ...prev,
-                        {
-                            role: "model",
-                            text: "Daily message limit reached. Please try again at 12AM.",
-                        },
-                    ])
-                    return
-                }
+                    if (usage.count >= DAILY_MESSAGE_LIMIT) {
+                        setMessages((prev) => [
+                            ...prev,
+                            {
+                                role: "model",
+                                text: "Daily message limit reached. Please try again at 12AM.",
+                            },
+                        ])
+                        return
+                    }
 
-                // Increment and save (optimistically)
-                usage.count++
-                localStorage.setItem(
-                    "gemini-daily-usage",
-                    JSON.stringify(usage)
-                )
-            } catch (e) {
-                // Ignore localStorage errors
+                    // Increment and save (optimistically)
+                    usage.count++
+                    localStorage.setItem(
+                        "gemini-daily-usage",
+                        JSON.stringify(usage)
+                    )
+                } catch (e) {
+                    // Ignore localStorage errors
+                }
             }
-        }
 
-        // Rate limiting check
-        const now = Date.now()
-        if (now - lastMessageTimeRef.current < MESSAGE_RATE_LIMIT_MS) {
-            return
-        }
-        lastMessageTimeRef.current = now
-
-        const attachmentsToSend = [...attachments]
-
-        // If not in Live Mode, but Screen Sharing or Whiteboarding, capture context and send as image
-        if (
-            !isLiveMode &&
-            (isScreenSharingRef.current || isWhiteboardOpenRef.current)
-        ) {
-            try {
-                const contextImage = await captureCurrentContext()
-                if (contextImage) {
-                    attachmentsToSend.push({
-                        id: `ctx-${Date.now()}`,
-                        type: "image",
-                        url: `data:image/jpeg;base64,${contextImage}`, // Display as Data URL
-                        previewUrl: `data:image/jpeg;base64,${contextImage}`,
-                        name: isWhiteboardOpenRef.current
-                            ? "Whiteboard Snapshot.jpg"
-                            : "Screen Share Snapshot.jpg",
-                        mimeType: "image/jpeg",
-                        // Create a dummy File object if needed by downstream logic, though we handle based on type/url usually
-                        file: new File(
-                            [
-                                Uint8Array.from(atob(contextImage), (c) =>
-                                    c.charCodeAt(0)
-                                ),
-                            ],
-                            "snapshot.jpg",
-                            { type: "image/jpeg" }
-                        ),
-                    })
-                }
-            } catch (e) {
-                console.error("Failed to capture context for message", e)
+            // Rate limiting check
+            const now = Date.now()
+            if (now - lastMessageTimeRef.current < MESSAGE_RATE_LIMIT_MS) {
+                return
             }
-        }
+            lastMessageTimeRef.current = now
 
-        // Build user message for display
-        const userMsg: Message = {
-            role: "user",
-            text: textToSend,
-            attachments: attachmentsToSend.map((a) => ({
-                type: a.type,
-                url: a.previewUrl || a.url, // For images/videos
-                name: a.name,
-                mimeType: a.mimeType,
-                file: a.file, // Keep file ref for local processing
-            })),
-        }
-        setMessages((prev) => [...prev, userMsg])
-        
-        // Immediate title generation trigger
-        const hasUserMessage = messages.some(m => m.role === "user")
-        if (!hasUserMessage) {
-            // Log for debugging
-            // console.log("[Gemini] First user message detected, triggering title generation")
-            generateChatTitle(textToSend)
+            const attachmentsToSend = [...attachments]
 
-            // Save chat immediately on first message
-            setSavedChats(prev => {
-                const existing = prev.find(c => c.id === currentChatId)
-                if (existing) return prev
-
-                const newChat: ChatSession = {
-                    id: currentChatId,
-                    title: "New Chat", // Temporary title until generated
-                    timestamp: Date.now(),
-                    messages: [userMsg],
-                    notes: docContent,
-                    whiteboard: null
-                }
-                return [newChat, ...prev]
-            })
-        }
-
-        setInputText("")
-        setAttachments([])
-        if (fileInputRef.current) fileInputRef.current.value = ""
-
-        // Send to Peer
-        if (dataConnectionsRef.current.size > 0) {
-            // Filter attachments for P2P limit (3MB)
-            const p2pAttachmentsPromise = Promise.all(attachments.map(async (att) => {
-                if (!att.file || att.file.size > MAX_P2P_FILE_SIZE_BYTES) {
-                     return null
-                }
-                
-                // Convert to Base64 for transfer
-                 try {
-                    const base64 = await new Promise<string>((resolve, reject) => {
-                        const reader = new FileReader()
-                        reader.onload = () => resolve(reader.result as string)
-                        reader.onerror = reject
-                        reader.readAsDataURL(att.file!)
-                    })
-                    
-                    return {
-                        id: att.id,
-                        type: att.type,
-                        name: att.name,
-                        mimeType: att.mimeType,
-                        url: base64, // Send full data URL
-                        previewUrl: base64 // Use same for preview
+            // If not in Live Mode, but Screen Sharing or Whiteboarding, capture context and send as image
+            if (
+                !isLiveMode &&
+                (isScreenSharingRef.current || isWhiteboardOpenRef.current)
+            ) {
+                try {
+                    const contextImage = await captureCurrentContext()
+                    if (contextImage) {
+                        attachmentsToSend.push({
+                            id: `ctx-${Date.now()}`,
+                            type: "image",
+                            url: `data:image/jpeg;base64,${contextImage}`, // Display as Data URL
+                            previewUrl: `data:image/jpeg;base64,${contextImage}`,
+                            name: isWhiteboardOpenRef.current
+                                ? "Whiteboard Snapshot.jpg"
+                                : "Screen Share Snapshot.jpg",
+                            mimeType: "image/jpeg",
+                            // Create a dummy File object if needed by downstream logic, though we handle based on type/url usually
+                            file: new File(
+                                [
+                                    Uint8Array.from(atob(contextImage), (c) =>
+                                        c.charCodeAt(0)
+                                    ),
+                                ],
+                                "snapshot.jpg",
+                                { type: "image/jpeg" }
+                            ),
+                        })
                     }
                 } catch (e) {
-                    console.warn("Failed to process attachment for P2P", e)
-                    return null
+                    console.error("Failed to capture context for message", e)
                 }
-            }))
+            }
 
-            p2pAttachmentsPromise.then((p2pAttachments) => {
-                 const validAttachments = p2pAttachments.filter(Boolean)
-                 
-                 broadcastData({
-                    type: "chat",
-                    payload: {
-                        text: textToSend,
-                        attachments: validAttachments,
-                    },
+            // Build user message for display
+            const userMsg: Message = {
+                role: "user",
+                text: textToSend,
+                attachments: attachmentsToSend.map((a) => ({
+                    type: a.type,
+                    url: a.previewUrl || a.url, // For images/videos
+                    name: a.name,
+                    mimeType: a.mimeType,
+                    file: a.file, // Keep file ref for local processing
+                })),
+            }
+            setMessages((prev) => [...prev, userMsg])
+
+            // Immediate title generation trigger
+            const hasUserMessage = messages.some((m) => m.role === "user")
+            if (!hasUserMessage) {
+                // Log for debugging
+                // console.log("[Gemini] First user message detected, triggering title generation")
+                generateChatTitle(textToSend)
+
+                // Save chat immediately on first message
+                setSavedChats((prev) => {
+                    const existing = prev.find((c) => c.id === currentChatId)
+                    if (existing) return prev
+
+                    const newChat: ChatSession = {
+                        id: currentChatId,
+                        title: "New Chat", // Temporary title until generated
+                        timestamp: Date.now(),
+                        messages: [userMsg],
+                        notes: docContent,
+                        whiteboard: null,
+                    }
+                    return [newChat, ...prev]
                 })
-                
-                // Clear peer's input bar as well
-                broadcastData({ type: "input-sync", payload: "" })
-            })
-        }
+            }
 
-        await generateAIResponse(textToSend, attachmentsToSend, "user")
-    }, [inputText, attachments, generateAIResponse, fetchLocation, messages, generateChatTitle])
+            setInputText("")
+            setAttachments([])
+            if (fileInputRef.current) fileInputRef.current.value = ""
+
+            // Send to Peer
+            if (dataConnectionsRef.current.size > 0) {
+                // Filter attachments for P2P limit (3MB)
+                const p2pAttachmentsPromise = Promise.all(
+                    attachments.map(async (att) => {
+                        if (
+                            !att.file ||
+                            att.file.size > MAX_P2P_FILE_SIZE_BYTES
+                        ) {
+                            return null
+                        }
+
+                        // Convert to Base64 for transfer
+                        try {
+                            const base64 = await new Promise<string>(
+                                (resolve, reject) => {
+                                    const reader = new FileReader()
+                                    reader.onload = () =>
+                                        resolve(reader.result as string)
+                                    reader.onerror = reject
+                                    reader.readAsDataURL(att.file!)
+                                }
+                            )
+
+                            return {
+                                id: att.id,
+                                type: att.type,
+                                name: att.name,
+                                mimeType: att.mimeType,
+                                url: base64, // Send full data URL
+                                previewUrl: base64, // Use same for preview
+                            }
+                        } catch (e) {
+                            console.warn(
+                                "Failed to process attachment for P2P",
+                                e
+                            )
+                            return null
+                        }
+                    })
+                )
+
+                p2pAttachmentsPromise.then((p2pAttachments) => {
+                    const validAttachments = p2pAttachments.filter(Boolean)
+
+                    broadcastData({
+                        type: "chat",
+                        payload: {
+                            text: textToSend,
+                            attachments: validAttachments,
+                        },
+                    })
+
+                    // Clear peer's input bar as well
+                    broadcastData({ type: "input-sync", payload: "" })
+                })
+            }
+
+            await generateAIResponse(textToSend, attachmentsToSend, "user")
+        },
+        [
+            inputText,
+            attachments,
+            generateAIResponse,
+            fetchLocation,
+            messages,
+            generateChatTitle,
+        ]
+    )
 
     // --- DRAG-TO-RESIZE LOGIC ---
 
@@ -12549,7 +14715,9 @@ Do not include markdown formatting or explanations.`
                     !!remoteScreenStream ||
                     isWhiteboardOpen ||
                     isDocOpen
-                const effectiveMinHeight = isOverlayActive ? MIN_CHAT_HEIGHT : minHeight
+                const effectiveMinHeight = isOverlayActive
+                    ? MIN_CHAT_HEIGHT
+                    : minHeight
 
                 let newHeight = dragStartHeight.current
 
@@ -12710,9 +14878,9 @@ Do not include markdown formatting or explanations.`
     // If 3+ people, force square aspect ratio as per requirements? Or keep 1.55?
     // "if 3+ people then the video tiles change to be squares."
     const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
-    // IMPORTANT: If tiles list is built from remoteStreams + local + placeholder, 
+    // IMPORTANT: If tiles list is built from remoteStreams + local + placeholder,
     // we need to make sure numTiles matches what we render.
-    // In render: 
+    // In render:
     // tiles = [local]
     // remoteStreams.forEach -> tiles.push
     // if tiles.length < 2 -> tiles.push(placeholder)
@@ -12726,8 +14894,10 @@ Do not include markdown formatting or explanations.`
     // 2. Whiteboard/Docs/Screenshare is OPEN (in which case tiles are small)
     // User request: "on whiteboard/notes/screenshare, aspect ratio should be square for 3+ people"
     const isMultiParty = numTiles > 2
-    const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
-    const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
+    const isContentOpen =
+        isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
+    const targetRatio =
+        isMultiParty || (isContentOpen && isMultiParty) ? 1.0 : 1.55
 
     const screenShareContainerStyle = React.useMemo(() => {
         // If whiteboard is active, use aspect ratio based on layout:
@@ -12768,7 +14938,7 @@ Do not include markdown formatting or explanations.`
             // If 2 tiles (min), each takes 50%.
             // If 3 tiles, each takes 33%.
             // We need to estimate height.
-            
+
             // Assuming simplified view: 2 tiles visible or scrollable?
             // Existing logic assumed 2 tiles:
             const tileW = (availW - 8) / 2
@@ -12825,25 +14995,25 @@ Do not include markdown formatting or explanations.`
         // MOBILE / SIDEBAR LOGIC
         // "if 3 tiles then side-by-side horizontal. if 4 tiles, its a 2x2 grid."
         const availableWidth = (isSidebarMode ? 400 : containerSize.width) - 32 // 16px padding on each side
-        
+
         if (numTiles === 4) {
             // 2x2 Grid
             // For 2x2 grid on mobile, we want to allow wrapping.
             // Layout is Flex Row with wrap enabled in render.
             // We need to calculate size for each item to be ~50% width.
-            
+
             shouldUseHorizontalLayout = true // Row direction to allow wrap
-            
+
             const gap = 8
             const availableW = (availableWidth - gap) / 2
-            
+
             // Calculate height based on target ratio
             const sizeByW = availableW / targetRatio
-            
+
             // Check vertical constraint (Drag bar adjustment)
             // Available height for 2 rows + gap
             const availableH = (videoSectionHeight - gap) / 2
-            
+
             if (sizeByW <= availableH) {
                 // Width constrained (normal case)
                 finalWidth = availableW
@@ -12854,49 +15024,52 @@ Do not include markdown formatting or explanations.`
                 finalWidth = finalHeight * targetRatio
             }
         } else {
-             // 1, 2, or 3 -> Horizontal or Vertical optimization
-             // User said: "if 3 tiles then side-by-side horizontal"
-             
-             if (numTiles === 3) {
-                 // Force Horizontal
-                 shouldUseHorizontalLayout = true
-                 const gapTotal = 8 * (numTiles - 1)
-                 const availableW = (availableWidth - gapTotal) / numTiles
-                 // Fit in height?
-                 const h_widthByHeight = videoSectionHeight * targetRatio
-                 
-                 if (h_widthByHeight <= availableW) {
-                     finalHeight = videoSectionHeight
-                     finalWidth = h_widthByHeight
-                 } else {
-                     finalWidth = availableW
-                     finalHeight = finalWidth / targetRatio
-                 }
-             } else {
+            // 1, 2, or 3 -> Horizontal or Vertical optimization
+            // User said: "if 3 tiles then side-by-side horizontal"
+
+            if (numTiles === 3) {
+                // Force Horizontal
+                shouldUseHorizontalLayout = true
+                const gapTotal = 8 * (numTiles - 1)
+                const availableW = (availableWidth - gapTotal) / numTiles
+                // Fit in height?
+                const h_widthByHeight = videoSectionHeight * targetRatio
+
+                if (h_widthByHeight <= availableW) {
+                    finalHeight = videoSectionHeight
+                    finalWidth = h_widthByHeight
+                } else {
+                    finalWidth = availableW
+                    finalHeight = finalWidth / targetRatio
+                }
+            } else {
                 // Legacy 1-2 peers logic (Adaptive V vs H)
                 // 1. Calculate Vertical Dimensions
                 const v_videoHeight = availableWidth / targetRatio
-                const v_totalVideoHeight = v_videoHeight * numTiles + (8 * (numTiles - 1))
-        
+                const v_totalVideoHeight =
+                    v_videoHeight * numTiles + 8 * (numTiles - 1)
+
                 let v_finalWidth, v_finalHeight
-        
+
                 if (v_totalVideoHeight <= videoSectionHeight) {
                     // Videos fit at full width vertically
                     v_finalWidth = availableWidth
                     v_finalHeight = v_videoHeight
                 } else {
                     // Scale down to fit height vertically
-                    const scaledHeight = (videoSectionHeight - (8 * (numTiles - 1))) / numTiles
+                    const scaledHeight =
+                        (videoSectionHeight - 8 * (numTiles - 1)) / numTiles
                     v_finalHeight = scaledHeight
                     v_finalWidth = scaledHeight * targetRatio
                 }
-        
+
                 // 2. Calculate Horizontal Dimensions
-                const h_availableWidthPerVideo = (availableWidth - (8 * (numTiles - 1))) / numTiles
+                const h_availableWidthPerVideo =
+                    (availableWidth - 8 * (numTiles - 1)) / numTiles
                 const h_widthByHeight = videoSectionHeight * targetRatio
-        
+
                 let h_finalWidth, h_finalHeight
-        
+
                 if (h_widthByHeight <= h_availableWidthPerVideo) {
                     h_finalHeight = videoSectionHeight
                     h_finalWidth = h_widthByHeight
@@ -12904,7 +15077,7 @@ Do not include markdown formatting or explanations.`
                     h_finalWidth = h_availableWidthPerVideo
                     h_finalHeight = h_finalWidth / targetRatio
                 }
-        
+
                 // 3. Compare: If Horizontal offers larger videos (better fit), use it
                 if (v_finalWidth < h_finalWidth) {
                     shouldUseHorizontalLayout = true
@@ -12915,13 +15088,14 @@ Do not include markdown formatting or explanations.`
                     finalWidth = v_finalWidth
                     finalHeight = v_finalHeight
                 }
-             }
+            }
         }
     } else {
         // DESKTOP: Horizontal layout - videos side by side
         // "if 3+ people then the video tiles change to be squares." (Handled by targetRatio)
         const gapTotal = 8 * (numTiles - 1)
-        const availableWidthPerVideo = (containerSize.width - 32 - gapTotal) / numTiles
+        const availableWidthPerVideo =
+            (containerSize.width - 32 - gapTotal) / numTiles
         const widthByHeight = videoSectionHeight * targetRatio
         const heightByWidth = availableWidthPerVideo / targetRatio
 
@@ -13037,171 +15211,582 @@ Do not include markdown formatting or explanations.`
 
     // 1. Tool Renderer (Whiteboard / Doc)
     const renderActiveTool = (isOverlay: boolean) => {
-    return (
-        <div
-            style={{
-                width: "100%",
-                height: "100%",
-                position: "relative",
-                background: isWhiteboardOpen && isMobileLayout ? "#F9FAFC" : chatThemeColors.background,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-                borderRadius: isMobileLayout ? "28px 28px 0 0" : "28px 0 0 28px",
-                border: "none",
-                paddingBottom: isMobileLayout ? mobileInputHeight : 0,
-            }}
-        >
-
+        return (
+            <div
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    position: "relative",
+                    background:
+                        isWhiteboardOpen && isMobileLayout
+                            ? "#F9FAFC"
+                            : chatThemeColors.background,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    borderRadius: isMobileLayout
+                        ? "28px 28px 0 0"
+                        : "28px 0 0 28px",
+                    border: "none",
+                    paddingBottom: isMobileLayout ? mobileInputHeight : 0,
+                }}
+            >
                 {false && (
-                    <div data-layer="left sidebar" className="LeftSidebar" style={{width: 260, height: 982, maxHeight: '100%', paddingTop: 128, position: 'absolute', top: 0, left: 0, bottom: 0, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', zIndex: 10000}}>
-                      <div data-layer="chat history flexbox" className="ChatHistoryFlexbox" style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}>
-                        <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
-                          <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word'}}>Your chats</div>
-                        </div>
-                        {/* 
+                    <div
+                        data-layer="left sidebar"
+                        className="LeftSidebar"
+                        style={{
+                            width: 260,
+                            height: 982,
+                            maxHeight: "100%",
+                            paddingTop: 128,
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            bottom: 0,
+                            flexDirection: "column",
+                            justifyContent: "flex-start",
+                            alignItems: "flex-start",
+                            gap: 24,
+                            display: "inline-flex",
+                            zIndex: 10000,
+                        }}
+                    >
+                        <div
+                            data-layer="chat history flexbox"
+                            className="ChatHistoryFlexbox"
+                            style={{
+                                alignSelf: "stretch",
+                                flex: "1 1 0",
+                                padding: 8,
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                display: "flex",
+                                overflowY: "auto",
+                            }}
+                        >
+                            <div
+                                data-layer="Chat title"
+                                className="ChatTitle"
+                                style={{
+                                    alignSelf: "stretch",
+                                    paddingLeft: 10,
+                                    paddingRight: 10,
+                                    paddingTop: 8,
+                                    paddingBottom: 8,
+                                    borderRadius: 12,
+                                    justifyContent: "flex-start",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    display: "inline-flex",
+                                }}
+                            >
+                                <div
+                                    data-layer="Your chats"
+                                    className="YourChats"
+                                    style={{
+                                        justifyContent: "center",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        color: "rgba(255, 255, 255, 0.65)",
+                                        fontSize: 14,
+                                        fontFamily: "Inter",
+                                        fontWeight: "400",
+                                        lineHeight: 1.38,
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    Your chats
+                                </div>
+                            </div>
+                            {/* 
                           New Chat button - Mobile/Duplicated version
                           Same logic: only show if current chat is NOT saved (new)
                           BUT NOW: We HIDE this if it's unsaved, so it doesn't appear in list until message sent.
                           The prompt requested: "a new chat shouldnt be SHOWN in sidebar until a mesage is actually snet"
                         */}
-                        {false && !savedChats.find(c => c.id === currentChatId) && (
-                             <div 
-                                onClick={() => {
-                                    setIsSidebarOpen(false)
-                                }}
-                                data-layer="chat item (current new)" 
+                            {false &&
+                                !savedChats.find(
+                                    (c) => c.id === currentChatId
+                                ) && (
+                                    <div
+                                        onClick={() => {
+                                            setIsSidebarOpen(false)
+                                        }}
+                                        data-layer="chat item (current new)"
+                                        style={{
+                                            alignSelf: "stretch",
+                                            minHeight: 36,
+                                            paddingLeft: 10,
+                                            paddingRight: 10,
+                                            borderRadius: 28,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                            cursor: "pointer",
+                                            marginBottom: 2,
+                                            background:
+                                                "rgba(255, 255, 255, 0.06)",
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                flex: "1 1 0",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.95)",
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: 1.38,
+                                                wordWrap: "break-word",
+                                                overflow: "hidden",
+                                                whiteSpace: "nowrap",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            New chat
+                                        </div>
+                                    </div>
+                                )}
+
+                            {savedChats.map((chat) => (
+                                <div
+                                    key={chat.id}
+                                    onClick={() => {
+                                        setCurrentChatId(chat.id)
+                                        setMessages(chat.messages)
+                                        setDocContent(chat.notes || "")
+                                        if (
+                                            chat.whiteboard &&
+                                            editorRef.current
+                                        ) {
+                                            try {
+                                                editorRef.current.store.loadSnapshot(
+                                                    chat.whiteboard
+                                                )
+                                            } catch (e) {
+                                                console.error(e)
+                                            }
+                                        }
+                                        setIsSidebarOpen(false)
+                                    }}
+                                    data-layer="chat item"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        minHeight: 36,
+                                        padding: "8px 10px",
+                                        borderRadius: 12,
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        display: "inline-flex",
+                                        cursor: "pointer",
+                                        marginBottom: 2,
+                                        background:
+                                            hoveredChatId === chat.id ||
+                                            currentChatId === chat.id
+                                                ? "rgba(255, 255, 255, 0.06)"
+                                                : "transparent",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            flex: "1 1 0",
+                                            justifyContent: "center",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            color: "rgba(255, 255, 255, 0.95)",
+                                            fontSize: 14,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: 1.38,
+                                            wordWrap: "break-word",
+                                            overflow: "hidden",
+                                            whiteSpace: "nowrap",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
+                                        {chat.title}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div
+                            data-layer="sidebar fixed top nav"
+                            className="SidebarFixedTopNav"
+                            style={{
+                                width: 260,
+                                paddingTop: 16,
+                                paddingBottom: 8,
+                                paddingLeft: 8,
+                                paddingRight: 8,
+                                left: 0,
+                                top: 0,
+                                position: "absolute",
+                                background: "#141414",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: 24,
+                                display: "flex",
+                            }}
+                        >
+                            <div
+                                data-layer="sidebar top actions"
+                                className="SidebarTopActions"
                                 style={{
-                                    alignSelf: 'stretch', 
-                                    minHeight: 36, 
-                                    paddingLeft: 10, 
-                                    paddingRight: 10, 
-                                    borderRadius: 28, 
-                                    justifyContent: 'flex-start', 
-                                    alignItems: 'center', 
-                                    gap: 8, 
-                                    display: 'inline-flex', 
-                                    cursor: 'pointer', 
-                                    marginBottom: 2,
-                                    background: 'rgba(255, 255, 255, 0.06)'
+                                    alignSelf: "stretch",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    display: "inline-flex",
                                 }}
                             >
-                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>New chat</div>
+                                <div
+                                    data-layer="new chat"
+                                    className="NewChat"
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+                                        paddingLeft: 9,
+                                        paddingRight: 9,
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        display: "flex",
+                                    }}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        data-layer="thinking"
+                                        className="Thinking"
+                                        style={{ position: "relative" }}
+                                    >
+                                        <svg
+                                            width="24"
+                                            height="24"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <g clipPath="url(#clip0_525_1678)">
+                                                <ellipse
+                                                    cx="11.7647"
+                                                    cy="12"
+                                                    rx="11.7647"
+                                                    ry="12"
+                                                    transform="matrix(-1 0 0 1 23.5312 9.53674e-06)"
+                                                    fill="white"
+                                                    fillOpacity="0.75"
+                                                />
+                                                <g filter="url(#filter0_f_525_1678)">
+                                                    <ellipse
+                                                        cx="11.499"
+                                                        cy="12"
+                                                        rx="11.499"
+                                                        ry="12"
+                                                        transform="matrix(-1 0 0 1 23.2656 9.53674e-06)"
+                                                        fill="url(#paint0_linear_525_1678)"
+                                                    />
+                                                </g>
+                                                <g filter="url(#filter1_di_525_1678)">
+                                                    <ellipse
+                                                        cx="8.89072"
+                                                        cy="9.34886"
+                                                        rx="2.25288"
+                                                        ry="2.8161"
+                                                        transform="rotate(-12 8.89072 9.34886)"
+                                                        fill="white"
+                                                        fillOpacity="0.75"
+                                                        shapeRendering="crispEdges"
+                                                    />
+                                                </g>
+                                                <g filter="url(#filter2_di_525_1678)">
+                                                    <ellipse
+                                                        cx="15.2579"
+                                                        cy="7.8496"
+                                                        rx="2.25288"
+                                                        ry="2.8161"
+                                                        transform="rotate(-12 15.2579 7.8496)"
+                                                        fill="white"
+                                                        fillOpacity="0.75"
+                                                        shapeRendering="crispEdges"
+                                                    />
+                                                </g>
+                                            </g>
+                                            <defs>
+                                                <filter
+                                                    id="filter0_f_525_1678"
+                                                    x="-4.53438"
+                                                    y="-4.79999"
+                                                    width="32.6"
+                                                    height="33.6"
+                                                    filterUnits="userSpaceOnUse"
+                                                    colorInterpolationFilters="sRGB"
+                                                >
+                                                    <feFlood
+                                                        floodOpacity="0"
+                                                        result="BackgroundImageFix"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in="SourceGraphic"
+                                                        in2="BackgroundImageFix"
+                                                        result="shape"
+                                                    />
+                                                    <feGaussianBlur
+                                                        stdDeviation="2.4"
+                                                        result="effect1_foregroundBlur_525_1678"
+                                                    />
+                                                </filter>
+                                                <filter
+                                                    id="filter1_di_525_1678"
+                                                    x="3.23005"
+                                                    y="4.30143"
+                                                    width="11.3211"
+                                                    height="12.3478"
+                                                    filterUnits="userSpaceOnUse"
+                                                    colorInterpolationFilters="sRGB"
+                                                >
+                                                    <feFlood
+                                                        floodOpacity="0"
+                                                        result="BackgroundImageFix"
+                                                    />
+                                                    <feColorMatrix
+                                                        in="SourceAlpha"
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                                        result="hardAlpha"
+                                                    />
+                                                    <feOffset dy="1.12644" />
+                                                    <feGaussianBlur stdDeviation="1.68966" />
+                                                    <feComposite
+                                                        in2="hardAlpha"
+                                                        operator="out"
+                                                    />
+                                                    <feColorMatrix
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in2="BackgroundImageFix"
+                                                        result="effect1_dropShadow_525_1678"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in="SourceGraphic"
+                                                        in2="effect1_dropShadow_525_1678"
+                                                        result="shape"
+                                                    />
+                                                    <feColorMatrix
+                                                        in="SourceAlpha"
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                                        result="hardAlpha"
+                                                    />
+                                                    <feOffset dy="-0.601442" />
+                                                    <feGaussianBlur stdDeviation="1.20288" />
+                                                    <feComposite
+                                                        in2="hardAlpha"
+                                                        operator="arithmetic"
+                                                        k2="-1"
+                                                        k3="1"
+                                                    />
+                                                    <feColorMatrix
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in2="shape"
+                                                        result="effect2_innerShadow_525_1678"
+                                                    />
+                                                </filter>
+                                                <filter
+                                                    id="filter2_di_525_1678"
+                                                    x="9.59724"
+                                                    y="2.80216"
+                                                    width="11.3211"
+                                                    height="12.3478"
+                                                    filterUnits="userSpaceOnUse"
+                                                    colorInterpolationFilters="sRGB"
+                                                >
+                                                    <feFlood
+                                                        floodOpacity="0"
+                                                        result="BackgroundImageFix"
+                                                    />
+                                                    <feColorMatrix
+                                                        in="SourceAlpha"
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                                        result="hardAlpha"
+                                                    />
+                                                    <feOffset dy="1.12644" />
+                                                    <feGaussianBlur stdDeviation="1.68966" />
+                                                    <feComposite
+                                                        in2="hardAlpha"
+                                                        operator="out"
+                                                    />
+                                                    <feColorMatrix
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in2="BackgroundImageFix"
+                                                        result="effect1_dropShadow_525_1678"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in="SourceGraphic"
+                                                        in2="effect1_dropShadow_525_1678"
+                                                        result="shape"
+                                                    />
+                                                    <feColorMatrix
+                                                        in="SourceAlpha"
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                                        result="hardAlpha"
+                                                    />
+                                                    <feOffset dy="-0.601442" />
+                                                    <feGaussianBlur stdDeviation="1.20288" />
+                                                    <feComposite
+                                                        in2="hardAlpha"
+                                                        operator="arithmetic"
+                                                        k2="-1"
+                                                        k3="1"
+                                                    />
+                                                    <feColorMatrix
+                                                        type="matrix"
+                                                        values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"
+                                                    />
+                                                    <feBlend
+                                                        mode="normal"
+                                                        in2="shape"
+                                                        result="effect2_innerShadow_525_1678"
+                                                    />
+                                                </filter>
+                                                <linearGradient
+                                                    id="paint0_linear_525_1678"
+                                                    x1="11.499"
+                                                    y1="0"
+                                                    x2="11.499"
+                                                    y2="24"
+                                                    gradientUnits="userSpaceOnUse"
+                                                >
+                                                    <stop stopColor="#0099FF" />
+                                                    <stop
+                                                        offset="1"
+                                                        stopColor="white"
+                                                        stopOpacity="0.85"
+                                                    />
+                                                </linearGradient>
+                                                <clipPath id="clip0_525_1678">
+                                                    <rect
+                                                        width="23.5294"
+                                                        height="24"
+                                                        rx="11.7647"
+                                                        transform="matrix(-1 0 0 1 23.5312 0)"
+                                                        fill="white"
+                                                    />
+                                                </clipPath>
+                                            </defs>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div
+                                    onClick={() => setIsSidebarOpen(false)}
+                                    style={{ cursor: "pointer" }}
+                                    data-svg-wrapper
+                                    data-layer="close sidebar button"
+                                    className="CloseSidebarButton"
+                                >
+                                    <svg
+                                        width="36"
+                                        height="36"
+                                        viewBox="0 0 36 36"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            d="M10 14H26M10 22H20"
+                                            stroke="white"
+                                            strokeOpacity="0.95"
+                                            strokeWidth="1.2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </div>
                             </div>
-                        )}
-
-                        {savedChats.map(chat => (
-                            <div key={chat.id} onClick={() => {
-                                setCurrentChatId(chat.id)
-                                setMessages(chat.messages)
-                                setDocContent(chat.notes || "")
-                                if (chat.whiteboard && editorRef.current) {
-                                    try {
-                                        editorRef.current.store.loadSnapshot(chat.whiteboard)
-                                    } catch(e) { console.error(e) }
-                                }
-                                setIsSidebarOpen(false)
-                            }} data-layer="chat item" style={{
-                                alignSelf: 'stretch', 
-                                minHeight: 36, 
-                                padding: "8px 10px", 
-                                borderRadius: 12, 
-                                justifyContent: 'flex-start', 
-                                alignItems: 'center', 
-                                gap: 8, 
-                                display: 'inline-flex', 
-                                cursor: 'pointer', 
-                                marginBottom: 2,
-                                background: (hoveredChatId === chat.id || currentChatId === chat.id) ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
-                            }}>
-                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>{chat.title}</div>
+                            <div
+                                onClick={handleClearMessages}
+                                style={{ cursor: "pointer" }}
+                                data-layer="flexbox"
+                                className="Flexbox"
+                            >
+                                <div
+                                    data-layer="new chat"
+                                    className="NewChat"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        height: 36,
+                                        paddingLeft: 10,
+                                        paddingRight: 10,
+                                        borderRadius: 28,
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        display: "inline-flex",
+                                        background: "rgba(255,255,255,0.1)",
+                                    }}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M14.9998 8.00011C14.9998 11.1823 14.9998 12.773 13.9747 13.7615C12.9496 14.75 11.2992 14.75 7.99988 14.75C4.69983 14.75 3.05019 14.75 2.02509 13.7615C1 12.773 1 11.1816 1 8.00011C1 4.81792 1 3.22719 2.02509 2.23871C3.05019 1.25023 4.7006 1.25023 7.99988 1.25023M6.08114 7.36262C5.81571 7.61895 5.66661 7.96637 5.66659 8.32861V10.2501H7.67167C8.04733 10.2501 8.40821 10.1061 8.6742 9.84958L14.5852 4.14668C14.7168 4.01979 14.8213 3.86913 14.8925 3.70332C14.9637 3.53751 15.0004 3.3598 15.0004 3.18032C15.0004 3.00084 14.9637 2.82313 14.8925 2.65732C14.8213 2.49151 14.7168 2.34085 14.5852 2.21396L14.0011 1.65072C13.8695 1.52369 13.7132 1.42291 13.5412 1.35415C13.3692 1.28539 13.1848 1.25 12.9986 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 12.1276 1.52369 11.996 1.65072L6.08114 7.36262Z"
+                                                stroke="white"
+                                                strokeOpacity="0.95"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <div
+                                        data-layer="New chat"
+                                        className="NewChat"
+                                        style={{
+                                            flex: "1 1 0",
+                                            justifyContent: "center",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            color: "rgba(255, 255, 255, 0.95)",
+                                            fontSize: 14,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: 1.38,
+                                            wordWrap: "break-word",
+                                        }}
+                                    >
+                                        New chat
+                                    </div>
+                                </div>
                             </div>
-                        ))}
-                      </div>
-                      
-                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 260, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, left: 0, top: 0, position: 'absolute', background: '#141414', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
-                        <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
-                          <div data-layer="new chat" className="NewChat" style={{width: 36, height: 36, paddingLeft: 9, paddingRight: 9, justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
-                            <div data-svg-wrapper data-layer="thinking" className="Thinking" style={{position: 'relative'}}>
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <g clipPath="url(#clip0_525_1678)">
-                              <ellipse cx="11.7647" cy="12" rx="11.7647" ry="12" transform="matrix(-1 0 0 1 23.5312 9.53674e-06)" fill="white" fillOpacity="0.75"/>
-                              <g filter="url(#filter0_f_525_1678)">
-                              <ellipse cx="11.499" cy="12" rx="11.499" ry="12" transform="matrix(-1 0 0 1 23.2656 9.53674e-06)" fill="url(#paint0_linear_525_1678)"/>
-                              </g>
-                              <g filter="url(#filter1_di_525_1678)">
-                              <ellipse cx="8.89072" cy="9.34886" rx="2.25288" ry="2.8161" transform="rotate(-12 8.89072 9.34886)" fill="white" fillOpacity="0.75" shapeRendering="crispEdges"/>
-                              </g>
-                              <g filter="url(#filter2_di_525_1678)">
-                              <ellipse cx="15.2579" cy="7.8496" rx="2.25288" ry="2.8161" transform="rotate(-12 15.2579 7.8496)" fill="white" fillOpacity="0.75" shapeRendering="crispEdges"/>
-                              </g>
-                              </g>
-                              <defs>
-                              <filter id="filter0_f_525_1678" x="-4.53438" y="-4.79999" width="32.6" height="33.6" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-                              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                              <feGaussianBlur stdDeviation="2.4" result="effect1_foregroundBlur_525_1678"/>
-                              </filter>
-                              <filter id="filter1_di_525_1678" x="3.23005" y="4.30143" width="11.3211" height="12.3478" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                              <feOffset dy="1.12644"/>
-                              <feGaussianBlur stdDeviation="1.68966"/>
-                              <feComposite in2="hardAlpha" operator="out"/>
-                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
-                              <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_525_1678"/>
-                              <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_525_1678" result="shape"/>
-                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                              <feOffset dy="-0.601442"/>
-                              <feGaussianBlur stdDeviation="1.20288"/>
-                              <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
-                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"/>
-                              <feBlend mode="normal" in2="shape" result="effect2_innerShadow_525_1678"/>
-                              </filter>
-                              <filter id="filter2_di_525_1678" x="9.59724" y="2.80216" width="11.3211" height="12.3478" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
-                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                              <feOffset dy="1.12644"/>
-                              <feGaussianBlur stdDeviation="1.68966"/>
-                              <feComposite in2="hardAlpha" operator="out"/>
-                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
-                              <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_525_1678"/>
-                              <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_525_1678" result="shape"/>
-                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                              <feOffset dy="-0.601442"/>
-                              <feGaussianBlur stdDeviation="1.20288"/>
-                              <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
-                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"/>
-                              <feBlend mode="normal" in2="shape" result="effect2_innerShadow_525_1678"/>
-                              </filter>
-                              <linearGradient id="paint0_linear_525_1678" x1="11.499" y1="0" x2="11.499" y2="24" gradientUnits="userSpaceOnUse">
-                              <stop stopColor="#0099FF"/>
-                              <stop offset="1" stopColor="white" stopOpacity="0.85"/>
-                              </linearGradient>
-                              <clipPath id="clip0_525_1678">
-                              <rect width="23.5294" height="24" rx="11.7647" transform="matrix(-1 0 0 1 23.5312 0)" fill="white"/>
-                              </clipPath>
-                              </defs>
-                              </svg>
-                            </div>
-                          </div>
-                          <div onClick={() => setIsSidebarOpen(false)} style={{cursor: 'pointer'}} data-svg-wrapper data-layer="close sidebar button" className="CloseSidebarButton">
-                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
                         </div>
-                        <div onClick={handleClearMessages} style={{cursor: 'pointer'}} data-layer="flexbox" className="Flexbox">
-                          <div data-layer="new chat" className="NewChat" style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', background: 'rgba(255,255,255,0.1)'}}>
-                            <div data-svg-wrapper className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons">
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M14.9998 8.00011C14.9998 11.1823 14.9998 12.773 13.9747 13.7615C12.9496 14.75 11.2992 14.75 7.99988 14.75C4.69983 14.75 3.05019 14.75 2.02509 13.7615C1 12.773 1 11.1816 1 8.00011C1 4.81792 1 3.22719 2.02509 2.23871C3.05019 1.25023 4.7006 1.25023 7.99988 1.25023M6.08114 7.36262C5.81571 7.61895 5.66661 7.96637 5.66659 8.32861V10.2501H7.67167C8.04733 10.2501 8.40821 10.1061 8.6742 9.84958L14.5852 4.14668C14.7168 4.01979 14.8213 3.86913 14.8925 3.70332C14.9637 3.53751 15.0004 3.3598 15.0004 3.18032C15.0004 3.00084 14.9637 2.82313 14.8925 2.65732C14.8213 2.49151 14.7168 2.34085 14.5852 2.21396L14.0011 1.65072C13.8695 1.52369 13.7132 1.42291 13.5412 1.35415C13.3692 1.28539 13.1848 1.25 12.9986 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 12.1276 1.52369 11.996 1.65072L6.08114 7.36262Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </div>
-                            <div data-layer="New chat" className="NewChat" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word'}}>New chat</div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                 )}
 
@@ -13215,23 +15800,23 @@ Do not include markdown formatting or explanations.`
                   If Whiteboard is open, we hide it (since we added custom buttons).
                 */}
                 {isOverlay && !isMobileLayout && (
-                <div
-                    style={{
+                    <div
+                        style={{
                             height: 56,
-                        display: "flex",
+                            display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "0 16px",
                             background: themeColors.background,
-                                          flexShrink: 0,
+                            flexShrink: 0,
                         }}
                     >
                         <div style={{ fontWeight: 600, fontSize: 16 }}>
                             {isDocOpen ? "Notes" : "Whiteboard"}
-                                                </div>
+                        </div>
                         <button
                             onClick={isDocOpen ? toggleDoc : toggleWhiteboard}
-                                                    style={{
+                            style={{
                                 background: "rgba(0,0,0,0.05)",
                                 border: "none",
                                 borderRadius: "50%",
@@ -13249,150 +15834,248 @@ Do not include markdown formatting or explanations.`
                         </button>
                     </div>
                 )}
-                
-                <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-                                    {isDocOpen ? (
-                                        <div style={{ position: "absolute", inset: 0, zIndex: 10 }}>
-                                            <DocEditor
-                                                content={docContent}
-                                                onChange={handleDocChange}
-                                                settings={docSettings}
-                                                onSettingsChange={setDocSettings}
-                                                themeColors={chatThemeColors}
-                                                isMobileLayout={isMobileLayout}
-                                                remoteCursors={remoteCursors}
-                                                onCursorMove={handleDocPointerMove}
-                                                onClose={() => setIsDocOpen(false)}
-                                            />
-                                        </div>
-                                    ) : null}
 
-                    {(isWhiteboardOpen || hasWhiteboardStarted) && !isDocOpen && (
-                                        <div
-                                            ref={whiteboardContainerRef}
-                            onPointerMove={handleWhiteboardPointerMove}
-                                            onPointerLeave={() => {
-                                                if (activeCalls.current.size > 0) {
-                                                    broadcastData({
-                                                        type: "cursor-update",
-                                                        payload: {
-                                                            x: -9999,
-                                                            y: -9999,
-                                                            color: myCursorColor.current,
-                                                        },
-                                                    })
+                <div
+                    style={{
+                        flex: 1,
+                        position: "relative",
+                        overflow: "hidden",
+                    }}
+                >
+                    {isDocOpen ? (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 10,
+                            }}
+                        >
+                            <DocEditor
+                                content={docContent}
+                                onChange={handleDocChange}
+                                settings={docSettings}
+                                onSettingsChange={setDocSettings}
+                                themeColors={chatThemeColors}
+                                isMobileLayout={isMobileLayout}
+                                remoteCursors={remoteCursors}
+                                onCursorMove={handleDocPointerMove}
+                                onClose={() => setIsDocOpen(false)}
+                            />
+                        </div>
+                    ) : null}
+
+                    {(isWhiteboardOpen || hasWhiteboardStarted) &&
+                        !isDocOpen && (
+                            <div
+                                ref={whiteboardContainerRef}
+                                onPointerMove={handleWhiteboardPointerMove}
+                                onPointerLeave={() => {
+                                    if (activeCalls.current.size > 0) {
+                                        broadcastData({
+                                            type: "cursor-update",
+                                            payload: {
+                                                x: -9999,
+                                                y: -9999,
+                                                color: myCursorColor.current,
+                                            },
+                                        })
+                                    }
+                                }}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    position: "relative",
+                                    zIndex: 0,
+                                    visibility: "visible",
+                                    pointerEvents: "auto",
+                                    background: "#F9FAFC",
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                            >
+                                {/* Whiteboard Toolbar (Download + Collapse) */}
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: 12,
+                                        right: 12,
+                                        zIndex: 9999 /* Boost Z-Index to be sure */,
+                                    }}
+                                >
+                                    <HeaderActions
+                                        themeColors={themeColors}
+                                        onDownloadClick={async () => {
+                                            if (editor && exportToBlob) {
+                                                try {
+                                                    const shapeIds =
+                                                        editor.getCurrentPageShapeIds()
+                                                    if (shapeIds.size === 0)
+                                                        return
+
+                                                    const blob =
+                                                        await exportToBlob({
+                                                            editor,
+                                                            ids: [...shapeIds],
+                                                            format: "png",
+                                                            opts: {
+                                                                background:
+                                                                    true,
+                                                            },
+                                                        })
+                                                    const url =
+                                                        URL.createObjectURL(
+                                                            blob
+                                                        )
+                                                    const a =
+                                                        document.createElement(
+                                                            "a"
+                                                        )
+                                                    a.href = url
+                                                    // Format: whiteboard_curastem.org12345.png
+                                                    const randomNum =
+                                                        Math.floor(
+                                                            10000 +
+                                                                Math.random() *
+                                                                    90000
+                                                        )
+                                                    a.download = `whiteboard_curastem.org${randomNum}.png`
+                                                    a.click()
+                                                    URL.revokeObjectURL(url)
+                                                } catch (e) {
+                                                    console.error(
+                                                        "Export failed",
+                                                        e
+                                                    )
                                                 }
-                                            }}
-                                            style={{
-                                                width: "100%",
-                                                height: "100%",
-                                                position: "relative",
-                                                zIndex: 0,
-                                                visibility: "visible",
-                                                pointerEvents: "auto",
-                                                background: "#F9FAFC",
-                                            }}
-                                            onPointerDown={(e) => e.stopPropagation()}
-                                        >
-                                            {/* Whiteboard Toolbar (Download + Collapse) */}
-                                            <div style={{
-                                                position: "absolute",
-                                                top: 12,
-                                                right: 12,
-                                                zIndex: 9999, /* Boost Z-Index to be sure */
-                                            }}>
-                                                <HeaderActions
-                                                    themeColors={themeColors}
-                                                    onDownloadClick={async () => {
-                                                        if (editor && exportToBlob) {
-                                                            try {
-                                                                const shapeIds = editor.getCurrentPageShapeIds()
-                                                                if (shapeIds.size === 0) return
+                                            }
+                                        }}
+                                        onCloseClick={toggleWhiteboard}
+                                        isDownloadHovered={
+                                            isWhiteboardDownloadHovered
+                                        }
+                                        onDownloadHoverChange={
+                                            setIsWhiteboardDownloadHovered
+                                        }
+                                        isCloseHovered={
+                                            isWhiteboardCloseHovered
+                                        }
+                                        onCloseHoverChange={
+                                            setIsWhiteboardCloseHovered
+                                        }
+                                    />
+                                </div>
 
-                                                                const blob = await exportToBlob({
-                                                                    editor,
-                                                                    ids: [...shapeIds],
-                                                                    format: 'png',
-                                                                    opts: { background: true }
-                                                                })
-                                                                const url = URL.createObjectURL(blob)
-                                                                const a = document.createElement('a')
-                                                                a.href = url
-                                                                // Format: whiteboard_curastem.org12345.png
-                                                                const randomNum = Math.floor(10000 + Math.random() * 90000)
-                                                                a.download = `whiteboard_curastem.org${randomNum}.png`
-                                                                a.click()
-                                                                URL.revokeObjectURL(url)
-                                                            } catch (e) {
-                                                                console.error("Export failed", e)
-                                                            }
-                                                        }
-                                                    }}
-                                                    onCloseClick={toggleWhiteboard}
-                                                    isDownloadHovered={isWhiteboardDownloadHovered}
-                                                    onDownloadHoverChange={setIsWhiteboardDownloadHovered}
-                                                    isCloseHovered={isWhiteboardCloseHovered}
-                                                    onCloseHoverChange={setIsWhiteboardCloseHovered}
-                                                />
-                                            </div>
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: !isMobileLayout ? 56 : 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                    }}
+                                >
+                                    <Tldraw
+                                        persistenceKey="framer-chatbot-whiteboard-v1"
+                                        onMount={(e) => {
+                                            if (editor) return
+                                            log("Tldraw editor mounted")
+                                            setEditor(e)
+                                            e.setCurrentTool("draw")
+                                            const defaultColor =
+                                                role === "volunteer"
+                                                    ? "red"
+                                                    : "black"
+                                            e.setStyleForNextShapes(
+                                                DefaultColorStyle,
+                                                defaultColor
+                                            )
+                                            e.setStyleForNextShapes(
+                                                DefaultSizeStyle,
+                                                "l"
+                                            )
 
-                                            <div style={{
-                                                position: "absolute",
-                                                top: !isMobileLayout ? 56 : 0,
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 0,
-                                            }}>
-                                                <Tldraw
-                                                    persistenceKey="framer-chatbot-whiteboard-v1"
-                                                    onMount={(e) => {
-                                                        if (editor) return
-                                                        log("Tldraw editor mounted")
-                                                        setEditor(e)
-                                                        e.setCurrentTool("draw")
-                                                        const defaultColor = role === "volunteer" ? "red" : "black"
-                                                        e.setStyleForNextShapes(DefaultColorStyle, defaultColor)
-                                                        e.setStyleForNextShapes(DefaultSizeStyle, "l")
-                                                        
-                                                        // Process pending AI updates
-                                                        if (pendingWhiteboardUpdates.current.length > 0) {
-                                                            try {
-                                                                e.batch(() => {
-                                                                    while (pendingWhiteboardUpdates.current.length > 0) {
-                                                                        const { added, updated, removed } = pendingWhiteboardUpdates.current.shift()
-                                                                        if (added && added.length > 0) e.createShapes(added)
-                                                                        if (updated && updated.length > 0) e.updateShapes(updated)
-                                                                        if (removed && removed.length > 0) e.deleteShapes(removed)
-                                                                    }
-                                                                })
-                                                            } catch (err) {
-                                                                console.error("Error applying pending whiteboard updates", err)
-                                                            }
+                                            // Process pending AI updates
+                                            if (
+                                                pendingWhiteboardUpdates.current
+                                                    .length > 0
+                                            ) {
+                                                try {
+                                                    e.batch(() => {
+                                                        while (
+                                                            pendingWhiteboardUpdates
+                                                                .current
+                                                                .length > 0
+                                                        ) {
+                                                            const {
+                                                                added,
+                                                                updated,
+                                                                removed,
+                                                            } =
+                                                                pendingWhiteboardUpdates.current.shift()
+                                                            if (
+                                                                added &&
+                                                                added.length > 0
+                                                            )
+                                                                e.createShapes(
+                                                                    added
+                                                                )
+                                                            if (
+                                                                updated &&
+                                                                updated.length >
+                                                                    0
+                                                            )
+                                                                e.updateShapes(
+                                                                    updated
+                                                                )
+                                                            if (
+                                                                removed &&
+                                                                removed.length >
+                                                                    0
+                                                            )
+                                                                e.deleteShapes(
+                                                                    removed
+                                                                )
                                                         }
-                                                        
-                                                        if (isWhiteboardOpenRef.current && dataConnectionsRef.current.size > 0) {
-                                                            const snapshot = e.store.getSnapshot()
-                                                            broadcastData({
-                                                                type: "tldraw-snapshot",
-                                                                payload: snapshot,
-                                                            })
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-                                            {Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
-                                                <LiveCursor
-                                                    key={peerId}
-                                                    x={cursor.x}
-                                                    y={cursor.y}
-                                                    color={cursor.color}
-                                                    editor={editor}
-                                                    containerRef={whiteboardContainerRef}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                        </div>
+                                                    })
+                                                } catch (err) {
+                                                    console.error(
+                                                        "Error applying pending whiteboard updates",
+                                                        err
+                                                    )
+                                                }
+                                            }
+
+                                            if (
+                                                isWhiteboardOpenRef.current &&
+                                                dataConnectionsRef.current
+                                                    .size > 0
+                                            ) {
+                                                const snapshot =
+                                                    e.store.getSnapshot()
+                                                broadcastData({
+                                                    type: "tldraw-snapshot",
+                                                    payload: snapshot,
+                                                })
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                {Array.from(remoteCursors.entries()).map(
+                                    ([peerId, cursor]) => (
+                                        <LiveCursor
+                                            key={peerId}
+                                            x={cursor.x}
+                                            y={cursor.y}
+                                            color={cursor.color}
+                                            editor={editor}
+                                            containerRef={
+                                                whiteboardContainerRef
+                                            }
+                                        />
+                                    )
+                                )}
+                            </div>
+                        )}
+                </div>
                 {isMobileLayout && (
                     <div
                         ref={mobileInputRef}
@@ -13407,27 +16090,42 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         <ChatInput
-                            hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
+                            hideGradient={
+                                aiGeneratedSuggestions.length > 0 ||
+                                ((isDocOpen || isWhiteboardOpen) &&
+                                    isMobileLayout)
+                            }
                             value={inputText}
                             onChange={(e) => {
                                 const newValue = sanitizeMessage(e.target.value)
                                 setInputText(newValue)
                                 const now = Date.now()
                                 const interval = 50
-                                const timeSinceLastSend = now - lastInputSendTimeRef.current
+                                const timeSinceLastSend =
+                                    now - lastInputSendTimeRef.current
 
-                                if (inputTimeoutRef.current) clearTimeout(inputTimeoutRef.current)
+                                if (inputTimeoutRef.current)
+                                    clearTimeout(inputTimeoutRef.current)
 
                                 if (timeSinceLastSend > interval) {
                                     if (dataConnectionsRef.current.size > 0) {
-                                    broadcastData({ type: "input-sync", payload: newValue })
+                                        broadcastData({
+                                            type: "input-sync",
+                                            payload: newValue,
+                                        })
                                         lastInputSendTimeRef.current = now
                                     }
                                 } else {
                                     inputTimeoutRef.current = setTimeout(() => {
-                                        if (dataConnectionsRef.current.size > 0) {
-                                        broadcastData({ type: "input-sync", payload: newValue })
-                                        lastInputSendTimeRef.current = Date.now()
+                                        if (
+                                            dataConnectionsRef.current.size > 0
+                                        ) {
+                                            broadcastData({
+                                                type: "input-sync",
+                                                payload: newValue,
+                                            })
+                                            lastInputSendTimeRef.current =
+                                                Date.now()
                                         }
                                     }, interval - timeSinceLastSend)
                                 }
@@ -13439,9 +16137,17 @@ Do not include markdown formatting or explanations.`
                             onFileSelect={handleFileSelect}
                             onScreenShare={toggleScreenShare}
                             onReport={handleReport}
-                            placeholder={isLoading ? "Thinking..." : (isDocOpen ? "Edit notes" : "Edit whiteboard")}
+                            placeholder={
+                                isLoading
+                                    ? "Thinking..."
+                                    : isDocOpen
+                                      ? "Edit notes"
+                                      : "Edit whiteboard"
+                            }
                             showEndCall={status !== "idle"}
-                            showAiLiveButton={status === "searching" && role === "student"}
+                            showAiLiveButton={
+                                status === "searching" && role === "student"
+                            }
                             attachments={attachments}
                             onRemoveAttachment={handleRemoveAttachment}
                             isLoading={isLoading}
@@ -13463,7 +16169,7 @@ Do not include markdown formatting or explanations.`
                         />
                     </div>
                 )}
-                                </div>
+            </div>
         )
     }
 
@@ -13512,162 +16218,213 @@ Do not include markdown formatting or explanations.`
                 style={{
                     display: "flex",
                     flexDirection: "column",
-                        width: "100%",
+                    width: "100%",
                     height: "100%", // Fill parent (which is flex: 1 in sidebar, or height: chatHeight in standard)
+                    position: "relative",
+                    background:
+                        isDocOpen && !isSidebar
+                            ? chatThemeColors.background
+                            : "transparent",
+                }}
+            >
+                <div
+                    ref={chatHistoryRef}
+                    data-layer="chat-messages-area"
+                    className="ChatMessagesArea"
+                    style={{
+                        flex: 1,
+                        width: "100%",
+                        padding: "0 24px",
+                        paddingBottom: 140,
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 16,
+                        overscrollBehavior: "contain",
+                        WebkitOverflowScrolling: "touch",
+                        touchAction: "pan-y",
                         position: "relative",
-                    background: isDocOpen && !isSidebar ? chatThemeColors.background : "transparent",
                     }}
                 >
-                    <div
-                        ref={chatHistoryRef}
-                        data-layer="chat-messages-area"
-                        className="ChatMessagesArea"
-                        style={{
-                            flex: 1,
-                            width: "100%",
-                            padding: "0 24px",
-                            paddingBottom: 140,
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 16,
-                            overscrollBehavior: "contain",
-                            WebkitOverflowScrolling: "touch",
-                            touchAction: "pan-y",
-                        position: "relative",
-                        }}
-                    >
-                        {messages.map((msg, idx) => {
-                            const isModelMessage = msg.role === "model"
-                            const shouldShowAd = adIndices.has(idx) && showAds && googleAdsClient && googleAdsSlot
+                    {messages.map((msg, idx) => {
+                        const isModelMessage = msg.role === "model"
+                        const shouldShowAd =
+                            adIndices.has(idx) &&
+                            showAds &&
+                            googleAdsClient &&
+                            googleAdsSlot
 
-                            return (
-                                <React.Fragment key={idx}>
-                                    <MessageBubble
-                                        id={`msg-${idx}`}
-                                        msg={msg}
-                                        previousMsg={idx > 0 ? messages[idx - 1] : undefined}
-                                        isMobileLayout={isMobileLayout}
-                                        isLast={idx === messages.length - 1}
-                                        themeColors={chatThemeColors}
-                                        isStreaming={
-                                            idx === messages.length - 1 &&
-                                            (isLoading || isLiveGenerating)
-                                        }
-                                        copiedMessageId={copiedMessageId}
-                                        onCopy={handleCopyMessage}
-                                        showDocButton={idx === lastDocCallIdx}
-                                        showWhiteboardButton={idx === lastWhiteboardCallIdx}
-                                        onToggleDoc={() => setIsDocOpen((prev) => !prev)}
-                                        onToggleWhiteboard={() => setIsWhiteboardOpen((prev) => !prev)}
-                                        isDocOpen={isDocOpen}
-                                        isWhiteboardOpen={isWhiteboardOpen}
+                        return (
+                            <React.Fragment key={idx}>
+                                <MessageBubble
+                                    id={`msg-${idx}`}
+                                    msg={msg}
+                                    previousMsg={
+                                        idx > 0 ? messages[idx - 1] : undefined
+                                    }
+                                    isMobileLayout={isMobileLayout}
+                                    isLast={idx === messages.length - 1}
+                                    themeColors={chatThemeColors}
+                                    isStreaming={
+                                        idx === messages.length - 1 &&
+                                        (isLoading || isLiveGenerating)
+                                    }
+                                    copiedMessageId={copiedMessageId}
+                                    onCopy={handleCopyMessage}
+                                    showDocButton={idx === lastDocCallIdx}
+                                    showWhiteboardButton={
+                                        idx === lastWhiteboardCallIdx
+                                    }
+                                    onToggleDoc={() =>
+                                        setIsDocOpen((prev) => !prev)
+                                    }
+                                    onToggleWhiteboard={() =>
+                                        setIsWhiteboardOpen((prev) => !prev)
+                                    }
+                                    isDocOpen={isDocOpen}
+                                    isWhiteboardOpen={isWhiteboardOpen}
+                                />
+                                {shouldShowAd && (
+                                    <AdCarousel
+                                        client={googleAdsClient}
+                                        slot={googleAdsSlot}
+                                        layoutKey={googleAdsLayoutKey}
                                     />
-                                    {shouldShowAd && (
-                                        <AdCarousel 
-                                            client={googleAdsClient}
-                                            slot={googleAdsSlot}
-                                            layoutKey={googleAdsLayoutKey}
-                                        />
-                                    )}
-                                </React.Fragment>
-                            )
-                        })}
-                        {isLoading &&
-                            (!messages.length ||
+                                )}
+                            </React.Fragment>
+                        )
+                    })}
+                    {isLoading &&
+                        (!messages.length ||
                             messages[messages.length - 1].role !== "model" ||
-                            messages[messages.length - 1].text.length === 0) && (
-                            <div style={{ paddingLeft: 8, paddingBottom: 8, minHeight: "auto" }}>
-                                <div
-                                    style={{
-                                        animation: "pulseStar 1.5s infinite ease-in-out",
-                                            width: 20,
-                                            height: 20,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                        }}
-                                    >
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <g clipPath="url(#clipLoadAnimMentorship)">
-                                                <path
-                                                    d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
-                                                fill={chatThemeColors.text.primary}
-                                                />
-                                            </g>
-                                            <defs>
-                                                <clipPath id="clipLoadAnimMentorship">
-                                                <rect width="20" height="20" fill={chatThemeColors.text.primary} />
-                                                </clipPath>
-                                            </defs>
-                                        </svg>
-                                    </div>
-                                </div>
-                            )}
-
-                        <div />
-                    </div>
-
-                {/* Chat Input */}
-                    <div
-                        style={{
-                        position: isBanned && !isSidebar ? "fixed" : "absolute",
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            width: "100%",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                        zIndex: 1000,
-                        pointerEvents: "none",
-                            paddingTop: aiGeneratedSuggestions.length > 0 ? 36 : 0,
-                            // touchAction: "none", // Removed to fix mobile tap accuracy issues
-                        }}
-                    >
-                        {aiGeneratedSuggestions.length > 0 && (
+                            messages[messages.length - 1].text.length ===
+                                0) && (
                             <div
                                 style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    background: `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 36px)`,
-                                    pointerEvents: "none",
-                                    zIndex: -1,
-                                }}
-                            />
-                        )}
-                        {aiGeneratedSuggestions.length > 0 && (
-                            <div
-                                data-layer="ai suggested replies"
-                                className="AiSuggestedReplies"
-                                style={{
-                                    width: "100%",
-                                    maxWidth: 728,
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    justifyContent: "flex-start",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    paddingLeft: isMobileLayout ? 16 : 24,
-                                    paddingRight: isMobileLayout ? 16 : 24,
-                                    paddingBottom: 4,
-                                    paddingTop: 1,
-                                    overflowX: "auto",
-                                    pointerEvents: "auto",
-                                    whiteSpace: "nowrap",
-                                    scrollbarWidth: "none",
-                                    msOverflowStyle: "none",
+                                    paddingLeft: 8,
+                                    paddingBottom: 8,
+                                    minHeight: "auto",
                                 }}
                             >
-                                {aiGeneratedSuggestions.slice(0, messages.length === 0 ? (isMobileLayout ? 10 : 5) : (isMobileLayout ? 5 : 3)).map((suggestion, index) => (
+                                <div
+                                    style={{
+                                        animation:
+                                            "pulseStar 1.5s infinite ease-in-out",
+                                        width: 20,
+                                        height: 20,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <g clipPath="url(#clipLoadAnimMentorship)">
+                                            <path
+                                                d="M9.291 1.32935C9.59351 0.762163 10.4065 0.762164 10.709 1.32935L13.4207 6.41384C13.4582 6.48418 13.5158 6.54176 13.5861 6.57927L18.6706 9.29099C19.2378 9.59349 19.2378 10.4065 18.6706 10.709L13.5861 13.4207C13.5158 13.4582 13.4582 13.5158 13.4207 13.5862L10.709 18.6706C10.4065 19.2378 9.59351 19.2378 9.291 18.6706L6.57927 13.5862C6.54176 13.5158 6.48417 13.4582 6.41384 13.4207L1.32934 10.709C0.762155 10.4065 0.762157 9.59349 1.32935 9.29099L6.41384 6.57927C6.48417 6.54176 6.54176 6.48418 6.57927 6.41384L9.291 1.32935Z"
+                                                fill={
+                                                    chatThemeColors.text.primary
+                                                }
+                                            />
+                                        </g>
+                                        <defs>
+                                            <clipPath id="clipLoadAnimMentorship">
+                                                <rect
+                                                    width="20"
+                                                    height="20"
+                                                    fill={
+                                                        chatThemeColors.text
+                                                            .primary
+                                                    }
+                                                />
+                                            </clipPath>
+                                        </defs>
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+
+                    <div />
+                </div>
+
+                {/* Chat Input */}
+                <div
+                    style={{
+                        position: isBanned && !isSidebar ? "fixed" : "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        zIndex: 1000,
+                        pointerEvents: "none",
+                        paddingTop: aiGeneratedSuggestions.length > 0 ? 36 : 0,
+                        // touchAction: "none", // Removed to fix mobile tap accuracy issues
+                    }}
+                >
+                    {aiGeneratedSuggestions.length > 0 && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: `linear-gradient(180deg, rgba(33, 33, 33, 0) 0%, ${themeColors.background} 36px)`,
+                                pointerEvents: "none",
+                                zIndex: -1,
+                            }}
+                        />
+                    )}
+                    {aiGeneratedSuggestions.length > 0 && (
+                        <div
+                            data-layer="ai suggested replies"
+                            className="AiSuggestedReplies"
+                            style={{
+                                width: "100%",
+                                maxWidth: 728,
+                                display: "flex",
+                                flexDirection: "row",
+                                justifyContent: "flex-start",
+                                alignItems: "center",
+                                gap: 8,
+                                paddingLeft: isMobileLayout ? 16 : 24,
+                                paddingRight: isMobileLayout ? 16 : 24,
+                                paddingBottom: 4,
+                                paddingTop: 1,
+                                overflowX: "auto",
+                                pointerEvents: "auto",
+                                whiteSpace: "nowrap",
+                                scrollbarWidth: "none",
+                                msOverflowStyle: "none",
+                            }}
+                        >
+                            {aiGeneratedSuggestions
+                                .slice(
+                                    0,
+                                    messages.length === 0
+                                        ? isMobileLayout
+                                            ? 10
+                                            : 5
+                                        : isMobileLayout
+                                          ? 5
+                                          : 3
+                                )
+                                .map((suggestion, index) => (
                                     <div
                                         key={index}
-                                        onClick={() => handleSendMessage(suggestion)}
+                                        onClick={() =>
+                                            handleSendMessage(suggestion)
+                                        }
                                         className={`Suggestion${index + 1}`}
                                         style={{
                                             maxWidth: 380,
@@ -13675,103 +16432,126 @@ Do not include markdown formatting or explanations.`
                                             paddingRight: 12,
                                             paddingTop: 8,
                                             paddingBottom: 8,
-                                            overflow: 'hidden',
+                                            overflow: "hidden",
                                             borderRadius: 24,
-                                            outline: '1px rgba(255, 255, 255, 0.20) solid',
-                                            outlineOffset: '-0.33px',
-                                            justifyContent: 'flex-start',
-                                            alignItems: 'center',
+                                            outline:
+                                                "1px rgba(255, 255, 255, 0.20) solid",
+                                            outlineOffset: "-0.33px",
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
                                             gap: 6,
-                                            display: 'inline-flex',
+                                            display: "inline-flex",
                                             cursor: "pointer",
                                             flexShrink: 0,
-                                            background: (isDocOpen || isWhiteboardOpen) ? themeColors.background : chatThemeColors.background,
-                                            color: 'rgba(255, 255, 255, 0.65)',
-                                            transition: "background-color 0.2s ease",
+                                            background:
+                                                isDocOpen || isWhiteboardOpen
+                                                    ? themeColors.background
+                                                    : chatThemeColors.background,
+                                            color: "rgba(255, 255, 255, 0.65)",
+                                            transition:
+                                                "background-color 0.2s ease",
                                             pointerEvents: "auto",
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = "#2B2B2B"
+                                            e.currentTarget.style.backgroundColor =
+                                                "#2B2B2B"
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = (isDocOpen || isWhiteboardOpen) ? themeColors.background : chatThemeColors.background
+                                            e.currentTarget.style.backgroundColor =
+                                                isDocOpen || isWhiteboardOpen
+                                                    ? themeColors.background
+                                                    : chatThemeColors.background
                                         }}
                                     >
                                         <div
                                             style={{
-                                                justifyContent: 'center',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                color: 'rgba(255, 255, 255, 0.65)',
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.65)",
                                                 fontSize: 15,
-                                                fontFamily: 'Inter',
-                                                fontWeight: '400',
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
                                                 lineHeight: "22.50px",
-                                                wordWrap: 'break-word',
+                                                wordWrap: "break-word",
                                             }}
                                         >
                                             {suggestion}
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        )}
-                        <ChatInput
-                            hideGradient={aiGeneratedSuggestions.length > 0 || ((isDocOpen || isWhiteboardOpen) && isMobileLayout)}
-                            value={inputText}
-                            onChange={(e) => {
-                                const newValue = sanitizeMessage(e.target.value)
-                                setInputText(newValue)
-                                const now = Date.now()
+                        </div>
+                    )}
+                    <ChatInput
+                        hideGradient={
+                            aiGeneratedSuggestions.length > 0 ||
+                            ((isDocOpen || isWhiteboardOpen) && isMobileLayout)
+                        }
+                        value={inputText}
+                        onChange={(e) => {
+                            const newValue = sanitizeMessage(e.target.value)
+                            setInputText(newValue)
+                            const now = Date.now()
                             const interval = 50
-                            const timeSinceLastSend = now - lastInputSendTimeRef.current
+                            const timeSinceLastSend =
+                                now - lastInputSendTimeRef.current
 
-                            if (inputTimeoutRef.current) clearTimeout(inputTimeoutRef.current)
+                            if (inputTimeoutRef.current)
+                                clearTimeout(inputTimeoutRef.current)
 
-                                if (timeSinceLastSend > interval) {
-                                    if (dataConnectionsRef.current.size > 0) {
-                                    broadcastData({ type: "input-sync", payload: newValue })
-                                        lastInputSendTimeRef.current = now
-                                    }
-                                } else {
-                                    inputTimeoutRef.current = setTimeout(() => {
-                                        if (dataConnectionsRef.current.size > 0) {
-                                        broadcastData({ type: "input-sync", payload: newValue })
-                                        lastInputSendTimeRef.current = Date.now()
-                                        }
-                                    }, interval - timeSinceLastSend)
+                            if (timeSinceLastSend > interval) {
+                                if (dataConnectionsRef.current.size > 0) {
+                                    broadcastData({
+                                        type: "input-sync",
+                                        payload: newValue,
+                                    })
+                                    lastInputSendTimeRef.current = now
                                 }
-                            }}
-                            onSend={handleSendMessage}
-                            onConnectWithAI={handleConnectWithAI}
-                            onStop={handleStop}
-                            onEndCall={() => cleanup(true)}
-                            onFileSelect={handleFileSelect}
-                            onScreenShare={toggleScreenShare}
-                            onReport={handleReport}
-                            placeholder="Ask anything"
-                            showEndCall={status !== "idle"}
-                        showAiLiveButton={status === "searching" && role === "student"}
-                            attachments={attachments}
-                            onRemoveAttachment={handleRemoveAttachment}
-                            isLoading={isLoading}
-                            isScreenSharing={isScreenSharing}
-                            isWhiteboardOpen={isWhiteboardOpen}
-                            toggleWhiteboard={toggleWhiteboard}
-                            isDocOpen={isDocOpen}
-                            toggleDoc={toggleDoc}
-                            isConnected={status === "connected" && !isLiveMode}
-                            status={status}
-                            isMobileLayout={isMobileLayout}
-                            isLiveMode={isLiveMode}
-                            onPasteFile={processFiles}
-                            themeColors={themeColors}
-                            role={role}
-                            hasMessages={messages.length > 0}
-                            onClearMessages={handleClearMessages}
-                        />
-                    </div>
+                            } else {
+                                inputTimeoutRef.current = setTimeout(() => {
+                                    if (dataConnectionsRef.current.size > 0) {
+                                        broadcastData({
+                                            type: "input-sync",
+                                            payload: newValue,
+                                        })
+                                        lastInputSendTimeRef.current =
+                                            Date.now()
+                                    }
+                                }, interval - timeSinceLastSend)
+                            }
+                        }}
+                        onSend={handleSendMessage}
+                        onConnectWithAI={handleConnectWithAI}
+                        onStop={handleStop}
+                        onEndCall={() => cleanup(true)}
+                        onFileSelect={handleFileSelect}
+                        onScreenShare={toggleScreenShare}
+                        onReport={handleReport}
+                        placeholder="Ask anything"
+                        showEndCall={status !== "idle"}
+                        showAiLiveButton={
+                            status === "searching" && role === "student"
+                        }
+                        attachments={attachments}
+                        onRemoveAttachment={handleRemoveAttachment}
+                        isLoading={isLoading}
+                        isScreenSharing={isScreenSharing}
+                        isWhiteboardOpen={isWhiteboardOpen}
+                        toggleWhiteboard={toggleWhiteboard}
+                        isDocOpen={isDocOpen}
+                        toggleDoc={toggleDoc}
+                        isConnected={status === "connected" && !isLiveMode}
+                        status={status}
+                        isMobileLayout={isMobileLayout}
+                        isLiveMode={isLiveMode}
+                        onPasteFile={processFiles}
+                        themeColors={themeColors}
+                        role={role}
+                        hasMessages={messages.length > 0}
+                        onClearMessages={handleClearMessages}
+                    />
                 </div>
+            </div>
         )
     }
 
@@ -13800,7 +16580,7 @@ Do not include markdown formatting or explanations.`
                         maxHeight: "100%",
                     }}
                 >
-                     <VideoPlayer
+                    <VideoPlayer
                         stream={remoteScreenStream || screenStreamRef.current}
                         isMirrored={false}
                         muted={!remoteScreenStream}
@@ -13827,12 +16607,12 @@ Do not include markdown formatting or explanations.`
         // Note: isSidebar means we are in the sidebar context (width ~400px)
         // isMobileLayout means we are on a small screen (width < 768px)
         const isSidebarOrMobile = isMobileLayout || isSidebar
-        
+
         // Use calculateHeightConstraints to get the 'ideal' dimensions based on the *current* layout context
         // If isSidebar, we pass the sidebar width (400) instead of full container width
         const effectiveW = isSidebar ? 400 : containerSize.width
         const effectiveH = containerSize.height
-        
+
         const constraints = calculateHeightConstraints(
             effectiveW,
             effectiveH,
@@ -13843,11 +16623,11 @@ Do not include markdown formatting or explanations.`
             isDocOpen,
             sharedScreenSize
         )
-        
+
         // Extract the minHeight (which in our logic corresponds to the calculated tile area height needed)
         // Wait, calculateHeightConstraints returns min/max CHAT height.
         // We want the *Tile* dimensions.
-        
+
         // Let's manually calculate the fit here using the same logic to be precise.
         // We want the tiles to fit within the available space above the chat.
         // Available Space = containerHeight - chatHeight - topUI (padding + drag bar)
@@ -13855,41 +16635,49 @@ Do not include markdown formatting or explanations.`
         // But the flex container has paddingTop: 16.
         // And drag bar is 24px height.
         // So available height for tiles = containerHeight - chatHeight - 40px (approx)
-        
+
         const availableHeight = Math.max(0, effectiveH - chatHeight - 40)
         const availableWidth = Math.max(0, effectiveW - 32) // -32 for padding (16px * 2)
-        
+
         // Determine aspect ratio
-        const numTiles = Math.max(2, 1 + remoteStreams.size + pendingPeerIds.size)
+        const numTiles = Math.max(
+            2,
+            1 + remoteStreams.size + pendingPeerIds.size
+        )
         const isMultiParty = numTiles > 2
-        // If content is open (Tool/Screen), tiles are small. 
+        // If content is open (Tool/Screen), tiles are small.
         // If Sidebar/Mobile, they are vertical stack.
         // If Desktop Standard, they are horizontal row (usually).
-        const isContentOpen = isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen
-        const targetRatio = (isMultiParty || (isContentOpen && isMultiParty)) ? 1.0 : 1.55
-        
+        const isContentOpen =
+            isScreenSharing ||
+            !!remoteScreenStream ||
+            isWhiteboardOpen ||
+            isDocOpen
+        const targetRatio =
+            isMultiParty || (isContentOpen && isMultiParty) ? 1.0 : 1.55
+
         // Calculate max fit dimensions for a single tile
         // If we have 2 tiles, they usually stack in Mobile/Sidebar.
         // So each tile has width = availableWidth.
         // Height = width / ratio.
         // Total height needed = height * 2 + gap.
-        
+
         // We want to constrain this so it fits in 'availableHeight'.
         let fitWidth = availableWidth
         let fitHeight = fitWidth / targetRatio
-        
+
         if (isSidebarOrMobile) {
             if (shouldUseHorizontalLayout) {
                 // Horizontal Layout (Side-by-side or Grid)
                 const isGrid = numTiles === 4
                 const cols = isGrid ? 2 : numTiles
                 const rows = isGrid ? 2 : 1
-                
+
                 const widthPerTile = (availableWidth - (cols - 1) * 8) / cols
                 const maxHPerTile = (availableHeight - (rows - 1) * 8) / rows
-                
+
                 let h = widthPerTile / targetRatio
-                
+
                 if (h > maxHPerTile) {
                     fitHeight = maxHPerTile
                     fitWidth = fitHeight * targetRatio
@@ -13904,9 +16692,9 @@ Do not include markdown formatting or explanations.`
                 // Max height per tile = (availableHeight - gap) / numTiles
                 // gap is 8px.
                 // Actually, let's assume 2 tiles for calculation safety
-                const count = Math.min(2, numTiles) 
+                const count = Math.min(2, numTiles)
                 const maxHPerTile = (availableHeight - (count - 1) * 8) / count
-                
+
                 if (fitHeight > maxHPerTile) {
                     fitHeight = maxHPerTile
                     fitWidth = fitHeight * targetRatio
@@ -13918,18 +16706,18 @@ Do not include markdown formatting or explanations.`
             // But here we are inside renderTilesSection, which might be called with isSidebar=false (Standard Layout)
             // If isScreenSharing or Tool is open, we are in the "small strip" mode.
             if (isContentOpen) {
-                // In small strip mode, height is fixed (e.g. 140px). 
+                // In small strip mode, height is fixed (e.g. 140px).
                 // We want to fill height and set width based on aspect ratio.
                 // However, renderTilesSection styles apply logic based on conditions.
-                
+
                 // If we are here, it means we are calculating 'fit' dimensions for animation.
                 // For horizontal strip:
                 // height = 100% (of 140px container)
                 // width = height * ratio
-                
+
                 // But wait, the container height is determined by the style in renderStandardLayout:
                 // height: isMobileLayout || isSidebar ? "auto" : 140
-                
+
                 // So if !isMobileLayout && !isSidebar, height is 140.
                 const stripHeight = 140
                 if (fitHeight > stripHeight) {
@@ -13940,9 +16728,9 @@ Do not include markdown formatting or explanations.`
                 // Large Desktop Tiles (Standard View, No Tool)
                 // Tiles should fill height as much as possible while maintaining aspect ratio without being cropped.
                 const widthPerTile = (availableWidth - 8) / 2
-                
+
                 // Check if height constrained
-                if ((widthPerTile / targetRatio) > availableHeight) {
+                if (widthPerTile / targetRatio > availableHeight) {
                     fitHeight = availableHeight
                     fitWidth = fitHeight * targetRatio
                 } else {
@@ -13952,24 +16740,27 @@ Do not include markdown formatting or explanations.`
                 }
             }
         }
-        
+
         // No forced style, let the standard logic handle it.
         const forcedStyle = {}
-        
+
         return (
-                <div
-                    data-layer="video-tiles-container"
-                    className="VideoTilesContainer"
-                    style={{
-                        display: "flex",
+            <div
+                data-layer="video-tiles-container"
+                className="VideoTilesContainer"
+                style={{
+                    display: "flex",
                     gap: 8,
                     width: "100%",
                     boxSizing: "border-box",
-                        justifyContent: "center",
-                    ...(isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
+                    justifyContent: "center",
+                    ...(isScreenSharing ||
+                    !!remoteScreenStream ||
+                    ((isWhiteboardOpen || isDocOpen) && !isSidebar)
                         ? {
                               // If content is open, tiles are small strip
-                            height: isMobileLayout || isSidebar ? "auto" : 140,
+                              height:
+                                  isMobileLayout || isSidebar ? "auto" : 140,
                               flex: "0 0 auto",
                               flexShrink: 0,
                               paddingLeft: 0,
@@ -13980,133 +16771,283 @@ Do not include markdown formatting or explanations.`
                         : {
                               // Default Large Tiles
                               flex: 1,
-                              flexDirection: shouldUseHorizontalLayout ? "row" : "column",
-                              flexWrap: ((isMobileLayout || isSidebar) && numTiles === 4) ? "wrap" : "nowrap",
-                              alignItems: ((isMobileLayout || isSidebar) && numTiles === 4) 
-                                  ? "flex-start" 
-                                  : !(isMobileLayout || isSidebar)
-                                      ? "flex-end"
-                                      : "center",
-                              alignContent: ((isMobileLayout || isSidebar) && numTiles === 4) ? "center" : "stretch",
+                              flexDirection: shouldUseHorizontalLayout
+                                  ? "row"
+                                  : "column",
+                              flexWrap:
+                                  (isMobileLayout || isSidebar) &&
+                                  numTiles === 4
+                                      ? "wrap"
+                                      : "nowrap",
+                              alignItems:
+                                  (isMobileLayout || isSidebar) &&
+                                  numTiles === 4
+                                      ? "flex-start"
+                                      : !(isMobileLayout || isSidebar)
+                                        ? "flex-end"
+                                        : "center",
+                              alignContent:
+                                  (isMobileLayout || isSidebar) &&
+                                  numTiles === 4
+                                      ? "center"
+                                      : "stretch",
                           }),
                     ...forcedStyle,
                 }}
             >
                 {(() => {
-                   const tiles: any[] = []
-                   tiles.push({ type: 'local', stream: localStream, key: 'local' })
-                   if (isLiveMode) {
-                       tiles.push({ type: 'remote', stream: null, id: 'ai-live', key: 'ai-live' })
-                   } else if (remoteStreams.size > 0) {
-                       remoteStreams.forEach((stream, id) => {
-                           tiles.push({ type: 'remote', stream, id, key: id })
-                       })
-                   }
-                   pendingPeerIds.forEach(id => {
-                       if (!remoteStreams.has(id)) {
-                           tiles.push({ type: 'pending', id, key: `pending-${id}` })
-                       }
-                   })
-                   if (tiles.length < 2) {
-                       tiles.push({ type: 'placeholder', key: 'placeholder' })
-                   }
-                   if (role === 'volunteer' && tiles.length === 2 && tiles[0].type === 'local') {
-                       tiles.reverse()
-                   }
+                    const tiles: any[] = []
+                    tiles.push({
+                        type: "local",
+                        stream: localStream,
+                        key: "local",
+                    })
+                    if (isLiveMode) {
+                        tiles.push({
+                            type: "remote",
+                            stream: null,
+                            id: "ai-live",
+                            key: "ai-live",
+                        })
+                    } else if (remoteStreams.size > 0) {
+                        remoteStreams.forEach((stream, id) => {
+                            tiles.push({ type: "remote", stream, id, key: id })
+                        })
+                    }
+                    pendingPeerIds.forEach((id) => {
+                        if (!remoteStreams.has(id)) {
+                            tiles.push({
+                                type: "pending",
+                                id,
+                                key: `pending-${id}`,
+                            })
+                        }
+                    })
+                    if (tiles.length < 2) {
+                        tiles.push({ type: "placeholder", key: "placeholder" })
+                    }
+                    if (
+                        role === "volunteer" &&
+                        tiles.length === 2 &&
+                        tiles[0].type === "local"
+                    ) {
+                        tiles.reverse()
+                    }
 
-                   return tiles.map((tile, index) => {
-                       const isLocal = tile.type === 'local'
-                       const isRemote = tile.type === 'remote'
-                       const isPending = tile.type === 'pending'
-                       const isPlaceholder = tile.type === 'placeholder'
-                       
-                       let bg = themeColors.card
-                       if (isLocal && !role && status === 'idle' && !isLiveMode) bg = themeColors.state.accent
-                       else if (isLocal && role === 'mentor' && !isRemote) bg = themeColors.surface
-                       else if (isPending) bg = "#000000"
-                       else if (isPlaceholder && role === 'student' && !isRemote) bg = themeColors.surface
+                    return tiles.map((tile, index) => {
+                        const isLocal = tile.type === "local"
+                        const isRemote = tile.type === "remote"
+                        const isPending = tile.type === "pending"
+                        const isPlaceholder = tile.type === "placeholder"
 
-                       const onClick = () => {
-                           if (isLocal && !role && status === 'idle' && !isLiveMode) handleRoleSelect('student')
-                           if (isPlaceholder && !role && status === 'idle') handleRoleSelect('volunteer')
-                       }
+                        let bg = themeColors.card
+                        if (
+                            isLocal &&
+                            !role &&
+                            status === "idle" &&
+                            !isLiveMode
+                        )
+                            bg = themeColors.state.accent
+                        else if (isLocal && role === "mentor" && !isRemote)
+                            bg = themeColors.surface
+                        else if (isPending) bg = "#000000"
+                        else if (
+                            isPlaceholder &&
+                            role === "student" &&
+                            !isRemote
+                        )
+                            bg = themeColors.surface
 
-                       return (
-                         <motion.div
-                            key={index}
-                            initial={false}
-                            animate={{
-                                flex: "0 0 auto",
-                                width: isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar) 
-                                    ? "auto" 
-                                    : fitWidth,
-                                height: isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)
-                                    ? (isMobileLayout || isSidebar ? "auto" : "100%")
-                                    : fitHeight,
-                                borderRadius: (isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar))
-                                    ? 24 
-                                    : (fitHeight < ((isMobileLayout || isSidebar) ? 164 : 224) ? 28 : 36)
-                            }}
-                            // @ts-ignore
-                            transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
-                            style={{
-                                transition: "border-radius 4s ease-in-out", // over 4 seconds to smoothly animate border radius changes 
-                                overflow: "hidden",
-                                position: "relative",
-                                background: bg,
-                                cursor: (!role && status === "idle") ? "pointer" : "default",
-                                display: "flex",
-                                flexDirection: "column",
-                                aspectRatio: (isMobileLayout || isSidebar) ? targetRatio : targetRatio,
-                                minWidth: 0,
-                                flexShrink: (isScreenSharing || !!remoteScreenStream || ((isWhiteboardOpen || isDocOpen) && !isSidebar)) && !(isMobileLayout || isSidebar) ? 0 : 1,
-                            }}
-                            layout // Added layout prop to animate aspect ratio/size changes
-                            onClick={onClick}
-                        >
-                            {/* CONTENT FOR TILE */}
-                            {isLocal ? (
-                                 (!role && status === "idle" && !isLiveMode) ? (
-                                    <RoleSelectionButton
-                                        colors={themeColors}
-                                        type="student"
-                                        isCompact={isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224)}
-                                        isMobileLayout={isMobileLayout}
+                        const onClick = () => {
+                            if (
+                                isLocal &&
+                                !role &&
+                                status === "idle" &&
+                                !isLiveMode
+                            )
+                                handleRoleSelect("student")
+                            if (isPlaceholder && !role && status === "idle")
+                                handleRoleSelect("volunteer")
+                        }
+
+                        return (
+                            <motion.div
+                                key={index}
+                                initial={false}
+                                animate={{
+                                    flex: "0 0 auto",
+                                    width:
+                                        isScreenSharing ||
+                                        !!remoteScreenStream ||
+                                        ((isWhiteboardOpen || isDocOpen) &&
+                                            !isSidebar)
+                                            ? "auto"
+                                            : fitWidth,
+                                    height:
+                                        isScreenSharing ||
+                                        !!remoteScreenStream ||
+                                        ((isWhiteboardOpen || isDocOpen) &&
+                                            !isSidebar)
+                                            ? isMobileLayout || isSidebar
+                                                ? "auto"
+                                                : "100%"
+                                            : fitHeight,
+                                    borderRadius:
+                                        isScreenSharing ||
+                                        !!remoteScreenStream ||
+                                        ((isWhiteboardOpen || isDocOpen) &&
+                                            !isSidebar)
+                                            ? 24
+                                            : fitHeight <
+                                                (isMobileLayout || isSidebar
+                                                    ? 164
+                                                    : 224)
+                                              ? 28
+                                              : 36,
+                                }}
+                                // @ts-ignore
+                                transition={{
+                                    duration: isDragging.current ? 0 : 0.25,
+                                    ease: "easeInOut",
+                                }}
+                                style={{
+                                    transition: "border-radius 4s ease-in-out", // over 4 seconds to smoothly animate border radius changes
+                                    overflow: "hidden",
+                                    position: "relative",
+                                    background: bg,
+                                    cursor:
+                                        !role && status === "idle"
+                                            ? "pointer"
+                                            : "default",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    aspectRatio:
+                                        isMobileLayout || isSidebar
+                                            ? targetRatio
+                                            : targetRatio,
+                                    minWidth: 0,
+                                    flexShrink:
+                                        (isScreenSharing ||
+                                            !!remoteScreenStream ||
+                                            ((isWhiteboardOpen || isDocOpen) &&
+                                                !isSidebar)) &&
+                                        !(isMobileLayout || isSidebar)
+                                            ? 0
+                                            : 1,
+                                }}
+                                layout // Added layout prop to animate aspect ratio/size changes
+                                onClick={onClick}
+                            >
+                                {/* CONTENT FOR TILE */}
+                                {isLocal ? (
+                                    !role &&
+                                    status === "idle" &&
+                                    !isLiveMode ? (
+                                        <RoleSelectionButton
+                                            colors={themeColors}
+                                            type="student"
+                                            isCompact={
+                                                isScreenSharing ||
+                                                !!remoteScreenStream ||
+                                                isWhiteboardOpen ||
+                                                isDocOpen ||
+                                                finalHeight <
+                                                    (isMobileLayout || isSidebar
+                                                        ? 164
+                                                        : 224)
+                                            }
+                                            isMobileLayout={isMobileLayout}
+                                        />
+                                    ) : (!role && status === "searching") ||
+                                      role === "student" ||
+                                      isLiveMode ||
+                                      (isPrivateRoomConnection &&
+                                          status === "connected" &&
+                                          isLocal) ? (
+                                        <VideoPlayer
+                                            stream={tile.stream}
+                                            isMirrored={true}
+                                            muted={true}
+                                            themeColors={themeColors}
+                                        />
+                                    ) : (
+                                        <VideoPlayer
+                                            stream={localStream}
+                                            isMirrored={true}
+                                            muted={true}
+                                            themeColors={themeColors}
+                                        />
+                                    )
+                                ) : isRemote ? (
+                                    isLiveMode ? (
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background:
+                                                    "linear-gradient(180deg, #4DB8FF 0%, #0099FF 100%)",
+                                            }}
+                                        >
+                                            <GeminiLiveCharacter
+                                                isThinking={isLiveGenerating}
+                                                isSpeaking={isAiSpeaking}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <VideoPlayer
+                                            stream={tile.stream}
+                                            isMirrored={false}
+                                            themeColors={themeColors}
+                                        />
+                                    )
+                                ) : isPending ? (
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            background: "#000000",
+                                        }}
                                     />
-                                 ) : (!role && status === "searching") || role === "student" || isLiveMode || (isPrivateRoomConnection && status === "connected" && isLocal) ? (
-                                    <VideoPlayer stream={tile.stream} isMirrored={true} muted={true} themeColors={themeColors} />
-                                 ) : (
-                                    <VideoPlayer stream={localStream} isMirrored={true} muted={true} themeColors={themeColors} />
-                                 )
-                            ) : isRemote ? (
-                                 isLiveMode ? (
-                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(180deg, #4DB8FF 0%, #0099FF 100%)" }}>
-                                        <GeminiLiveCharacter isThinking={isLiveGenerating} isSpeaking={isAiSpeaking} />
-                    </div>
-                                 ) : (
-                                    <VideoPlayer stream={tile.stream} isMirrored={false} themeColors={themeColors} />
-                                 )
-                            ) : isPending ? (
-                                 <div style={{ width: "100%", height: "100%", background: "#000000" }} />
-                            ) : (
-                                !role && status === "idle" ? (
+                                ) : !role && status === "idle" ? (
                                     <RoleSelectionButton
                                         colors={themeColors}
                                         type="volunteer"
-                                        isCompact={isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || finalHeight < ((isMobileLayout || isSidebar) ? 164 : 224)}
+                                        isCompact={
+                                            isScreenSharing ||
+                                            !!remoteScreenStream ||
+                                            isWhiteboardOpen ||
+                                            isDocOpen ||
+                                            finalHeight <
+                                                (isMobileLayout || isSidebar
+                                                    ? 164
+                                                    : 224)
+                                        }
                                         isMobileLayout={isMobileLayout}
                                     />
-                                ) : isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen ? (
-                                    <VideoPlayer stream={null} placeholder="Waiting..." themeColors={themeColors} style={transparentStyle} />
+                                ) : isScreenSharing ||
+                                  !!remoteScreenStream ||
+                                  isWhiteboardOpen ||
+                                  isDocOpen ? (
+                                    <VideoPlayer
+                                        stream={null}
+                                        placeholder="Waiting..."
+                                        themeColors={themeColors}
+                                        style={transparentStyle}
+                                    />
                                 ) : (
                                     <div
                                         data-layer="tile"
                                         className="Tile"
-                            style={{
+                                        style={{
                                             alignSelf: "stretch",
                                             height: "100%",
                                             padding: 16,
-                                            background: isPrivateRoomConnection ? "#000000" : "transparent",
+                                            background: isPrivateRoomConnection
+                                                ? "#000000"
+                                                : "transparent",
                                             overflow: "hidden",
                                             borderRadius: 28,
                                             flexDirection: "column",
@@ -14117,23 +17058,42 @@ Do not include markdown formatting or explanations.`
                                     >
                                         {!isPrivateRoomConnection && (
                                             <>
-                                                <div style={{ textAlign: "center", color: themeColors.text.primary, fontSize: 15, marginBottom: 8 }}>
-                                                    {role === 'volunteer' ? "Waiting for student" : "Waiting for mentor"}
-                        </div>
-                                                {role !== 'volunteer' && (
-                                                    <div onClick={handleConnectWithAI} style={{ cursor: "pointer", color: themeColors.text.secondary, fontSize: 15 }}>
+                                                <div
+                                                    style={{
+                                                        textAlign: "center",
+                                                        color: themeColors.text
+                                                            .primary,
+                                                        fontSize: 15,
+                                                        marginBottom: 8,
+                                                    }}
+                                                >
+                                                    {role === "volunteer"
+                                                        ? "Waiting for student"
+                                                        : "Waiting for mentor"}
+                                                </div>
+                                                {role !== "volunteer" && (
+                                                    <div
+                                                        onClick={
+                                                            handleConnectWithAI
+                                                        }
+                                                        style={{
+                                                            cursor: "pointer",
+                                                            color: themeColors
+                                                                .text.secondary,
+                                                            fontSize: 15,
+                                                        }}
+                                                    >
                                                         Or connect with AI
                                                     </div>
                                                 )}
                                             </>
                                         )}
                                     </div>
-                                )
-                            )}
-                        </motion.div>
-                       )
-                   })
-               })()}
+                                )}
+                            </motion.div>
+                        )
+                    })
+                })()}
             </div>
         )
     }
@@ -14147,16 +17107,16 @@ Do not include markdown formatting or explanations.`
         // In sidebar context, we force the container to act like a mobile container
         // But we rely on the parent container (400px width) to constrain it.
         // The renderTilesSection and renderChatSection helpers already accept isSidebarContext to adjust their internal logic.
-        
+
         // Drag bar logic:
         // In sidebar context, the drag bar is used to resize chat vs tiles in the sidebar column.
         // It should work exactly as it does on mobile.
-        
+
         return (
-                        <div
-                            data-layer="standard-layout-container"
-                            className="StandardLayoutContainer"
-                            style={{
+            <div
+                data-layer="standard-layout-container"
+                className="StandardLayoutContainer"
+                style={{
                     flex: "1 1 0",
                     width: "100%",
                     display: "flex",
@@ -14166,51 +17126,105 @@ Do not include markdown formatting or explanations.`
                 }}
             >
                 {/* 1. Tiles & Main Content Area */}
-                {(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen || !isBanned) && (
-                     <div data-layer="tiles-main-content-area" className="TilesMainContentArea" style={{
-                         flex: "1 1 0",
-                         width: "100%",
-                         display: "flex",
-                         // Sidebar context: Always column (vertical stack). Standard context: Adaptive.
-                         flexDirection: isSidebarContext 
-                             ? "column" 
-                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "column" : shouldUseHorizontalLayout ? "row" : "column"),
-                         gap: 8,
-                         paddingTop: 16,
-                         paddingLeft: 16,
-                         paddingRight: 16,
-                         paddingBottom: 0,
-                         alignItems: isSidebarContext
-                             ? "center"
-                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "center" : !isMobileLayout ? "center" : "center"),
-                         justifyContent: isSidebarContext
-                             ? "flex-start" 
-                             : ((isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "flex-start" : "center"),
-                         boxSizing: "border-box",
-                         minHeight: 0,
-                         position: "relative",
-                         overflow: "hidden",
-                     }}>
-                         {/* Tiles */}
-                         {renderTilesSection(isSidebarContext)}
+                {(isScreenSharing ||
+                    !!remoteScreenStream ||
+                    isWhiteboardOpen ||
+                    isDocOpen ||
+                    !isBanned) && (
+                    <div
+                        data-layer="tiles-main-content-area"
+                        className="TilesMainContentArea"
+                        style={{
+                            flex: "1 1 0",
+                            width: "100%",
+                            display: "flex",
+                            // Sidebar context: Always column (vertical stack). Standard context: Adaptive.
+                            flexDirection: isSidebarContext
+                                ? "column"
+                                : isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                  ? "column"
+                                  : shouldUseHorizontalLayout
+                                    ? "row"
+                                    : "column",
+                            gap: 8,
+                            paddingTop: 16,
+                            paddingLeft: 16,
+                            paddingRight: 16,
+                            paddingBottom: 0,
+                            alignItems: isSidebarContext
+                                ? "center"
+                                : isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                  ? "center"
+                                  : !isMobileLayout
+                                    ? "center"
+                                    : "center",
+                            justifyContent: isSidebarContext
+                                ? "flex-start"
+                                : isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                  ? "flex-start"
+                                  : "center",
+                            boxSizing: "border-box",
+                            minHeight: 0,
+                            position: "relative",
+                            overflow: "hidden",
+                        }}
+                    >
+                        {/* Tiles */}
+                        {renderTilesSection(isSidebarContext)}
 
-                         {/* Main Content (ScreenShare Only in this view - Tool is overlaid or not shown here if mobile tool mode) */}
-                         {(isScreenSharing || !!remoteScreenStream) && (
-                             <div data-layer="screen-share-section" className="ScreenShareSection" style={{ flex: 1, width: "100%", overflow: "hidden", background: "transparent", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                 {renderScreenShareSection()}
-                        </div>
-                         )}
+                        {/* Main Content (ScreenShare Only in this view - Tool is overlaid or not shown here if mobile tool mode) */}
+                        {(isScreenSharing || !!remoteScreenStream) && (
+                            <div
+                                data-layer="screen-share-section"
+                                className="ScreenShareSection"
+                                style={{
+                                    flex: 1,
+                                    width: "100%",
+                                    overflow: "hidden",
+                                    background: "transparent",
+                                    position: "relative",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}
+                            >
+                                {renderScreenShareSection()}
+                            </div>
+                        )}
                     </div>
                 )}
-                
+
                 {/* 2. Drag Handle (Present in both Standard and Sidebar) */}
-                {(!isBanned || isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) && (
+                {(!isBanned ||
+                    isScreenSharing ||
+                    !!remoteScreenStream ||
+                    isWhiteboardOpen ||
+                    isDocOpen) && (
                     <motion.div
                         data-layer="drag-handle-container"
                         className="DragHandleContainer"
                         onPointerDown={handlePointerDown}
-                        onPointerEnter={() => { hoverTimeoutRef.current = window.setTimeout(() => { setIsDragBarHovered(true) }, 50) }}
-                        onPointerLeave={() => { if (hoverTimeoutRef.current) { clearTimeout(hoverTimeoutRef.current); hoverTimeoutRef.current = null }; setIsDragBarHovered(false) }}
+                        onPointerEnter={() => {
+                            hoverTimeoutRef.current = window.setTimeout(() => {
+                                setIsDragBarHovered(true)
+                            }, 50)
+                        }}
+                        onPointerLeave={() => {
+                            if (hoverTimeoutRef.current) {
+                                clearTimeout(hoverTimeoutRef.current)
+                                hoverTimeoutRef.current = null
+                            }
+                            setIsDragBarHovered(false)
+                        }}
                         style={{
                             height: 24,
                             width: "100%",
@@ -14223,41 +17237,84 @@ Do not include markdown formatting or explanations.`
                             position: "relative",
                         }}
                     >
-                            <div
-                                data-layer="drag-indicator"
-                                style={{ width: 48, height: 5, borderRadius: 4, background: "rgba(133,133,133)" }} 
-                            />
+                        <div
+                            data-layer="drag-indicator"
+                            style={{
+                                width: 48,
+                                height: 5,
+                                borderRadius: 4,
+                                background: "rgba(133,133,133)",
+                            }}
+                        />
                         {isDragBarHovered && !isDragging.current && (
-                            <Tooltip style={{ top: "100%", left: "50%", transform: "translate(-50%, 4px)", whiteSpace: "nowrap" }}>
-                                {chatHeight < currentConstraints.maxHeight - 5 ? "Click to expand chat" : "Click to hide chat"}
+                            <Tooltip
+                                style={{
+                                    top: "100%",
+                                    left: "50%",
+                                    transform: "translate(-50%, 4px)",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {chatHeight < currentConstraints.maxHeight - 5
+                                    ? "Click to expand chat"
+                                    : "Click to hide chat"}
                             </Tooltip>
                         )}
                     </motion.div>
                 )}
 
                 {/* 3. Chat History (Drawer) */}
-                <div 
+                <div
                     data-layer="chat-history-drawer"
                     className="ChatHistoryDrawer"
-                    style={{ width: "100%", height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : "auto", background: "transparent", display: "flex", justifyContent: "center" }}
+                    style={{
+                        width: "100%",
+                        height:
+                            isBanned &&
+                            !(
+                                isScreenSharing ||
+                                !!remoteScreenStream ||
+                                isWhiteboardOpen ||
+                                isDocOpen
+                            )
+                                ? "100%"
+                                : "auto",
+                        background: "transparent",
+                        display: "flex",
+                        justifyContent: "center",
+                    }}
                 >
-                    <motion.div 
+                    <motion.div
                         data-layer="chat-history-content"
                         className="ChatHistoryContent"
                         initial={false}
-                        animate={{ height: isBanned && !(isScreenSharing || !!remoteScreenStream || isWhiteboardOpen || isDocOpen) ? "100%" : chatHeight }}
-                        transition={{ duration: isDragging.current ? 0 : 0.25, ease: "easeInOut" }}
-                        style={{ 
-                            paddingTop: 0, 
-                            width: "100%", 
-                            maxWidth: 728, 
-                            position: "relative", 
-                            display: "flex", 
+                        animate={{
+                            height:
+                                isBanned &&
+                                !(
+                                    isScreenSharing ||
+                                    !!remoteScreenStream ||
+                                    isWhiteboardOpen ||
+                                    isDocOpen
+                                )
+                                    ? "100%"
+                                    : chatHeight,
+                        }}
+                        transition={{
+                            duration: isDragging.current ? 0 : 0.25,
+                            ease: "easeInOut",
+                        }}
+                        style={{
+                            paddingTop: 0,
+                            width: "100%",
+                            maxWidth: 728,
+                            position: "relative",
+                            display: "flex",
                             flexDirection: "column",
-                            overflow: "hidden" 
+                            overflow: "hidden",
                         }}
                     >
-                         {renderChatSection(isSidebarContext)}
+                        {renderChatSection(isSidebarContext)}
                     </motion.div>
                 </div>
             </div>
@@ -14269,7 +17326,9 @@ Do not include markdown formatting or explanations.`
             ref={containerRef}
             data-layer="main-app-container"
             className="MainAppContainer"
-            onClick={() => isMobileLayout && isSidebarOpen && setIsSidebarOpen(false)}
+            onClick={() =>
+                isMobileLayout && isSidebarOpen && setIsSidebarOpen(false)
+            }
             style={{
                 width: "100%",
                 height: "100%",
@@ -14289,24 +17348,26 @@ Do not include markdown formatting or explanations.`
             }}
         >
             {/* --- SIDEBAR & BUTTON --- */}
-            <div 
-                data-svg-wrapper 
-                data-layer="open sidebar (6% white fill on hover)" 
-                className="OpenSidebar6WhiteFillOnHover" 
+            <div
+                data-svg-wrapper
+                data-layer="open sidebar (6% white fill on hover)"
+                className="OpenSidebar6WhiteFillOnHover"
                 style={{
-                    left: 8, 
-                    top: 8, 
-                    position: 'absolute', 
-                    zIndex: 100, 
-                    cursor: 'pointer',
-                    background: isSidebarBtnHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
-                    borderRadius: '50%',
+                    left: 8,
+                    top: 8,
+                    position: "absolute",
+                    zIndex: 100,
+                    cursor: "pointer",
+                    background: isSidebarBtnHovered
+                        ? "rgba(255, 255, 255, 0.06)"
+                        : "transparent",
+                    borderRadius: "50%",
                     width: 36,
                     height: 36,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }} 
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}
                 onMouseEnter={() => setIsSidebarBtnHovered(true)}
                 onMouseLeave={() => setIsSidebarBtnHovered(false)}
                 onClick={(e) => {
@@ -14314,79 +17375,142 @@ Do not include markdown formatting or explanations.`
                     setIsSidebarOpen(true)
                 }}
             >
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg
+                    width="36"
+                    height="36"
+                    viewBox="0 0 36 36"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M10 14H26M10 22H20"
+                        stroke="white"
+                        strokeOpacity="0.95"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
                 </svg>
             </div>
 
             <AnimatePresence>
-            {isSidebarOpen && (
-                <>
-                    {isMobileLayout && (
+                {isSidebarOpen && (
+                    <>
+                        {isMobileLayout && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                style={{
+                                    position: "fixed",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: colors.state.overlay,
+                                    zIndex: 9999, // Below sidebar (10000)
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setIsSidebarOpen(false)
+                                }}
+                            />
+                        )}
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
+                            data-layer="left sidebar"
+                            className="LeftSidebar"
+                            initial={{ x: -260 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: -260 }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 30,
+                            }}
                             style={{
-                                position: "fixed",
+                                width: 260,
+                                height: "100%",
+                                paddingTop: 108,
+                                position: "absolute",
                                 top: 0,
                                 left: 0,
-                                right: 0,
                                 bottom: 0,
-                                background: colors.state.overlay,
-                                zIndex: 9999, // Below sidebar (10000)
+                                background: "#141414",
+                                overflow: "hidden",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: 24,
+                                display: "inline-flex",
+                                zIndex: 10000,
                             }}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                setIsSidebarOpen(false)
-                            }}
-                        />
-                    )}
-                    <motion.div 
-                        data-layer="left sidebar" 
-                        className="LeftSidebar" 
-                        initial={{ x: -260 }}
-                        animate={{ x: 0 }}
-                        exit={{ x: -260 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        style={{
-                            width: 260, 
-                            height: '100%', 
-                            paddingTop: 108, 
-                            position: 'absolute', 
-                            top: 0, 
-                            left: 0, 
-                            bottom: 0, 
-                            background: '#141414', 
-                            overflow: 'hidden', 
-                            flexDirection: 'column', 
-                            justifyContent: 'flex-start', 
-                            alignItems: 'flex-start', 
-                            gap: 24, 
-                            display: 'inline-flex', 
-                            zIndex: 10000
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div 
-                            data-layer="chat history flexbox" 
-                            className="ChatHistoryFlexbox" 
-                            style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}
-                            onScroll={() => {
-                                if (menuOpenChatId) {
-                                    setMenuOpenChatId(null)
-                                    setMenuPosition(null)
-                                    setHoveredActionId(null)
-                                }
-                            }}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                        {savedChats.filter(chat => !searchQuery || chat.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
-                            <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
-                                <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Your chats</div>
-                            </div>
-                        )}
-                        {/* 
+                            <div
+                                data-layer="chat history flexbox"
+                                className="ChatHistoryFlexbox"
+                                style={{
+                                    alignSelf: "stretch",
+                                    flex: "1 1 0",
+                                    padding: 8,
+                                    flexDirection: "column",
+                                    justifyContent: "flex-start",
+                                    alignItems: "flex-start",
+                                    display: "flex",
+                                    overflowY: "auto",
+                                }}
+                                onScroll={() => {
+                                    if (menuOpenChatId) {
+                                        setMenuOpenChatId(null)
+                                        setMenuPosition(null)
+                                        setHoveredActionId(null)
+                                    }
+                                }}
+                            >
+                                {savedChats.filter(
+                                    (chat) =>
+                                        !searchQuery ||
+                                        chat.title
+                                            .toLowerCase()
+                                            .includes(searchQuery.toLowerCase())
+                                ).length > 0 && (
+                                    <div
+                                        data-layer="Chat title"
+                                        className="ChatTitle"
+                                        style={{
+                                            alignSelf: "stretch",
+                                            paddingLeft: 10,
+                                            paddingRight: 10,
+                                            paddingTop: 8,
+                                            paddingBottom: 8,
+                                            borderRadius: 12,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                        }}
+                                    >
+                                        <div
+                                            data-layer="Your chats"
+                                            className="YourChats"
+                                            style={{
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.65)",
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: "19.32px",
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            Your chats
+                                        </div>
+                                    </div>
+                                )}
+                                {/* 
                           New Chat button - Only shows if the current chat isn't "New chat" 
                           Wait, per prompt: "it doesnt say empty new chats to sidebar UNLESS its the chat the user currently has open."
                           Meaning if I am in a new empty chat, it should be listed in sidebar as "New chat".
@@ -14406,229 +17530,516 @@ Do not include markdown formatting or explanations.`
                           - CHANGED: We now HIDE this item entirely if it's new/unsaved.
                           - It will only appear once saved (after first message).
                         */}
-                        {false && !savedChats.find(c => c.id === currentChatId) && (
-                             <div 
-                                onClick={() => {
-                                    // It's already open, just close sidebar
-                                    if (isMobileLayout) setIsSidebarOpen(false)
-                                }}
-                                data-layer="chat item (current new)" 
-                                style={{
-                                    alignSelf: 'stretch', 
-                                    minHeight: 36, 
-                                    paddingLeft: 10, 
-                                    paddingRight: 10, 
-                                    borderRadius: 28, 
-                                    justifyContent: 'flex-start', 
-                                    alignItems: 'center', 
-                                    gap: 8, 
-                                    display: 'inline-flex', 
-                                    cursor: 'pointer', 
-                                    marginBottom: 2,
-                                    background: 'rgba(255, 255, 255, 0.06)' // Always highlighted as we are in it
-                                }}
-                            >
-                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>New chat</div>
-                            </div>
-                        )}
-
-                        {savedChats.filter(chat => !searchQuery || chat.title.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
-                            <div 
-                                key={chat.id} 
-                                onClick={() => {
-                                    if (editingChatId === chat.id) return
-                                    setCurrentChatId(chat.id)
-                                    setMessages(chat.messages)
-                                    setDocContent(chat.notes || "")
-                                    if (chat.whiteboard && editorRef.current) {
-                                        try {
-                                            editorRef.current.store.loadSnapshot(chat.whiteboard)
-                                        } catch(e) { console.error(e) }
-                                    }
-                                    if (isMobileLayout) setIsSidebarOpen(false)
-                                }} 
-                                onMouseEnter={() => setHoveredChatId(chat.id)}
-                                onMouseLeave={() => setHoveredChatId(null)}
-                                data-layer="chat item" 
-                                style={{
-                                    alignSelf: 'stretch', 
-                                    minHeight: 36, 
-                                    paddingLeft: 10, 
-                                    paddingRight: 10, 
-                                    borderRadius: 28, 
-                                    justifyContent: 'flex-start', 
-                                    alignItems: 'center', 
-                                    gap: 8, 
-                                    display: 'inline-flex', 
-                                    cursor: 'pointer', 
-                                    marginBottom: 2,
-                                    position: "relative",
-                                    background: (hoveredChatId === chat.id || currentChatId === chat.id || menuOpenChatId === chat.id) 
-                                        ? (hoveredChatId === chat.id ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.06)') 
-                                        : 'transparent'
-                                }}
-                            >
-                                {editingChatId === chat.id ? (
-                                    <input
-                                        ref={renameInputRef}
-                                        value={editingTitle}
-                                        onChange={(e) => setEditingTitle(e.target.value)}
-                                        onBlur={handleFinishRename}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") handleFinishRename()
-                                            if (e.key === "Escape") {
-                                                setEditingChatId(null)
-                                                setEditingTitle("")
-                                            }
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={{
-                                            flex: '1 1 0',
-                                            background: "transparent",
-                                            border: "none",
-                                            color: 'rgba(255, 255, 255, 0.95)',
-                                            fontSize: 14,
-                                            fontFamily: 'Inter',
-                                            fontWeight: '400',
-                                            lineHeight: "19.32px",
-                                            outline: "none",
-                                            padding: 0,
-                                            width: "100%"
-                                        }}
-                                    />
-                                ) : (
-                                    <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>
-                                        {chat.title}
-                                    </div>
-                                )}
-
-
-                                {(hoveredChatId === chat.id || menuOpenChatId === chat.id || isMobileLayout) && !editingChatId ? (
+                                {false &&
+                                    !savedChats.find(
+                                        (c) => c.id === currentChatId
+                                    ) && (
                                         <div
+                                            onClick={() => {
+                                                // It's already open, just close sidebar
+                                                if (isMobileLayout)
+                                                    setIsSidebarOpen(false)
+                                            }}
+                                            data-layer="chat item (current new)"
+                                            style={{
+                                                alignSelf: "stretch",
+                                                minHeight: 36,
+                                                paddingLeft: 10,
+                                                paddingRight: 10,
+                                                borderRadius: 28,
+                                                justifyContent: "flex-start",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                display: "inline-flex",
+                                                cursor: "pointer",
+                                                marginBottom: 2,
+                                                background:
+                                                    "rgba(255, 255, 255, 0.06)", // Always highlighted as we are in it
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    flex: "1 1 0",
+                                                    justifyContent: "center",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    color: "rgba(255, 255, 255, 0.95)",
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "400",
+                                                    lineHeight: "19.32px",
+                                                    wordWrap: "break-word",
+                                                    overflow: "hidden",
+                                                    whiteSpace: "nowrap",
+                                                    textOverflow: "ellipsis",
+                                                }}
+                                            >
+                                                New chat
+                                            </div>
+                                        </div>
+                                    )}
+
+                                {savedChats
+                                    .filter(
+                                        (chat) =>
+                                            !searchQuery ||
+                                            chat.title
+                                                .toLowerCase()
+                                                .includes(
+                                                    searchQuery.toLowerCase()
+                                                )
+                                    )
+                                    .map((chat) => (
+                                        <div
+                                            key={chat.id}
+                                            onClick={() => {
+                                                if (editingChatId === chat.id)
+                                                    return
+                                                setCurrentChatId(chat.id)
+                                                setMessages(chat.messages)
+                                                setDocContent(chat.notes || "")
+                                                if (
+                                                    chat.whiteboard &&
+                                                    editorRef.current
+                                                ) {
+                                                    try {
+                                                        editorRef.current.store.loadSnapshot(
+                                                            chat.whiteboard
+                                                        )
+                                                    } catch (e) {
+                                                        console.error(e)
+                                                    }
+                                                }
+                                                if (isMobileLayout)
+                                                    setIsSidebarOpen(false)
+                                            }}
+                                            onMouseEnter={() =>
+                                                setHoveredChatId(chat.id)
+                                            }
+                                            onMouseLeave={() =>
+                                                setHoveredChatId(null)
+                                            }
+                                            data-layer="chat item"
+                                            style={{
+                                                alignSelf: "stretch",
+                                                minHeight: 36,
+                                                paddingLeft: 10,
+                                                paddingRight: 10,
+                                                borderRadius: 28,
+                                                justifyContent: "flex-start",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                display: "inline-flex",
+                                                cursor: "pointer",
+                                                marginBottom: 2,
+                                                position: "relative",
+                                                background:
+                                                    hoveredChatId === chat.id ||
+                                                    currentChatId === chat.id ||
+                                                    menuOpenChatId === chat.id
+                                                        ? hoveredChatId ===
+                                                          chat.id
+                                                            ? "rgba(255, 255, 255, 0.10)"
+                                                            : "rgba(255, 255, 255, 0.06)"
+                                                        : "transparent",
+                                            }}
+                                        >
+                                            {editingChatId === chat.id ? (
+                                                <input
+                                                    ref={renameInputRef}
+                                                    value={editingTitle}
+                                                    onChange={(e) =>
+                                                        setEditingTitle(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    onBlur={handleFinishRename}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter")
+                                                            handleFinishRename()
+                                                        if (
+                                                            e.key === "Escape"
+                                                        ) {
+                                                            setEditingChatId(
+                                                                null
+                                                            )
+                                                            setEditingTitle("")
+                                                        }
+                                                    }}
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                    style={{
+                                                        flex: "1 1 0",
+                                                        background:
+                                                            "transparent",
+                                                        border: "none",
+                                                        color: "rgba(255, 255, 255, 0.95)",
+                                                        fontSize: 14,
+                                                        fontFamily: "Inter",
+                                                        fontWeight: "400",
+                                                        lineHeight: "19.32px",
+                                                        outline: "none",
+                                                        padding: 0,
+                                                        width: "100%",
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    style={{
+                                                        flex: "1 1 0",
+                                                        justifyContent:
+                                                            "center",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        color: "rgba(255, 255, 255, 0.95)",
+                                                        fontSize: 14,
+                                                        fontFamily: "Inter",
+                                                        fontWeight: "400",
+                                                        lineHeight: "19.32px",
+                                                        wordWrap: "break-word",
+                                                        overflow: "hidden",
+                                                        whiteSpace: "nowrap",
+                                                        textOverflow:
+                                                            "ellipsis",
+                                                    }}
+                                                >
+                                                    {chat.title}
+                                                </div>
+                                            )}
+
+                                            {(hoveredChatId === chat.id ||
+                                                menuOpenChatId === chat.id ||
+                                                isMobileLayout) &&
+                                            !editingChatId ? (
+                                                <div
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (
+                                                            menuOpenChatId ===
+                                                            chat.id
+                                                        ) {
+                                                            setMenuOpenChatId(
+                                                                null
+                                                            )
+                                                            setMenuPosition(
+                                                                null
+                                                            )
+                                                        } else {
+                                                            const rect =
+                                                                e.currentTarget.getBoundingClientRect()
+                                                            setMenuOpenChatId(
+                                                                chat.id
+                                                            )
+                                                            setMenuPosition({
+                                                                top:
+                                                                    rect.bottom +
+                                                                    4,
+                                                                left: rect.left,
+                                                            })
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        width: 16,
+                                                        height: 24,
+                                                        borderRadius: 12,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent:
+                                                            "center",
+                                                        color: "rgba(255,255,255,0.7)",
+                                                    }}
+                                                >
+                                                    <div
+                                                        data-svg-wrapper
+                                                        data-layer="open actions menu button"
+                                                        className="OpenActionsMenuButton"
+                                                        style={{
+                                                            position:
+                                                                "relative",
+                                                        }}
+                                                    >
+                                                        <svg
+                                                            width="16"
+                                                            height="24"
+                                                            viewBox="0 0 16 24"
+                                                            fill="none"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <path
+                                                                d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z"
+                                                                fill="white"
+                                                                fillOpacity="0.95"
+                                                            />
+                                                            <path
+                                                                d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z"
+                                                                fill="white"
+                                                                fillOpacity="0.95"
+                                                            />
+                                                            <path
+                                                                d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z"
+                                                                fill="white"
+                                                                fillOpacity="0.95"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                chat.isPinned &&
+                                                !editingChatId && (
+                                                    <div
+                                                        data-svg-wrapper
+                                                        data-layer="16x24 to make sure its centered and good"
+                                                        style={{
+                                                            width: 16,
+                                                            height: 24,
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            justifyContent:
+                                                                "center",
+                                                            marginLeft: 4,
+                                                        }}
+                                                    >
+                                                        <svg
+                                                            width="16"
+                                                            height="24"
+                                                            viewBox="0 0 16 24"
+                                                            fill="none"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <path
+                                                                d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z"
+                                                                fill="white"
+                                                                fillOpacity="0.45"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    ))}
+                            </div>
+
+                            <div
+                                data-layer="fixed top nav"
+                                className="FixedTopNav"
+                                style={{
+                                    width: "100%",
+                                    padding: 8,
+                                    left: 0,
+                                    top: 0,
+                                    position: "absolute",
+                                    background: "#141414",
+                                    flexDirection: "column",
+                                    justifyContent: "flex-start",
+                                    alignItems: "flex-start",
+                                    gap: 12,
+                                    display: "inline-flex",
+                                }}
+                            >
+                                <div
+                                    data-layer="sidebar top actions"
+                                    className="SidebarTopActions"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        justifyContent: "space-between",
+                                        alignItems: "flex-start",
+                                        display: "inline-flex",
+                                    }}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        data-layer="new chat (6% white fill on HOVER)"
+                                        className="NewChat6WhiteFillOnHover"
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            if (menuOpenChatId === chat.id) {
-                                                setMenuOpenChatId(null)
-                                                setMenuPosition(null)
-                                            } else {
-                                                const rect = e.currentTarget.getBoundingClientRect()
-                                                setMenuOpenChatId(chat.id)
-                                                setMenuPosition({
-                                                    top: rect.bottom + 4,
-                                                    left: rect.left
-                                                })
-                                            }
+                                            handleClearMessages()
+                                            if (isMobileLayout)
+                                                setIsSidebarOpen(false)
                                         }}
+                                        onMouseEnter={() =>
+                                            setIsTopNewChatHovered(true)
+                                        }
+                                        onMouseLeave={() =>
+                                            setIsTopNewChatHovered(false)
+                                        }
                                         style={{
-                                            width: 16,
-                                            height: 24,
-                                            borderRadius: 12,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            color: "rgba(255,255,255,0.7)",
+                                            cursor: "pointer",
+                                            borderRadius: 28,
+                                            background: isTopNewChatHovered
+                                                ? "rgba(255, 255, 255, 0.06)"
+                                                : "transparent",
                                         }}
                                     >
-                                        <div data-svg-wrapper data-layer="open actions menu button" className="OpenActionsMenuButton" style={{position: 'relative'}}>
-                                            <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z" fill="white" fillOpacity="0.95"/>
-                                            <path d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z" fill="white" fillOpacity="0.95"/>
-                                            <path d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z" fill="white" fillOpacity="0.95"/>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                ) : (chat.isPinned && !editingChatId && (
-                                    <div data-svg-wrapper data-layer="16x24 to make sure its centered and good" style={{ width: 16, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                                        <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z" fill="white" fillOpacity="0.45"/>
+                                        <svg
+                                            width="36"
+                                            height="36"
+                                            viewBox="0 0 36 36"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M25.774 18.0001C25.774 21.5359 25.774 23.3034 24.6351 24.4017C23.4961 25.5 21.6623 25.5 17.9964 25.5C14.3297 25.5 12.4967 25.5 11.3577 24.4017C10.2187 23.3034 10.2188 21.5351 10.2188 18.0001C10.2188 14.4644 10.2187 12.6969 11.3577 11.5986C12.4967 10.5003 14.3305 10.5003 17.9964 10.5003M15.8645 17.2918C15.5695 17.5766 15.4039 17.9626 15.4038 18.3651V20.5001H17.6317C18.0491 20.5001 18.4501 20.3401 18.7456 20.0551L25.3134 13.7185C25.4597 13.5775 25.5757 13.4101 25.6548 13.2259C25.734 13.0417 25.7747 12.8442 25.7747 12.6448C25.7747 12.4454 25.734 12.2479 25.6548 12.0637C25.5757 11.8795 25.4597 11.7121 25.3134 11.5711L24.6644 10.9452C24.5182 10.8041 24.3446 10.6921 24.1534 10.6157C23.9623 10.5393 23.7574 10.5 23.5505 10.5C23.3436 10.5 23.1387 10.5393 22.9476 10.6157C22.7564 10.6921 22.5828 10.8041 22.4366 10.9452L15.8645 17.2918Z"
+                                                stroke="white"
+                                                strokeOpacity="0.95"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
                                         </svg>
                                     </div>
-                                ))}
+                                    <div
+                                        data-svg-wrapper
+                                        data-layer="close sidebar button (6% white fill on HOVER)"
+                                        className="CloseSidebarButton6WhiteFillOnHover"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setIsSidebarOpen(false)
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.stopPropagation()
+                                            setIsCloseSidebarHovered(true)
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.stopPropagation()
+                                            setIsCloseSidebarHovered(false)
+                                        }}
+                                        style={{
+                                            cursor: "pointer",
+                                            borderRadius: 28,
+                                            background: isCloseSidebarHovered
+                                                ? "rgba(255, 255, 255, 0.06)"
+                                                : "transparent",
+                                        }}
+                                    >
+                                        <svg
+                                            width="36"
+                                            height="36"
+                                            viewBox="0 0 36 36"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M10 14H26M10 22H20"
+                                                stroke="white"
+                                                strokeOpacity="0.95"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div
+                                    data-layer="search-bar"
+                                    className="SearchBar"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        height: 36,
+                                        paddingLeft: 12,
+                                        background: "#333333",
+                                        overflow: "hidden",
+                                        borderRadius: 50,
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        display: "inline-flex",
+                                    }}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        data-layer="search-icon"
+                                        className="SearchIcon"
+                                        style={{ marginTop: 2 }}
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M10.9289 10.8023L14.7616 14.6M12.6167 6.5224C12.6167 8.09311 11.9837 9.5995 10.8571 10.7102C9.73045 11.8208 8.20241 12.4448 6.60911 12.4448C5.01581 12.4448 3.48777 11.8208 2.36113 10.7102C1.2345 9.5995 0.601563 8.09311 0.601562 6.5224C0.601563 4.95168 1.2345 3.44529 2.36113 2.33463C3.48777 1.22396 5.01581 0.599998 6.60911 0.599998C8.20241 0.599998 9.73045 1.22396 10.8571 2.33463C11.9837 3.44529 12.6167 4.95168 12.6167 6.5224Z"
+                                                stroke="white"
+                                                strokeOpacity="0.65"
+                                                strokeWidth="1.2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <input
+                                        value={searchQuery}
+                                        onChange={(e) =>
+                                            setSearchQuery(e.target.value)
+                                        }
+                                        placeholder="Search"
+                                        className="Search"
+                                        style={{
+                                            flex: "1 1 0",
+                                            color: "rgba(255, 255, 255, 0.95)",
+                                            fontSize: 14,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: "19.60px",
+                                            background: "transparent",
+                                            border: "none",
+                                            outline: "none",
+                                            padding: 0,
+                                            height: "100%",
+                                        }}
+                                    />
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                    
-                    <div data-layer="fixed top nav" className="FixedTopNav" style={{width: '100%', padding: 8, left: 0, top: 0, position: 'absolute', background: '#141414', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 12, display: 'inline-flex'}}>
-                        <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
-                            <div 
-                                data-svg-wrapper 
-                                data-layer="new chat (6% white fill on HOVER)" 
-                                className="NewChat6WhiteFillOnHover"
-                                onClick={(e) => { e.stopPropagation(); handleClearMessages(); if (isMobileLayout) setIsSidebarOpen(false); }}
-                                onMouseEnter={() => setIsTopNewChatHovered(true)}
-                                onMouseLeave={() => setIsTopNewChatHovered(false)}
-                                style={{
-                                    cursor: 'pointer',
-                                    borderRadius: 28,
-                                    background: isTopNewChatHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
-                                }}
-                            >
-                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M25.774 18.0001C25.774 21.5359 25.774 23.3034 24.6351 24.4017C23.4961 25.5 21.6623 25.5 17.9964 25.5C14.3297 25.5 12.4967 25.5 11.3577 24.4017C10.2187 23.3034 10.2188 21.5351 10.2188 18.0001C10.2188 14.4644 10.2187 12.6969 11.3577 11.5986C12.4967 10.5003 14.3305 10.5003 17.9964 10.5003M15.8645 17.2918C15.5695 17.5766 15.4039 17.9626 15.4038 18.3651V20.5001H17.6317C18.0491 20.5001 18.4501 20.3401 18.7456 20.0551L25.3134 13.7185C25.4597 13.5775 25.5757 13.4101 25.6548 13.2259C25.734 13.0417 25.7747 12.8442 25.7747 12.6448C25.7747 12.4454 25.734 12.2479 25.6548 12.0637C25.5757 11.8795 25.4597 11.7121 25.3134 11.5711L24.6644 10.9452C24.5182 10.8041 24.3446 10.6921 24.1534 10.6157C23.9623 10.5393 23.7574 10.5 23.5505 10.5C23.3436 10.5 23.1387 10.5393 22.9476 10.6157C22.7564 10.6921 22.5828 10.8041 22.4366 10.9452L15.8645 17.2918Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                            <div 
-                                data-svg-wrapper 
-                                data-layer="close sidebar button (6% white fill on HOVER)" 
-                                className="CloseSidebarButton6WhiteFillOnHover"
-                                onClick={(e) => { e.stopPropagation(); setIsSidebarOpen(false); }}
-                                onMouseEnter={(e) => { e.stopPropagation(); setIsCloseSidebarHovered(true); }}
-                                onMouseLeave={(e) => { e.stopPropagation(); setIsCloseSidebarHovered(false); }}
-                                style={{
-                                    cursor: 'pointer',
-                                    borderRadius: 28,
-                                    background: isCloseSidebarHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
-                                }}
-                            >
-                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M10 14H26M10 22H20" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div data-layer="search-bar" className="SearchBar" style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, background: '#333333', overflow: 'hidden', borderRadius: 50, justifyContent: 'flex-start', alignItems: 'center', gap: 6, display: 'inline-flex'}}>
-                            <div data-svg-wrapper data-layer="search-icon" className="SearchIcon" style={{ marginTop: 2 }}>
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M10.9289 10.8023L14.7616 14.6M12.6167 6.5224C12.6167 8.09311 11.9837 9.5995 10.8571 10.7102C9.73045 11.8208 8.20241 12.4448 6.60911 12.4448C5.01581 12.4448 3.48777 11.8208 2.36113 10.7102C1.2345 9.5995 0.601563 8.09311 0.601562 6.5224C0.601563 4.95168 1.2345 3.44529 2.36113 2.33463C3.48777 1.22396 5.01581 0.599998 6.60911 0.599998C8.20241 0.599998 9.73045 1.22396 10.8571 2.33463C11.9837 3.44529 12.6167 4.95168 12.6167 6.5224Z" stroke="white" strokeOpacity="0.65" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                            </div>
-                            <input
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search"
-                                className="Search"
-                                style={{
-                                    flex: '1 1 0', 
-                                    color: 'rgba(255, 255, 255, 0.95)', 
-                                    fontSize: 14, 
-                                    fontFamily: 'Inter', 
-                                    fontWeight: '400', 
-                                    lineHeight: "19.60px", 
-                                    background: 'transparent',
-                                    border: 'none',
-                                    outline: 'none',
-                                    padding: 0,
-                                    height: '100%'
-                                }}
-                            />
-                        </div>
-                    </div>
-                    </motion.div>
-                </>
-            )}
+                        </motion.div>
+                    </>
+                )}
             </AnimatePresence>
             {/* BAN BANNER */}
             {isBanned && (
-                <div 
+                <div
                     data-layer="ban-banner"
                     className="BanBanner"
-                    style={{ width: "100%", background: "transparent", color: "rgba(160, 160, 160, 1)", padding: "12px 16px", textAlign: "center", fontSize: 14, fontWeight: 500, zIndex: 2000, flexShrink: 0 }}
+                    style={{
+                        width: "100%",
+                        background: "transparent",
+                        color: "rgba(160, 160, 160, 1)",
+                        padding: "12px 16px",
+                        textAlign: "center",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        zIndex: 2000,
+                        flexShrink: 0,
+                    }}
                 >
-                    You are temporarily banned. Please review the <a href="https://curastem.org/code-of-conduct" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(160, 160, 160, 1)", textDecoration: "underline", fontWeight: 700 }}>code of conduct</a>.
+                    You are temporarily banned. Please review the{" "}
+                    <a
+                        href="https://curastem.org/code-of-conduct"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            color: "rgba(160, 160, 160, 1)",
+                            textDecoration: "underline",
+                            fontWeight: 700,
+                        }}
+                    >
+                        code of conduct
+                    </a>
+                    .
                 </div>
             )}
 
             {/* Hidden file input */}
-            <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style={{ display: "none" }} onChange={handleFileChange} />
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+            />
 
             {/* DEBUG CONSOLE */}
             {debugMode && (
@@ -14638,16 +18049,16 @@ Do not include markdown formatting or explanations.`
             <style>{markdownStyles}</style>
 
             {/* MAIN CONTENT STRUCTURE */}
-            <div 
+            <div
                 data-layer="main-content-layout"
                 className="MainContentLayout"
-                style={{ 
-                    display: "flex", 
-                    width: "100%", 
-                    height: "100%", 
+                style={{
+                    display: "flex",
+                    width: "100%",
+                    height: "100%",
                     overflow: "hidden",
-                    paddingLeft: (!isMobileLayout && isSidebarOpen) ? 260 : 0,
-                    transition: "padding-left 0.2s ease-in-out"
+                    paddingLeft: !isMobileLayout && isSidebarOpen ? 260 : 0,
+                    transition: "padding-left 0.2s ease-in-out",
                 }}
             >
                 {/* Right: Sidebar / Standard View */}
@@ -14665,8 +18076,14 @@ Do not include markdown formatting or explanations.`
                     // Removed 'layout' prop to prevent distortion of children during width change
                     initial={false}
                     animate={{
-                        width: (!isMobileLayout && (isDocOpen || isWhiteboardOpen)) ? 400 : "100%",
-                        flexGrow: (!isMobileLayout && (isDocOpen || isWhiteboardOpen)) ? 0 : 1
+                        width:
+                            !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                                ? 400
+                                : "100%",
+                        flexGrow:
+                            !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                                ? 0
+                                : 1,
                     }}
                     transition={{ duration: 0.25, ease: "easeInOut" }}
                     style={{
@@ -14676,10 +18093,12 @@ Do not include markdown formatting or explanations.`
                         background: themeColors.background,
                         position: "relative",
                         zIndex: 20,
-                        overflow: "hidden" // Ensure content clips if needed during transition
+                        overflow: "hidden", // Ensure content clips if needed during transition
                     }}
                 >
-                    {renderStandardLayout(!isMobileLayout && (isDocOpen || isWhiteboardOpen))}
+                    {renderStandardLayout(
+                        !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                    )}
                 </motion.div>
 
                 {/* Left: Tool (Desktop only) */}
@@ -14692,7 +18111,12 @@ Do not include markdown formatting or explanations.`
                             animate={{ x: 0 }}
                             exit={{ x: "-100%" }}
                             transition={{ duration: 0.25, ease: "easeInOut" }}
-                            style={{ flex: 1, position: "relative", zIndex: 10, background: themeColors.background }}
+                            style={{
+                                flex: 1,
+                                position: "relative",
+                                zIndex: 10,
+                                background: themeColors.background,
+                            }}
                         >
                             {renderActiveTool(false)}
                         </motion.div>
@@ -14724,196 +18148,421 @@ Do not include markdown formatting or explanations.`
             </AnimatePresence>
 
             {/* REPORT MODAL */}
-            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} onSubmit={onSubmitReport} participantCount={remoteStreams.size + 1} />
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                onSubmit={onSubmitReport}
+                participantCount={remoteStreams.size + 1}
+            />
 
             {/* FILE DRAG OVERLAY */}
-            <div 
+            <div
                 data-layer="file-drag-overlay"
                 className="FileDragOverlay"
-                style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 99999, background: themeColors.state.overlay, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: isDraggingFile ? 1 : 0, visibility: isDraggingFile ? "visible" : "hidden" }}
+                style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    zIndex: 99999,
+                    background: themeColors.state.overlay,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                    opacity: isDraggingFile ? 1 : 0,
+                    visibility: isDraggingFile ? "visible" : "hidden",
+                }}
             >
-                <div 
+                <div
                     data-layer="file-drag-content"
                     className="FileDragContent"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 16,
+                    }}
                 >
-                    <div data-svg-wrapper data-layer="share icon" className="ShareIcon">
-                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z" fill="#0099FF" fillOpacity="0.95" />
+                    <div
+                        data-svg-wrapper
+                        data-layer="share icon"
+                        className="ShareIcon"
+                    >
+                        <svg
+                            width="64"
+                            height="64"
+                            viewBox="0 0 64 64"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M3.01893e-06 43.6383V42.9137C3.01893e-06 41.311 1.29968 40.0112 2.9027 40.0112C4.50572 40.0112 5.8054 41.311 5.8054 42.9137V43.6383C5.8054 46.7411 5.80937 48.8951 5.94607 50.569C6.07998 52.2083 6.32803 53.1315 6.67921 53.8211L6.98609 54.3754C7.75563 55.6298 8.85998 56.6529 10.1786 57.3251L10.7455 57.5677C11.373 57.7925 12.2002 57.9575 13.4308 58.0579C15.1048 58.195 17.258 58.1945 20.3615 58.1945H43.6386C46.741 58.1945 48.8955 58.195 50.5693 58.0579C52.2074 57.9243 53.1318 57.676 53.8214 57.3251L54.3753 57.0139C55.6297 56.2444 56.6533 55.1397 57.325 53.8211L57.5681 53.2546C57.7924 52.6269 57.9574 51.7989 58.0583 50.569C58.1949 48.8951 58.1944 46.7411 58.1944 43.6383V42.9137C58.1944 41.3114 59.4947 40.0121 61.0974 40.0112C62.7001 40.0112 63.9999 41.311 63.9999 42.9137V43.6383C63.9999 46.6455 64.0025 49.0771 63.8423 51.0421C63.6992 52.7923 63.4155 54.3684 62.7852 55.8376L62.4954 56.4595C61.3366 58.7336 59.5737 60.6352 57.4101 61.9626L56.4599 62.4951C54.8153 63.3331 53.0415 63.6788 51.042 63.842C49.077 64.0026 46.6459 64 43.6386 64H20.3615C17.3538 64 14.9229 64.0026 12.9577 63.842C11.2095 63.6993 9.63424 63.4186 8.16678 62.7892L7.54446 62.4951C5.26993 61.3362 3.36475 59.5742 2.03744 57.4102L1.50464 56.4595C0.666753 54.8154 0.32107 53.0411 0.157743 51.0421C-0.00274689 49.0771 3.01893e-06 46.6455 3.01893e-06 43.6383ZM29.0994 42.9137V9.91008L19.5047 19.5047C18.3715 20.638 16.5336 20.6375 15.4 19.5047C14.2666 18.3712 14.2666 16.5336 15.4 15.4L29.9476 0.848235L30.3909 0.485922C30.864 0.170791 31.4253 0 32.0019 0C32.7705 0.000392823 33.5086 0.305092 34.0524 0.848235L48.6043 15.4C49.7361 16.5334 49.7365 18.3717 48.6043 19.5047C47.4708 20.6382 45.6285 20.6382 44.495 19.5047L34.9049 9.91432V42.9137C34.904 44.5156 33.6042 45.8158 32.0019 45.8167C30.3995 45.8167 29.1002 44.516 29.0994 42.9137Z"
+                                fill="#0099FF"
+                                fillOpacity="0.95"
+                            />
                         </svg>
                     </div>
                     <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 16, lineHeight: 1.4 }}>Add anything</div>
-                        <div style={{ fontSize: 14, opacity: 0.65, fontWeight: 400, lineHeight: 1.4 }}>Drop any file here to add it to the conversation</div>
+                        <div
+                            style={{
+                                fontSize: 24,
+                                fontWeight: 700,
+                                marginBottom: 16,
+                                lineHeight: 1.4,
+                            }}
+                        >
+                            Add anything
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 14,
+                                opacity: 0.65,
+                                fontWeight: 400,
+                                lineHeight: 1.4,
+                            }}
+                        >
+                            Drop any file here to add it to the conversation
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* SIDEBAR ACTIONS MENU PORTAL */}
-            {menuOpenChatId && menuPosition && savedChats.find(c => c.id === menuOpenChatId) && createPortal(
-                <>
-                    <div 
-                        style={{
-                            position: "fixed", 
-                            top: 0, 
-                            left: 0, 
-                            right: 0, 
-                            bottom: 0, 
-                            zIndex: 9998, 
-                            cursor: "default",
-                            background: isMobileLayout ? "rgba(0, 0, 0, 0.7)" : "transparent"
-                        }} 
-                        onClick={(e) => { e.stopPropagation(); setMenuOpenChatId(null); setMenuPosition(null); setHoveredActionId(null); }}
-                    />
-                    <div 
-                        data-layer="chat actions menu" 
-                        className="ChatActionsMenu" 
-                        onClick={(e) => e.stopPropagation()} 
-                        onMouseLeave={() => !isMobileLayout && setHoveredActionId(null)}
-                        style={{
-                            position: "fixed",
-                            zIndex: 9999,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'flex-start',
-                            alignItems: 'flex-start',
-                            gap: 4,
-                            ...(isMobileLayout ? {
-                                bottom: 0,
+            {menuOpenChatId &&
+                menuPosition &&
+                savedChats.find((c) => c.id === menuOpenChatId) &&
+                createPortal(
+                    <>
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: 0,
                                 left: 0,
                                 right: 0,
-                                top: "auto",
-                                width: "100%",
-                                padding: 10,
-                                background: '#353535', 
-                                borderRadius: "36px 36px 0px 0px",
-                                borderTop: '1px rgba(255, 255, 255, 0.10) solid', 
-                                paddingBottom: 32 // Safe area
-                            } : {
-                                left: menuPosition.left,
-                                top: menuPosition.top,
-                                width: 196, 
-                                padding: 10, 
-                                background: '#353535', 
-                                boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', 
-                                borderRadius: 28, 
-                                outline: '0.33px rgba(255, 255, 255, 0.10) solid', 
-                                outlineOffset: '-0.33px', 
-                            })
-                        }}
-                    >
-                        {(() => {
-                            const chat = savedChats.find(c => c.id === menuOpenChatId)!
-                            
-                            const actions = [
-                                {
-                                    id: 'share',
-                                    label: 'Share',
-                                    icon: (
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M0.796875 11.3786V12.275C0.796875 12.9911 1.08134 13.6778 1.58769 14.1842C2.09403 14.6905 2.78079 14.975 3.49687 14.975H12.4969C13.213 14.975 13.8997 14.6905 14.4061 14.1842C14.9124 13.6778 15.1969 12.9911 15.1969 12.275V11.375M7.99687 10.925V1.025M7.99687 1.025L11.1469 4.175M7.99687 1.025L4.84687 4.175" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    ),
-                                    onClick: () => handleShareChat(chat)
-                                },
-                                {
-                                    id: 'rename',
-                                    label: 'Rename',
-                                    icon: (
-                                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M13.7466 6.61748L5.43491 14.9325C5.00818 15.3595 4.42939 15.5995 3.82574 15.6H0.601562V12.3967C0.601562 11.7933 0.841563 11.2142 1.26823 10.7875L10.7766 1.2683C10.988 1.05651 11.2392 0.888481 11.5156 0.77381C11.7921 0.659139 12.0884 0.600076 12.3877 0.599999C12.687 0.599921 12.9833 0.65883 13.2598 0.773358C13.5363 0.887886 13.7875 1.05579 13.9991 1.26746L14.9374 2.20663C15.3645 2.63375 15.6045 3.21303 15.6045 3.81705C15.6045 4.42108 15.3645 5.00036 14.9374 5.42747L13.7466 6.61748ZM13.7466 6.61748L9.58742 2.4583" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    ),
-                                    onClick: () => handleStartRename(chat)
-                                },
-                                {
-                                    id: 'pin',
-                                    label: chat.isPinned ? "Unpin" : "Pin",
-                                    icon: chat.isPinned ? (
-                                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M3.61219 6.66505C3.84674 6.66157 4.11171 6.66951 4.37683 6.67872L5.57408 7.90234C5.16225 7.90665 4.74889 7.89255 4.38855 7.87988C3.99177 7.86593 3.67685 7.85673 3.45106 7.87109C3.17446 7.88872 2.82596 8.14464 2.62684 8.59374C2.42793 9.04267 2.49466 9.40603 2.67274 9.58396L7.6141 14.5263C7.79323 14.7053 8.15755 14.7719 8.60628 14.5732C9.05537 14.3741 9.31132 14.0261 9.32893 13.749C9.34312 13.5229 9.33317 13.2073 9.31916 12.8105C9.30726 12.4734 9.29485 12.0901 9.2967 11.705L10.5233 12.957C10.5336 13.2703 10.5417 13.5762 10.5262 13.8242C10.4706 14.7067 9.78154 15.3655 9.0926 15.6708C8.44618 15.9572 7.55502 16.0351 6.89438 15.4921L6.76548 15.3749L4.71862 13.3281L1.02334 17.0243C0.789076 17.2586 0.410024 17.2585 0.175696 17.0243C-0.058565 16.79 -0.0585655 16.411 0.175696 16.1767L3.87 12.4794L1.82412 10.4326C1.15477 9.76359 1.22403 8.7962 1.5292 8.10742C1.83442 7.41895 2.49268 6.72947 3.37488 6.67384L3.61219 6.66505Z" fill="white" fillOpacity="0.95"/>
-                                            <path d="M0.314366 0.397528C0.511812 0.204725 0.828424 0.208084 1.02139 0.405341L6.98911 6.5127H6.99204L7.86703 7.40527L7.86312 7.40723L9.77228 9.36131C9.77342 9.35957 9.77505 9.35816 9.77619 9.35643L10.6639 10.2627C10.6629 10.2656 10.6619 10.2685 10.6609 10.2715L16.0369 15.7734C16.2298 15.9708 16.2263 16.2874 16.0291 16.4804C15.8316 16.6733 15.515 16.6699 15.322 16.4726L0.306554 1.10455C0.113661 0.907105 0.117057 0.59052 0.314366 0.397528Z" fill="white" fillOpacity="0.95"/>
-                                            <path d="M10.5047 0.35749C11.0516 -0.00459142 11.9578 -0.250724 12.6385 0.429755L16.7683 4.56057C17.451 5.24176 17.2044 6.14765 16.8416 6.69434C16.6484 6.98522 16.3879 7.24439 16.0945 7.43066C15.8414 7.59129 15.5327 7.71638 15.2009 7.73144H15.0574C14.8582 7.72095 14.6246 7.68762 14.4177 7.66015C14.1981 7.63099 13.9857 7.60485 13.783 7.59473C13.3896 7.57513 13.187 7.62869 13.0916 7.69336L13.0574 7.7207L11.2977 9.48045L10.4578 8.62304L12.2088 6.87208C12.6819 6.39988 13.3717 6.37294 13.8435 6.39649C14.1011 6.40938 14.3577 6.44173 14.5759 6.47071C14.807 6.50141 14.9816 6.5259 15.1209 6.53321L15.1785 6.52931C15.2452 6.51967 15.3393 6.48943 15.4519 6.41798C15.5975 6.32551 15.7378 6.18738 15.8416 6.03126C16.0724 5.68355 16.0031 5.49159 15.9216 5.41018L11.7908 1.27838C11.7098 1.19735 11.5164 1.12768 11.1678 1.35846C11.0113 1.46205 10.8732 1.60193 10.7811 1.74712C10.6865 1.89621 10.6633 2.01205 10.6668 2.07622V2.07915C10.6741 2.21844 10.6986 2.39309 10.7293 2.62407C10.7583 2.84224 10.7907 3.09894 10.8035 3.35648C10.8271 3.82819 10.8 4.51623 10.3279 4.98928L8.59554 6.72071L7.7557 5.8633L9.47932 4.14163L9.50666 4.10745C9.57136 4.012 9.62493 3.80929 9.60529 3.41605C9.59516 3.21358 9.56902 3.00171 9.53986 2.78227C9.51249 2.57622 9.47918 2.34335 9.46858 2.14458C9.44659 1.75729 9.58359 1.39439 9.7674 1.10455C9.95384 0.810629 10.2135 0.55033 10.5047 0.35749Z" fill="white" fillOpacity="0.95"/>
-                                        </svg>
-                                    ) : (
-                                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M0.601562 16.6008L4.71716 12.4843M2.25047 10.0088C1.40246 9.16164 2.2558 7.34562 3.41493 7.27273C4.46205 7.20606 6.88607 7.58562 7.69231 6.77939L9.90566 4.56603C10.4541 4.01669 10.1057 2.78824 10.0701 2.1109C10.0186 1.20778 11.455 0.0922083 12.2168 0.853994L16.3475 4.98559C17.112 5.74827 15.9919 7.18028 15.0915 7.13228C14.4142 7.09673 13.1848 6.74828 12.6355 7.29673L10.4221 9.51009C9.61677 10.3163 9.99544 12.7395 9.92966 13.7866C9.85677 14.9466 8.04075 15.7999 7.19185 14.951L2.25047 10.0088Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    ),
-                                    onClick: () => handlePinChat(chat.id)
-                                },
-                                { isSeparator: true },
-                                {
-                                    id: 'report',
-                                    label: 'Report chat',
-                                    icon: (
-                                        <svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M1.33594 15.6V11.1726M1.33594 11.1726C6.18414 7.38101 9.82072 14.9641 14.6689 11.1726V1.69449C9.82072 5.48606 6.18414 -2.09708 1.33594 1.69449V11.1726Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    ),
-                                    onClick: () => { setShowReportModal(true); setMenuOpenChatId(null); setHoveredActionId(null); }
-                                },
-                                {
-                                    id: 'delete',
-                                    label: 'Delete',
-                                    isDestructive: true,
-                                    icon: (
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M13.3359 4.33333L12.5893 11.7982C12.4764 12.9298 12.4204 13.4951 12.1626 13.9227C11.9365 14.299 11.604 14.6 11.207 14.7876C10.7564 15 10.1893 15 9.05149 15H6.95371C5.81683 15 5.24883 15 4.79816 14.7867C4.40087 14.5992 4.06804 14.2983 3.84172 13.9218C3.58572 13.4951 3.52883 12.9298 3.41505 11.7982L2.66927 4.33333M9.33594 11.3111V6.86667M6.66927 11.3111V6.86667M1.33594 4.11111H5.43816M5.43816 4.11111L5.78127 1.736C5.88083 1.304 6.23994 1 6.65238 1H9.35283C9.76527 1 10.1235 1.304 10.2239 1.736L10.567 4.11111M5.43816 4.11111H10.567M10.567 4.11111H14.6693" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    ),
-                                    onClick: () => handleDeleteChat(chat.id)
-                                }
-                            ]
+                                bottom: 0,
+                                zIndex: 9998,
+                                cursor: "default",
+                                background: isMobileLayout
+                                    ? "rgba(0, 0, 0, 0.7)"
+                                    : "transparent",
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setMenuOpenChatId(null)
+                                setMenuPosition(null)
+                                setHoveredActionId(null)
+                            }}
+                        />
+                        <div
+                            data-layer="chat actions menu"
+                            className="ChatActionsMenu"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseLeave={() =>
+                                !isMobileLayout && setHoveredActionId(null)
+                            }
+                            style={{
+                                position: "fixed",
+                                zIndex: 9999,
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: 4,
+                                ...(isMobileLayout
+                                    ? {
+                                          bottom: 0,
+                                          left: 0,
+                                          right: 0,
+                                          top: "auto",
+                                          width: "100%",
+                                          padding: 10,
+                                          background: "#353535",
+                                          borderRadius: "36px 36px 0px 0px",
+                                          borderTop:
+                                              "1px rgba(255, 255, 255, 0.10) solid",
+                                          paddingBottom: 32, // Safe area
+                                      }
+                                    : {
+                                          left: menuPosition.left,
+                                          top: menuPosition.top,
+                                          width: 196,
+                                          padding: 10,
+                                          background: "#353535",
+                                          boxShadow:
+                                              "0px 4px 24px rgba(0, 0, 0, 0.08)",
+                                          borderRadius: 28,
+                                          outline:
+                                              "0.33px rgba(255, 255, 255, 0.10) solid",
+                                          outlineOffset: "-0.33px",
+                                      }),
+                            }}
+                        >
+                            {(() => {
+                                const chat = savedChats.find(
+                                    (c) => c.id === menuOpenChatId
+                                )!
 
-                            return actions.map((action, i) => {
-                                if (action.isSeparator) {
+                                const actions = [
+                                    {
+                                        id: "share",
+                                        label: "Share",
+                                        icon: (
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M0.796875 11.3786V12.275C0.796875 12.9911 1.08134 13.6778 1.58769 14.1842C2.09403 14.6905 2.78079 14.975 3.49687 14.975H12.4969C13.213 14.975 13.8997 14.6905 14.4061 14.1842C14.9124 13.6778 15.1969 12.9911 15.1969 12.275V11.375M7.99687 10.925V1.025M7.99687 1.025L11.1469 4.175M7.99687 1.025L4.84687 4.175"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ),
+                                        onClick: () => handleShareChat(chat),
+                                    },
+                                    {
+                                        id: "rename",
+                                        label: "Rename",
+                                        icon: (
+                                            <svg
+                                                width="17"
+                                                height="17"
+                                                viewBox="0 0 17 17"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M13.7466 6.61748L5.43491 14.9325C5.00818 15.3595 4.42939 15.5995 3.82574 15.6H0.601562V12.3967C0.601562 11.7933 0.841563 11.2142 1.26823 10.7875L10.7766 1.2683C10.988 1.05651 11.2392 0.888481 11.5156 0.77381C11.7921 0.659139 12.0884 0.600076 12.3877 0.599999C12.687 0.599921 12.9833 0.65883 13.2598 0.773358C13.5363 0.887886 13.7875 1.05579 13.9991 1.26746L14.9374 2.20663C15.3645 2.63375 15.6045 3.21303 15.6045 3.81705C15.6045 4.42108 15.3645 5.00036 14.9374 5.42747L13.7466 6.61748ZM13.7466 6.61748L9.58742 2.4583"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ),
+                                        onClick: () => handleStartRename(chat),
+                                    },
+                                    {
+                                        id: "pin",
+                                        label: chat.isPinned ? "Unpin" : "Pin",
+                                        icon: chat.isPinned ? (
+                                            <svg
+                                                width="18"
+                                                height="18"
+                                                viewBox="0 0 18 18"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M3.61219 6.66505C3.84674 6.66157 4.11171 6.66951 4.37683 6.67872L5.57408 7.90234C5.16225 7.90665 4.74889 7.89255 4.38855 7.87988C3.99177 7.86593 3.67685 7.85673 3.45106 7.87109C3.17446 7.88872 2.82596 8.14464 2.62684 8.59374C2.42793 9.04267 2.49466 9.40603 2.67274 9.58396L7.6141 14.5263C7.79323 14.7053 8.15755 14.7719 8.60628 14.5732C9.05537 14.3741 9.31132 14.0261 9.32893 13.749C9.34312 13.5229 9.33317 13.2073 9.31916 12.8105C9.30726 12.4734 9.29485 12.0901 9.2967 11.705L10.5233 12.957C10.5336 13.2703 10.5417 13.5762 10.5262 13.8242C10.4706 14.7067 9.78154 15.3655 9.0926 15.6708C8.44618 15.9572 7.55502 16.0351 6.89438 15.4921L6.76548 15.3749L4.71862 13.3281L1.02334 17.0243C0.789076 17.2586 0.410024 17.2585 0.175696 17.0243C-0.058565 16.79 -0.0585655 16.411 0.175696 16.1767L3.87 12.4794L1.82412 10.4326C1.15477 9.76359 1.22403 8.7962 1.5292 8.10742C1.83442 7.41895 2.49268 6.72947 3.37488 6.67384L3.61219 6.66505Z"
+                                                    fill="white"
+                                                    fillOpacity="0.95"
+                                                />
+                                                <path
+                                                    d="M0.314366 0.397528C0.511812 0.204725 0.828424 0.208084 1.02139 0.405341L6.98911 6.5127H6.99204L7.86703 7.40527L7.86312 7.40723L9.77228 9.36131C9.77342 9.35957 9.77505 9.35816 9.77619 9.35643L10.6639 10.2627C10.6629 10.2656 10.6619 10.2685 10.6609 10.2715L16.0369 15.7734C16.2298 15.9708 16.2263 16.2874 16.0291 16.4804C15.8316 16.6733 15.515 16.6699 15.322 16.4726L0.306554 1.10455C0.113661 0.907105 0.117057 0.59052 0.314366 0.397528Z"
+                                                    fill="white"
+                                                    fillOpacity="0.95"
+                                                />
+                                                <path
+                                                    d="M10.5047 0.35749C11.0516 -0.00459142 11.9578 -0.250724 12.6385 0.429755L16.7683 4.56057C17.451 5.24176 17.2044 6.14765 16.8416 6.69434C16.6484 6.98522 16.3879 7.24439 16.0945 7.43066C15.8414 7.59129 15.5327 7.71638 15.2009 7.73144H15.0574C14.8582 7.72095 14.6246 7.68762 14.4177 7.66015C14.1981 7.63099 13.9857 7.60485 13.783 7.59473C13.3896 7.57513 13.187 7.62869 13.0916 7.69336L13.0574 7.7207L11.2977 9.48045L10.4578 8.62304L12.2088 6.87208C12.6819 6.39988 13.3717 6.37294 13.8435 6.39649C14.1011 6.40938 14.3577 6.44173 14.5759 6.47071C14.807 6.50141 14.9816 6.5259 15.1209 6.53321L15.1785 6.52931C15.2452 6.51967 15.3393 6.48943 15.4519 6.41798C15.5975 6.32551 15.7378 6.18738 15.8416 6.03126C16.0724 5.68355 16.0031 5.49159 15.9216 5.41018L11.7908 1.27838C11.7098 1.19735 11.5164 1.12768 11.1678 1.35846C11.0113 1.46205 10.8732 1.60193 10.7811 1.74712C10.6865 1.89621 10.6633 2.01205 10.6668 2.07622V2.07915C10.6741 2.21844 10.6986 2.39309 10.7293 2.62407C10.7583 2.84224 10.7907 3.09894 10.8035 3.35648C10.8271 3.82819 10.8 4.51623 10.3279 4.98928L8.59554 6.72071L7.7557 5.8633L9.47932 4.14163L9.50666 4.10745C9.57136 4.012 9.62493 3.80929 9.60529 3.41605C9.59516 3.21358 9.56902 3.00171 9.53986 2.78227C9.51249 2.57622 9.47918 2.34335 9.46858 2.14458C9.44659 1.75729 9.58359 1.39439 9.7674 1.10455C9.95384 0.810629 10.2135 0.55033 10.5047 0.35749Z"
+                                                    fill="white"
+                                                    fillOpacity="0.95"
+                                                />
+                                            </svg>
+                                        ) : (
+                                            <svg
+                                                width="18"
+                                                height="18"
+                                                viewBox="0 0 18 18"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M0.601562 16.6008L4.71716 12.4843M2.25047 10.0088C1.40246 9.16164 2.2558 7.34562 3.41493 7.27273C4.46205 7.20606 6.88607 7.58562 7.69231 6.77939L9.90566 4.56603C10.4541 4.01669 10.1057 2.78824 10.0701 2.1109C10.0186 1.20778 11.455 0.0922083 12.2168 0.853994L16.3475 4.98559C17.112 5.74827 15.9919 7.18028 15.0915 7.13228C14.4142 7.09673 13.1848 6.74828 12.6355 7.29673L10.4221 9.51009C9.61677 10.3163 9.99544 12.7395 9.92966 13.7866C9.85677 14.9466 8.04075 15.7999 7.19185 14.951L2.25047 10.0088Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ),
+                                        onClick: () => handlePinChat(chat.id),
+                                    },
+                                    { isSeparator: true },
+                                    {
+                                        id: "report",
+                                        label: "Report chat",
+                                        icon: (
+                                            <svg
+                                                width="16"
+                                                height="17"
+                                                viewBox="0 0 16 17"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M1.33594 15.6V11.1726M1.33594 11.1726C6.18414 7.38101 9.82072 14.9641 14.6689 11.1726V1.69449C9.82072 5.48606 6.18414 -2.09708 1.33594 1.69449V11.1726Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ),
+                                        onClick: () => {
+                                            setShowReportModal(true)
+                                            setMenuOpenChatId(null)
+                                            setHoveredActionId(null)
+                                        },
+                                    },
+                                    {
+                                        id: "delete",
+                                        label: "Delete",
+                                        isDestructive: true,
+                                        icon: (
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M13.3359 4.33333L12.5893 11.7982C12.4764 12.9298 12.4204 13.4951 12.1626 13.9227C11.9365 14.299 11.604 14.6 11.207 14.7876C10.7564 15 10.1893 15 9.05149 15H6.95371C5.81683 15 5.24883 15 4.79816 14.7867C4.40087 14.5992 4.06804 14.2983 3.84172 13.9218C3.58572 13.4951 3.52883 12.9298 3.41505 11.7982L2.66927 4.33333M9.33594 11.3111V6.86667M6.66927 11.3111V6.86667M1.33594 4.11111H5.43816M5.43816 4.11111L5.78127 1.736C5.88083 1.304 6.23994 1 6.65238 1H9.35283C9.76527 1 10.1235 1.304 10.2239 1.736L10.567 4.11111M5.43816 4.11111H10.567M10.567 4.11111H14.6693"
+                                                    stroke="#FB6A6A"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ),
+                                        onClick: () =>
+                                            handleDeleteChat(chat.id),
+                                    },
+                                ]
+
+                                return actions.map((action, i) => {
+                                    if (action.isSeparator) {
+                                        return (
+                                            <div
+                                                key={i}
+                                                data-layer="Frame 1000007254"
+                                                className="Frame1000007254"
+                                                style={{
+                                                    alignSelf: "stretch",
+                                                    paddingLeft: 8,
+                                                    paddingRight: 8,
+                                                    paddingTop: 2,
+                                                    paddingBottom: 2,
+                                                    flexDirection: "column",
+                                                    justifyContent:
+                                                        "flex-start",
+                                                    alignItems: "flex-start",
+                                                    display: "flex",
+                                                }}
+                                            >
+                                                <div
+                                                    data-layer="separator"
+                                                    className="Separator"
+                                                    style={{
+                                                        alignSelf: "stretch",
+                                                        height: 1,
+                                                        position: "relative",
+                                                        background:
+                                                            "rgba(255, 255, 255, 0.10)",
+                                                        borderRadius: 4,
+                                                    }}
+                                                />
+                                            </div>
+                                        )
+                                    }
+
+                                    const isDestructive = action.isDestructive
+                                    const isHovered =
+                                        hoveredActionId === action.id
+
                                     return (
-                                        <div key={i} data-layer="Frame 1000007254" className="Frame1000007254" style={{alignSelf: 'stretch', paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex'}}>
-                                            <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
+                                        <div
+                                            key={action.id}
+                                            onClick={action.onClick}
+                                            data-layer={action.id}
+                                            className={action.id}
+                                            style={{
+                                                cursor: "pointer",
+                                                alignSelf: "stretch",
+                                                height: isMobileLayout
+                                                    ? 44
+                                                    : 36,
+                                                paddingLeft: 12,
+                                                paddingRight: 12,
+                                                borderRadius: 28,
+                                                justifyContent: "flex-start",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                display: "inline-flex",
+                                                background: isHovered
+                                                    ? isDestructive
+                                                        ? "rgba(251, 106, 106, 0.12)"
+                                                        : "rgba(255,255,255,0.06)"
+                                                    : "transparent",
+                                                transition: "background 0.2s",
+                                            }}
+                                            onMouseEnter={() =>
+                                                !isMobileLayout &&
+                                                setHoveredActionId(action.id!)
+                                            }
+                                        >
+                                            <div
+                                                data-svg-wrapper
+                                                className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                                style={{
+                                                    width: 15,
+                                                    display: "flex",
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                {action.icon}
+                                            </div>
+                                            <div
+                                                className="Label"
+                                                style={{
+                                                    flex: "1 1 0",
+                                                    justifyContent: "center",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    color: isDestructive
+                                                        ? "rgba(251, 106, 106, 0.95)"
+                                                        : "rgba(255, 255, 255, 0.95)",
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "400",
+                                                    lineHeight: 19.32,
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                {action.label}
+                                            </div>
                                         </div>
                                     )
-                                }
-                                
-                                const isDestructive = action.isDestructive
-                                const isHovered = hoveredActionId === action.id
-                                
-                                return (
-                                    <div 
-                                        key={action.id}
-                                        onClick={action.onClick} 
-                                        data-layer={action.id} 
-                                        className={action.id} 
-                                        style={{
-                                            cursor: "pointer", 
-                                            alignSelf: 'stretch', 
-                                            height: isMobileLayout ? 44 : 36, 
-                                            paddingLeft: 12, 
-                                            paddingRight: 12, 
-                                            borderRadius: 28, 
-                                            justifyContent: 'flex-start', 
-                                            alignItems: 'center', 
-                                            gap: 8, 
-                                            display: 'inline-flex', 
-                                            background: isHovered ? (isDestructive ? 'rgba(251, 106, 106, 0.12)' : 'rgba(255,255,255,0.06)') : 'transparent', 
-                                            transition: 'background 0.2s'
-                                        }} 
-                                        onMouseEnter={() => !isMobileLayout && setHoveredActionId(action.id!)}
-                                    >
-                                        <div data-svg-wrapper className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
-                                            {action.icon}
-                                        </div>
-                                        <div className="Label" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: isDestructive ? 'rgba(251, 106, 106, 0.95)' : 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 19.32, wordWrap: 'break-word'}}>
-                                            {action.label}
-                                        </div>
-                                    </div>
-                                )
-                            })
-                        })()}
-                    </div>
-                </>,
-                document.body
-            )}
+                                })
+                            })()}
+                        </div>
+                    </>,
+                    document.body
+                )}
         </div>
     )
 }
