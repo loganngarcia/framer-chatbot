@@ -17,6 +17,16 @@ const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
 const MODEL_OUTPUT_SAMPLE_RATE = 24000
 const INPUT_TARGET_SAMPLE_RATE = 16000
 
+interface ChatSession {
+    id: string
+    title: string
+    timestamp: number
+    messages: Message[]
+    notes: string
+    whiteboard: any
+    isPinned?: boolean
+}
+
 // -----------------------------------------------------------------------------
 // Three Letter Word List for Hash Generation
 // -----------------------------------------------------------------------------
@@ -482,7 +492,7 @@ const applyInlineFormatting = (
     // Improved regex with simplified URL capture (validation/trimming handled in logic)
     // Removed capture groups for specific URL parts to avoid regex engine confusion
     const combinedRegex =
-        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|(https?:\/\/[^\s]+)|((?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?))/gi
+        /(\*\*(.*?)\*\*|__(.*?)__|<strong>(.*?)<\/strong>|<b>(.*?)<\/b>|\`([^`]+)\`|~~(.*?)~~|(\*|_)(.*?)\8|<em>(.*?)<\/em>|<i>(.*?)<\/i>|\[([^\]]+?)\]\(([^)]+?)\)|<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63})|(https?:\/\/[^\s<>"{}|\\^`\[\]]+)|((?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?))/gi
 
     let match
     while ((match = combinedRegex.exec(textSegment)) !== null) {
@@ -3958,58 +3968,9 @@ const ChatInput = React.memo(function ChatInput({
             isDestructive: isDocOpen,
         })
 
-        // Show "New Chat" button:
-        // - For students: always show if there are messages
-        // - For volunteers: only show if actively waiting to connect (searching state, not when connected p2p or idle)
-        const showNewChat = hasMessages && (role !== "volunteer" || status === "searching")
-        // console.log("showNewChat?", showNewChat, "role", role, "hasMessages", hasMessages, "status", status)
-
+        // Show "New Chat" button logic removed as per user request
+        
         const showReport = isConnected && !isLiveMode
-
-        if (showNewChat) {
-            items.push({
-                id: "new_chat",
-                label: "New chat",
-                icon: (
-                    <div
-                        data-svg-wrapper
-                        data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 16,
-                            height: 16,
-                        }}
-                        className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
-                    >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M14.7498 8.00011C14.7498 11.1823 14.7498 12.773 13.7613 13.7615C12.7728 14.75 11.1813 14.75 7.99989 14.75C4.81769 14.75 3.22697 14.75 2.23848 13.7615C1.25 12.773 1.25 11.1816 1.25 8.00011C1.25 4.81792 1.25 3.22719 2.23848 2.23871C3.22697 1.25023 4.81844 1.25023 7.99989 1.25023M6.14967 7.36262C5.89372 7.61895 5.74995 7.96637 5.74992 8.32861V10.2501H7.68339C8.04564 10.2501 8.39363 10.1061 8.65013 9.84958L14.35 4.14668C14.477 4.01979 14.5776 3.86913 14.6463 3.70332C14.715 3.53751 14.7504 3.3598 14.7504 3.18032C14.7504 3.00084 14.715 2.82313 14.6463 2.65732C14.5776 2.49151 14.477 2.34085 14.35 2.21396L13.7868 1.65072C13.6599 1.52369 13.5092 1.42291 13.3433 1.35415C13.1774 1.28539 12.9996 1.25 12.8201 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 11.9802 1.52369 11.8533 1.65072L6.14967 7.36262Z"
-                                stroke={themeColors.text.primary}
-                                strokeOpacity="0.95"
-                                strokeWidth="1.2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </div>
-                ),
-                onClick: () => {
-                    if (onClearMessages) onClearMessages()
-                    setShowMenu(false)
-                },
-                className: "NewChat",
-                isDestructive: false,
-                hasSeparator: true,
-            })
-        }
 
         items.push({
             id: "add_people",
@@ -4075,7 +4036,7 @@ const ChatInput = React.memo(function ChatInput({
             },
             className: "AddPeople",
             isDestructive: false,
-            hasSeparator: !showNewChat,
+            hasSeparator: true,
         })
 
         if (showReport) {
@@ -5338,11 +5299,13 @@ function sanitizeMessage(text: string): string {
         "fingering",
         "foreplay",
         "gangbang",
+        "glory hole",
         "groomer",
         "grooming",
         "handjob",
         "hard on",
         "hardcore",
+        "porn",
         "hentai",
         "hj",
         "hooker",
@@ -5397,6 +5360,7 @@ function sanitizeMessage(text: string): string {
         "scrotum",
         "semen",
         "sex",
+        "sexual",
         "sext",
         "sexting",
         "sexy",
@@ -5454,6 +5418,11 @@ function sanitizeMessage(text: string): string {
         "kill yourself",
         "die",
         "kys",
+        "body dysmorphia",
+        "eating disorders",
+        "self-injury",
+        "trauma",
+        "glorification",
 
         // Grooming / Predator Keywords
         "asl",
@@ -5465,16 +5434,14 @@ function sanitizeMessage(text: string): string {
         // Security / Phishing Prevention
         "account number",
         "amino",
-        "apple",
         "badoo",
         "bumble",
         "cash app",
         "chatroulette",
         "discord",
         "facebook",
-        "fb",
+        "omegle",
         "gmail",
-        "google",
         "microsoft",
         "fortnite",
         "grindr",
@@ -7268,6 +7235,8 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const pendingSnapshotRef = React.useRef<any>(null)
     const isScreenSharingRef = React.useRef(false)
+    const saveChatHistoryRef = React.useRef<() => void>(() => {})
+
     React.useEffect(() => {
         isScreenSharingRef.current = isScreenSharing
     }, [isScreenSharing])
@@ -7601,7 +7570,7 @@ export default function OmegleMentorshipUI(props: Props) {
             try {
                 const systemInstruction = `You are a helpful AI assistant.
 Your goal is to suggest 3 short, relevant follow-up responses the USER might want to say next.
-Keep suggestions brief (under 10 words).
+Keep suggestions brief and useful (under 5 words).
 Output ONLY a JSON array of strings: ["suggestion 1", "suggestion 2", "suggestion 3"].
 Do not include markdown formatting or explanations.`
 
@@ -7716,6 +7685,10 @@ Do not include markdown formatting or explanations.`
 
     const cleanup = React.useCallback(
         (isManualHangup = false) => {
+            if (statusRef.current === "connected" || statusRef.current === "searching") {
+                saveChatHistoryRef.current()
+            }
+
             isManualHangupRef.current = isManualHangup
             const isAiSession = isLiveMode || !!liveClientRef.current
 
@@ -8668,6 +8641,116 @@ Do not include markdown formatting or explanations.`
         }
     }, [aiGeneratedSuggestions])
 
+    // --- CHAT HISTORY & SIDEBAR STATE ---
+    const [savedChats, setSavedChats] = React.useState<ChatSession[]>([])
+
+    // --- SIDEBAR CHAT ACTIONS ---
+    const [menuOpenChatId, setMenuOpenChatId] = React.useState<string | null>(null)
+    const [menuPosition, setMenuPosition] = React.useState<{ top: number, left: number } | null>(null)
+    const [editingChatId, setEditingChatId] = React.useState<string | null>(null)
+    const [editingTitle, setEditingTitle] = React.useState("")
+    const [hoveredActionId, setHoveredActionId] = React.useState<string | null>(null)
+    const renameInputRef = React.useRef<HTMLInputElement>(null)
+
+    // Focus input when editing starts
+    React.useEffect(() => {
+        if (editingChatId && renameInputRef.current) {
+            renameInputRef.current.focus()
+            renameInputRef.current.select()
+        }
+    }, [editingChatId])
+
+    const [currentChatId, setCurrentChatId] = React.useState<string>(() => {
+        if (typeof window !== "undefined") {
+            const savedId = localStorage.getItem("current_chat_id")
+            if (savedId) return savedId
+        }
+        return Date.now().toString()
+    })
+    
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("current_chat_id", currentChatId)
+        }
+    }, [currentChatId])
+
+    const [isSidebarOpen, setIsSidebarOpen] = React.useState(false)
+    const [isSidebarBtnHovered, setIsSidebarBtnHovered] = React.useState(false)
+    const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(null)
+    const [isNewChatHovered, setIsNewChatHovered] = React.useState(false)
+    const [isCloseSidebarHovered, setIsCloseSidebarHovered] = React.useState(false)
+    const [isTopNewChatHovered, setIsTopNewChatHovered] = React.useState(false)
+    const [searchQuery, setSearchQuery] = React.useState("")
+    const messagesRef = React.useRef(messages)
+    // docContentRef already declared above
+
+    React.useEffect(() => {
+        messagesRef.current = messages
+    }, [messages])
+
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+             const saved = localStorage.getItem("saved_chat_history")
+             if (saved) {
+                 try {
+                     setSavedChats(JSON.parse(saved))
+                 } catch (e) {
+                     console.error("Failed to load chat history", e)
+                 }
+             }
+        }
+    }, [])
+
+    const saveChatHistory = React.useCallback(() => {
+        const msgs = messagesRef.current
+        if (!msgs || msgs.length === 0) return
+
+        const currentRole = roleRef.current
+        const isGroup = remoteStreams.size >= 2
+        const isAiSession = statusRef.current === "connected" && (isLiveMode || !!liveClientRef.current) 
+        
+        const shouldSave = currentRole === "student" || 
+                          (!currentRole) || 
+                          (currentRole === "volunteer" && (isGroup || isAiSession))
+
+        if (!shouldSave) return
+
+        let whiteboardData = null
+        if (editorRef.current) {
+             try {
+                 whiteboardData = editorRef.current.store.getSnapshot()
+             } catch(e) { console.error("Whiteboard snapshot failed", e) }
+        }
+
+        // Get title from first 3 words
+        const firstUserMsg = msgs.find(m => (m.role === 'user' || m.role === 'peer') && m.text)
+        let title = "New chat"
+        if (firstUserMsg && firstUserMsg.text) {
+             const words = firstUserMsg.text.split(' ')
+             title = words.slice(0, 3).join(' ')
+        }
+
+        const sessionToSave: ChatSession = {
+            id: currentChatId,
+            title: title,
+            timestamp: Date.now(),
+            messages: msgs.map(m => ({ ...m, attachments: undefined })),
+            notes: docContentRef.current,
+            whiteboard: whiteboardData
+        }
+
+        setSavedChats(prev => {
+            const others = prev.filter(c => c.id !== currentChatId)
+            const updated = [sessionToSave, ...others].slice(0, 25)
+            localStorage.setItem("saved_chat_history", JSON.stringify(updated))
+            return updated
+        })
+    }, [remoteStreams, isLiveMode, currentChatId])
+
+    React.useEffect(() => {
+        saveChatHistoryRef.current = saveChatHistory
+    }, [saveChatHistory])
+
     // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
     React.useEffect(() => {
         // Restore OTHER state if student OR if no role (initial state)
@@ -8988,7 +9071,7 @@ Do not include markdown formatting or explanations.`
             // Shuffle
             const shuffled = [...defaultSuggestions].sort(() => 0.5 - Math.random())
             // Slice based on layout
-            const count = isMobileLayout ? 10 : 3
+            const count = 10
             setAiGeneratedSuggestions(shuffled.slice(0, count))
         }
     }, [isMobileLayout, defaultSuggestions, messages.length])
@@ -9862,9 +9945,85 @@ Do not include markdown formatting or explanations.`
     }, [isScreenSharing, isWhiteboardOpen, stopLocalScreenShare])
 
     const handleClearMessages = React.useCallback(() => {
+        saveChatHistory()
+        
+        // Reset state for new chat
+        const newId = Date.now().toString()
+        setCurrentChatId(newId)
         setMessages([])
         setAiGeneratedSuggestions([])
+        setDocContent("") // Reset docs too? Usually yes for new chat.
+        
+        // Clear persistence
         localStorage.removeItem("student_messages")
+        localStorage.removeItem("student_doc")
+        localStorage.removeItem("student_whiteboard")
+        
+        // Ensure new ID is saved
+        if (typeof window !== "undefined") {
+            localStorage.setItem("current_chat_id", newId)
+        }
+    }, [saveChatHistory])
+
+    // --- SIDEBAR ACTIONS ---
+    const handlePinChat = React.useCallback((chatId: string) => {
+        setSavedChats(prev => {
+            const updated = prev.map(c => c.id === chatId ? { ...c, isPinned: !c.isPinned } : c)
+            // Sort: Pinned first, then by timestamp (newest first)
+            return updated.sort((a, b) => {
+                if (a.isPinned && !b.isPinned) return -1
+                if (!a.isPinned && b.isPinned) return 1
+                return b.timestamp - a.timestamp
+            })
+        })
+        setMenuOpenChatId(null)
+        setMenuPosition(null)
+        setHoveredActionId(null)
+    }, [])
+
+    const handleDeleteChat = React.useCallback((chatId: string) => {
+        setSavedChats(prev => prev.filter(c => c.id !== chatId))
+        if (currentChatId === chatId) {
+            handleClearMessages()
+        }
+        setMenuOpenChatId(null)
+        setMenuPosition(null)
+        setHoveredActionId(null)
+    }, [currentChatId, handleClearMessages])
+
+    const handleStartRename = React.useCallback((chat: ChatSession) => {
+        setEditingChatId(chat.id)
+        setEditingTitle(chat.title)
+        setMenuOpenChatId(null)
+        setMenuPosition(null)
+        setHoveredActionId(null)
+    }, [])
+
+    const handleFinishRename = React.useCallback(() => {
+        if (editingChatId) {
+            setSavedChats(prev => prev.map(c => c.id === editingChatId ? { ...c, title: editingTitle.trim() || "Untitled Chat" } : c))
+            setEditingChatId(null)
+            setEditingTitle("")
+        }
+    }, [editingChatId, editingTitle])
+
+    const handleShareChat = React.useCallback(async (chat: ChatSession) => {
+        try {
+             if (typeof navigator !== "undefined" && navigator.share) {
+                 await navigator.share({
+                     title: chat.title,
+                     text: `Check out this chat on Curastem: ${chat.title}`,
+                     url: "https://curastem.org"
+                 })
+             } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+                 await navigator.clipboard.writeText("https://curastem.org")
+             }
+        } catch (e) {
+            console.error("Share failed", e)
+        }
+        setMenuOpenChatId(null)
+        setMenuPosition(null)
+        setHoveredActionId(null)
     }, [])
 
     const handleReport = React.useCallback(() => {
@@ -12613,7 +12772,10 @@ Do not include markdown formatting or explanations.`
             50% { opacity: 1; transform: scale(1.0); }
             100% { opacity: 0.5; transform: scale(0.85); }
         }
-
+        .Search::placeholder {
+            color: rgba(255, 255, 255, 0.65);
+            opacity: 1;
+        }
     `,
         [accentColor, chatThemeColors]
     )
@@ -12654,11 +12816,162 @@ Do not include markdown formatting or explanations.`
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
-                borderRadius: isMobileLayout ? "28px 28px 0 0" : "0 28px 28px 0",
+                borderRadius: isMobileLayout ? "28px 28px 0 0" : "28px 0 0 28px",
                 border: "none",
                 paddingBottom: isMobileLayout ? mobileInputHeight : 0,
             }}
         >
+
+                {false && (
+                    <div data-layer="left sidebar" className="LeftSidebar" style={{width: 240, height: 982, maxHeight: '100%', paddingTop: 128, position: 'absolute', top: 0, left: 0, bottom: 0, background: '#181818', overflow: 'hidden', borderRight: '0.33px rgba(255, 255, 255, 0.20) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'inline-flex', zIndex: 10000}}>
+                      <div data-layer="chat history flexbox" className="ChatHistoryFlexbox" style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}>
+                        <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
+                          <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word'}}>Your chats</div>
+                        </div>
+                        {/* 
+                          New Chat button - Mobile/Duplicated version
+                          Same logic: only show if current chat is NOT saved (new)
+                        */}
+                        {!savedChats.find(c => c.id === currentChatId) && (
+                             <div 
+                                onClick={() => {
+                                    setIsSidebarOpen(false)
+                                }}
+                                data-layer="chat item (current new)" 
+                                style={{
+                                    alignSelf: 'stretch', 
+                                    minHeight: 36, 
+                                    paddingLeft: 10, 
+                                    paddingRight: 10, 
+                                    borderRadius: 28, 
+                                    justifyContent: 'flex-start', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    display: 'inline-flex', 
+                                    cursor: 'pointer', 
+                                    marginBottom: 2,
+                                    background: 'rgba(255, 255, 255, 0.06)'
+                                }}
+                            >
+                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>New chat</div>
+                            </div>
+                        )}
+
+                        {savedChats.map(chat => (
+                            <div key={chat.id} onClick={() => {
+                                setCurrentChatId(chat.id)
+                                setMessages(chat.messages)
+                                setDocContent(chat.notes || "")
+                                if (chat.whiteboard && editorRef.current) {
+                                    try {
+                                        editorRef.current.store.loadSnapshot(chat.whiteboard)
+                                    } catch(e) { console.error(e) }
+                                }
+                                setIsSidebarOpen(false)
+                            }} data-layer="chat item" style={{
+                                alignSelf: 'stretch', 
+                                minHeight: 36, 
+                                padding: "8px 10px", 
+                                borderRadius: 12, 
+                                justifyContent: 'flex-start', 
+                                alignItems: 'center', 
+                                gap: 8, 
+                                display: 'inline-flex', 
+                                cursor: 'pointer', 
+                                marginBottom: 2,
+                                background: (hoveredChatId === chat.id || currentChatId === chat.id) ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                            }}>
+                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>{chat.title}</div>
+                            </div>
+                        ))}
+                      </div>
+                      
+                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 240, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, left: 0, top: 0, position: 'absolute', background: '#181818', borderRight: '1px rgba(255, 255, 255, 0.10) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
+                        <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
+                          <div data-layer="new chat" className="NewChat" style={{width: 36, height: 36, paddingLeft: 9, paddingRight: 9, justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
+                            <div data-svg-wrapper data-layer="thinking" className="Thinking" style={{position: 'relative'}}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <g clipPath="url(#clip0_525_1678)">
+                              <ellipse cx="11.7647" cy="12" rx="11.7647" ry="12" transform="matrix(-1 0 0 1 23.5312 9.53674e-06)" fill="white" fillOpacity="0.75"/>
+                              <g filter="url(#filter0_f_525_1678)">
+                              <ellipse cx="11.499" cy="12" rx="11.499" ry="12" transform="matrix(-1 0 0 1 23.2656 9.53674e-06)" fill="url(#paint0_linear_525_1678)"/>
+                              </g>
+                              <g filter="url(#filter1_di_525_1678)">
+                              <ellipse cx="8.89072" cy="9.34886" rx="2.25288" ry="2.8161" transform="rotate(-12 8.89072 9.34886)" fill="white" fillOpacity="0.75" shapeRendering="crispEdges"/>
+                              </g>
+                              <g filter="url(#filter2_di_525_1678)">
+                              <ellipse cx="15.2579" cy="7.8496" rx="2.25288" ry="2.8161" transform="rotate(-12 15.2579 7.8496)" fill="white" fillOpacity="0.75" shapeRendering="crispEdges"/>
+                              </g>
+                              </g>
+                              <defs>
+                              <filter id="filter0_f_525_1678" x="-4.53438" y="-4.79999" width="32.6" height="33.6" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                              <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+                              <feGaussianBlur stdDeviation="2.4" result="effect1_foregroundBlur_525_1678"/>
+                              </filter>
+                              <filter id="filter1_di_525_1678" x="3.23005" y="4.30143" width="11.3211" height="12.3478" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                              <feOffset dy="1.12644"/>
+                              <feGaussianBlur stdDeviation="1.68966"/>
+                              <feComposite in2="hardAlpha" operator="out"/>
+                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
+                              <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_525_1678"/>
+                              <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_525_1678" result="shape"/>
+                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                              <feOffset dy="-0.601442"/>
+                              <feGaussianBlur stdDeviation="1.20288"/>
+                              <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"/>
+                              <feBlend mode="normal" in2="shape" result="effect2_innerShadow_525_1678"/>
+                              </filter>
+                              <filter id="filter2_di_525_1678" x="9.59724" y="2.80216" width="11.3211" height="12.3478" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                              <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                              <feOffset dy="1.12644"/>
+                              <feGaussianBlur stdDeviation="1.68966"/>
+                              <feComposite in2="hardAlpha" operator="out"/>
+                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"/>
+                              <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_525_1678"/>
+                              <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_525_1678" result="shape"/>
+                              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                              <feOffset dy="-0.601442"/>
+                              <feGaussianBlur stdDeviation="1.20288"/>
+                              <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.6 0 0 0 0 1 0 0 0 0.24 0"/>
+                              <feBlend mode="normal" in2="shape" result="effect2_innerShadow_525_1678"/>
+                              </filter>
+                              <linearGradient id="paint0_linear_525_1678" x1="11.499" y1="0" x2="11.499" y2="24" gradientUnits="userSpaceOnUse">
+                              <stop stopColor="#0099FF"/>
+                              <stop offset="1" stopColor="white" stopOpacity="0.85"/>
+                              </linearGradient>
+                              <clipPath id="clip0_525_1678">
+                              <rect width="23.5294" height="24" rx="11.7647" transform="matrix(-1 0 0 1 23.5312 0)" fill="white"/>
+                              </clipPath>
+                              </defs>
+                              </svg>
+                            </div>
+                          </div>
+                          <div onClick={() => setIsSidebarOpen(false)} style={{cursor: 'pointer'}} data-svg-wrapper data-layer="close sidebar button" className="CloseSidebarButton">
+                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 14H26M10 22H26" stroke="#858585" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        </div>
+                        <div onClick={handleClearMessages} style={{cursor: 'pointer'}} data-layer="flexbox" className="Flexbox">
+                          <div data-layer="new chat" className="NewChat" style={{alignSelf: 'stretch', height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 28, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex', background: 'rgba(255,255,255,0.1)'}}>
+                            <div data-svg-wrapper className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M14.9998 8.00011C14.9998 11.1823 14.9998 12.773 13.9747 13.7615C12.9496 14.75 11.2992 14.75 7.99988 14.75C4.69983 14.75 3.05019 14.75 2.02509 13.7615C1 12.773 1 11.1816 1 8.00011C1 4.81792 1 3.22719 2.02509 2.23871C3.05019 1.25023 4.7006 1.25023 7.99988 1.25023M6.08114 7.36262C5.81571 7.61895 5.66661 7.96637 5.66659 8.32861V10.2501H7.67167C8.04733 10.2501 8.40821 10.1061 8.6742 9.84958L14.5852 4.14668C14.7168 4.01979 14.8213 3.86913 14.8925 3.70332C14.9637 3.53751 15.0004 3.3598 15.0004 3.18032C15.0004 3.00084 14.9637 2.82313 14.8925 2.65732C14.8213 2.49151 14.7168 2.34085 14.5852 2.21396L14.0011 1.65072C13.8695 1.52369 13.7132 1.42291 13.5412 1.35415C13.3692 1.28539 13.1848 1.25 12.9986 1.25C12.6405 1.25 12.4627 1.28539 12.2968 1.35415C12.1309 1.42291 12.1276 1.52369 11.996 1.65072L6.08114 7.36262Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                            <div data-layer="New chat" className="NewChat" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 1.38, wordWrap: 'break-word'}}>New chat</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                )}
+
                 {/* 
                   Standard Topbar (hidden for both Doc and Whiteboard on mobile) 
                   Only show this bar if it's an overlay AND NOT a Doc/Whiteboard tool on mobile
@@ -13118,7 +13431,7 @@ Do not include markdown formatting or explanations.`
                                     msOverflowStyle: "none",
                                 }}
                             >
-                                {aiGeneratedSuggestions.slice(0, isMobileLayout ? 10 : 3).map((suggestion, index) => (
+                                {aiGeneratedSuggestions.slice(0, messages.length === 0 ? (isMobileLayout ? 10 : 5) : (isMobileLayout ? 5 : 3)).map((suggestion, index) => (
                                     <div
                                         key={index}
                                         onClick={() => handleSendMessage(suggestion)}
@@ -13723,6 +14036,7 @@ Do not include markdown formatting or explanations.`
             ref={containerRef}
             data-layer="main-app-container"
             className="MainAppContainer"
+            onClick={() => isSidebarOpen && setIsSidebarOpen(false)}
             style={{
                 width: "100%",
                 height: "100%",
@@ -13741,6 +14055,318 @@ Do not include markdown formatting or explanations.`
                 // touchAction: "none", // Removed to fix mobile tap accuracy issues
             }}
         >
+            {/* --- SIDEBAR & BUTTON --- */}
+            <div 
+                data-svg-wrapper 
+                data-layer="open sidebar (6% white fill on hover)" 
+                className="OpenSidebar6WhiteFillOnHover" 
+                style={{
+                    left: 8, 
+                    top: 8, 
+                    position: 'absolute', 
+                    zIndex: 9999, 
+                    cursor: 'pointer',
+                    background: isSidebarBtnHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                    borderRadius: '50%', // Assuming it should still be round if it has a fill? The prompt didn't specify radius but "fill" implies shape. The SVG is 36x36. I'll keep it round or just wrap. The user snippet has a div wrapper.
+                    // The user snippet provided: <div ... style={{left: 0, top: 0, position: 'absolute'}}> <svg...> </div>
+                    // It doesn't explicitly set width/height on the div, but SVG is 36x36.
+                    // "only when its hovered it should have a 6% white background fill" -> implies the div gets the fill.
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }} 
+                onMouseEnter={() => setIsSidebarBtnHovered(true)}
+                onMouseLeave={() => setIsSidebarBtnHovered(false)}
+                onClick={(e) => {
+                    e.stopPropagation()
+                    setIsSidebarOpen(true)
+                }}
+            >
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 14H26M10 22H26" stroke="#858585" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            </div>
+
+            {isSidebarOpen && (
+                <>
+                    {isMobileLayout && (
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                        bottom: 0,
+                        background: colors.state.overlay,
+                        zIndex: 9999, // Below sidebar (10000)
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        setIsSidebarOpen(false)
+                    }}
+                />
+            )}
+            <div 
+                data-layer="left sidebar" 
+                className="LeftSidebar" 
+                style={{
+                        width: 240, 
+                        height: '100%', 
+                        paddingTop: 108, 
+                        position: 'absolute', 
+                        top: 0, 
+                        left: 0, 
+                        bottom: 0, 
+                        background: '#181818', 
+                        overflow: 'hidden', 
+                        flexDirection: 'column', 
+                        justifyContent: 'flex-start', 
+                        alignItems: 'flex-start', 
+                        gap: 24, 
+                        display: 'inline-flex', 
+                        zIndex: 10000
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div 
+                        data-layer="chat history flexbox" 
+                        className="ChatHistoryFlexbox" 
+                        style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}
+                        onScroll={() => {
+                            if (menuOpenChatId) {
+                                setMenuOpenChatId(null)
+                                setMenuPosition(null)
+                                setHoveredActionId(null)
+                            }
+                        }}
+                    >
+                        {savedChats.filter(chat => !searchQuery || chat.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
+                            <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
+                                <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Your chats</div>
+                            </div>
+                        )}
+                        {/* 
+                          New Chat button - Only shows if the current chat isn't "New chat" 
+                          Wait, per prompt: "it doesnt say empty new chats to sidebar UNLESS its the chat the user currently has open."
+                          Meaning if I am in a new empty chat, it should be listed in sidebar as "New chat".
+                          But usually sidebar lists SAVED chats. 
+                          If I am in a new chat (messages.length === 0), it hasn't been saved yet.
+                          So I should probably render a fake "New chat" entry if the current one is empty?
+                          
+                          Actually the prompt says: "it doesnt say empty new chats to sidebar UNLESS its the chat the user currently has open. if its a new chat with no messages, it says "New chat" on sidebar."
+                          
+                          This implies:
+                          1. If I am currently in an empty chat (new session), show "New chat" item in the sidebar list, highlighted.
+                          2. If I switch away, and it was empty, it shouldn't be saved/shown (standard behavior usually, but prompt says "UNLESS its the chat the user currently has open").
+                          
+                          So:
+                          - We should check if `currentChatId` exists in `savedChats`.
+                          - If NOT, it means it's a new unsaved chat. We should render it in the list.
+                        */}
+                        {!savedChats.find(c => c.id === currentChatId) && (
+                             <div 
+                                onClick={() => {
+                                    // It's already open, just close sidebar
+                                    setIsSidebarOpen(false)
+                                }}
+                                data-layer="chat item (current new)" 
+                                style={{
+                                    alignSelf: 'stretch', 
+                                    minHeight: 36, 
+                                    paddingLeft: 10, 
+                                    paddingRight: 10, 
+                                    borderRadius: 28, 
+                                    justifyContent: 'flex-start', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    display: 'inline-flex', 
+                                    cursor: 'pointer', 
+                                    marginBottom: 2,
+                                    background: 'rgba(255, 255, 255, 0.06)' // Always highlighted as we are in it
+                                }}
+                            >
+                                <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>New chat</div>
+                            </div>
+                        )}
+
+                        {savedChats.filter(chat => !searchQuery || chat.title.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
+                            <div 
+                                key={chat.id} 
+                                onClick={() => {
+                                    if (editingChatId === chat.id) return
+                                    setCurrentChatId(chat.id)
+                                    setMessages(chat.messages)
+                                    setDocContent(chat.notes || "")
+                                    if (chat.whiteboard && editorRef.current) {
+                                        try {
+                                            editorRef.current.store.loadSnapshot(chat.whiteboard)
+                                        } catch(e) { console.error(e) }
+                                    }
+                                    setIsSidebarOpen(false)
+                                }} 
+                                onMouseEnter={() => setHoveredChatId(chat.id)}
+                                onMouseLeave={() => setHoveredChatId(null)}
+                                data-layer="chat item" 
+                                style={{
+                                    alignSelf: 'stretch', 
+                                    minHeight: 36, 
+                                    paddingLeft: 10, 
+                                    paddingRight: 10, 
+                                    borderRadius: 28, 
+                                    justifyContent: 'flex-start', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    display: 'inline-flex', 
+                                    cursor: 'pointer', 
+                                    marginBottom: 2,
+                                    position: "relative",
+                                    background: (hoveredChatId === chat.id || currentChatId === chat.id || menuOpenChatId === chat.id) 
+                                        ? (hoveredChatId === chat.id ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.06)') 
+                                        : 'transparent'
+                                }}
+                            >
+                                {editingChatId === chat.id ? (
+                                    <input
+                                        ref={renameInputRef}
+                                        value={editingTitle}
+                                        onChange={(e) => setEditingTitle(e.target.value)}
+                                        onBlur={handleFinishRename}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleFinishRename()
+                                            if (e.key === "Escape") {
+                                                setEditingChatId(null)
+                                                setEditingTitle("")
+                                            }
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                            flex: '1 1 0',
+                                            background: "transparent",
+                                            border: "none",
+                                            color: 'rgba(255, 255, 255, 0.95)',
+                                            fontSize: 14,
+                                            fontFamily: 'Inter',
+                                            fontWeight: '400',
+                                            lineHeight: "19.32px",
+                                            outline: "none",
+                                            padding: 0,
+                                            width: "100%"
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}>
+                                        {chat.isPinned && <span style={{ marginRight: 4 }}>📌</span>}{chat.title}
+                                    </div>
+                                )}
+
+                                {(hoveredChatId === chat.id || menuOpenChatId === chat.id || isMobileLayout) && !editingChatId && (
+                                        <div
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (menuOpenChatId === chat.id) {
+                                                setMenuOpenChatId(null)
+                                                setMenuPosition(null)
+                                            } else {
+                                                const rect = e.currentTarget.getBoundingClientRect()
+                                                setMenuOpenChatId(chat.id)
+                                                setMenuPosition({
+                                                    top: rect.bottom + 4,
+                                                    left: rect.left
+                                                })
+                                            }
+                                        }}
+                                        style={{
+                                            width: 16,
+                                            height: 24,
+                                            borderRadius: 12,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "rgba(255,255,255,0.7)",
+                                        }}
+                                    >
+                                        <div data-svg-wrapper data-layer="open actions menu button" className="OpenActionsMenuButton" style={{position: 'relative'}}>
+                                            <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z" fill="white" fillOpacity="0.95"/>
+                                            <path d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z" fill="white" fillOpacity="0.95"/>
+                                            <path d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z" fill="white" fillOpacity="0.95"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div data-layer="fixed top nav" className="FixedTopNav" style={{width: '100%', padding: 8, left: 0, top: 0, position: 'absolute', background: '#181818', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 12, display: 'inline-flex'}}>
+                        <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
+                            <div 
+                                data-svg-wrapper 
+                                data-layer="new chat (6% white fill on HOVER)" 
+                                className="NewChat6WhiteFillOnHover"
+                                onClick={(e) => { e.stopPropagation(); handleClearMessages(); setIsSidebarOpen(false); }}
+                                onMouseEnter={() => setIsTopNewChatHovered(true)}
+                                onMouseLeave={() => setIsTopNewChatHovered(false)}
+                                style={{
+                                    cursor: 'pointer',
+                                    borderRadius: 28,
+                                    background: isTopNewChatHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                                }}
+                            >
+                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M25.774 18.0001C25.774 21.5359 25.774 23.3034 24.6351 24.4017C23.4961 25.5 21.6623 25.5 17.9964 25.5C14.3297 25.5 12.4967 25.5 11.3577 24.4017C10.2187 23.3034 10.2188 21.5351 10.2188 18.0001C10.2188 14.4644 10.2187 12.6969 11.3577 11.5986C12.4967 10.5003 14.3305 10.5003 17.9964 10.5003M15.8645 17.2918C15.5695 17.5766 15.4039 17.9626 15.4038 18.3651V20.5001H17.6317C18.0491 20.5001 18.4501 20.3401 18.7456 20.0551L25.3134 13.7185C25.4597 13.5775 25.5757 13.4101 25.6548 13.2259C25.734 13.0417 25.7747 12.8442 25.7747 12.6448C25.7747 12.4454 25.734 12.2479 25.6548 12.0637C25.5757 11.8795 25.4597 11.7121 25.3134 11.5711L24.6644 10.9452C24.5182 10.8041 24.3446 10.6921 24.1534 10.6157C23.9623 10.5393 23.7574 10.5 23.5505 10.5C23.3436 10.5 23.1387 10.5393 22.9476 10.6157C22.7564 10.6921 22.5828 10.8041 22.4366 10.9452L15.8645 17.2918Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <div 
+                                data-svg-wrapper 
+                                data-layer="close sidebar button (6% white fill on HOVER)" 
+                                className="CloseSidebarButton6WhiteFillOnHover"
+                                onClick={(e) => { e.stopPropagation(); setIsSidebarOpen(false); }}
+                                onMouseEnter={(e) => { e.stopPropagation(); setIsCloseSidebarHovered(true); }}
+                                onMouseLeave={(e) => { e.stopPropagation(); setIsCloseSidebarHovered(false); }}
+                                style={{
+                                    cursor: 'pointer',
+                                    borderRadius: 28,
+                                    background: isCloseSidebarHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                                }}
+                            >
+                                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 14H26M10 22H26" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div data-layer="search-bar" className="SearchBar" style={{alignSelf: 'stretch', height: 36, paddingLeft: 12, background: 'rgba(255, 255, 255, 0.06)', overflow: 'hidden', borderRadius: 50, justifyContent: 'flex-start', alignItems: 'center', gap: 6, display: 'inline-flex'}}>
+                            <div data-svg-wrapper data-layer="search-icon" className="SearchIcon" style={{ marginTop: 2 }}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10.9289 10.8023L14.7616 14.6M12.6167 6.5224C12.6167 8.09311 11.9837 9.5995 10.8571 10.7102C9.73045 11.8208 8.20241 12.4448 6.60911 12.4448C5.01581 12.4448 3.48777 11.8208 2.36113 10.7102C1.2345 9.5995 0.601563 8.09311 0.601562 6.5224C0.601563 4.95168 1.2345 3.44529 2.36113 2.33463C3.48777 1.22396 5.01581 0.599998 6.60911 0.599998C8.20241 0.599998 9.73045 1.22396 10.8571 2.33463C11.9837 3.44529 12.6167 4.95168 12.6167 6.5224Z" stroke="white" strokeOpacity="0.65" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </div>
+                            <input
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search"
+                                className="Search"
+                                style={{
+                                    flex: '1 1 0', 
+                                    color: 'rgba(255, 255, 255, 0.95)', 
+                                    fontSize: 14, 
+                                    fontFamily: 'Inter', 
+                                    fontWeight: '400', 
+                                    lineHeight: "19.60px", 
+                                    background: 'transparent',
+                                    border: 'none',
+                                    outline: 'none',
+                                    padding: 0,
+                                    height: '100%'
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+                </>
+            )}
             {/* BAN BANNER */}
             {isBanned && (
                 <div 
@@ -13773,25 +14399,15 @@ Do not include markdown formatting or explanations.`
             <div 
                 data-layer="main-content-layout"
                 className="MainContentLayout"
-                style={{ display: "flex", width: "100%", height: "100%", overflow: "hidden" }}
+                style={{ 
+                    display: "flex", 
+                    width: "100%", 
+                    height: "100%", 
+                    overflow: "hidden",
+                    paddingLeft: (!isMobileLayout && isSidebarOpen) ? 240 : 0,
+                    transition: "padding-left 0.2s ease-in-out"
+                }}
             >
-                {/* Left: Tool (Desktop only) */}
-                <AnimatePresence>
-                    {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
-                        <motion.div
-                            data-layer="desktop-tool-panel"
-                            className="DesktopToolPanel"
-                            initial={{ x: "-100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "-100%" }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
-                            style={{ flex: 1, position: "relative", zIndex: 10, background: themeColors.background }}
-                        >
-                            {renderActiveTool(false)}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
                 {/* Right: Sidebar / Standard View */}
                 {/* 
                    When tool is OPEN: 
@@ -13817,12 +14433,29 @@ Do not include markdown formatting or explanations.`
                         flexDirection: "column",
                         background: themeColors.background,
                         position: "relative",
-                        zIndex: 5,
+                        zIndex: 20,
                         overflow: "hidden" // Ensure content clips if needed during transition
                     }}
                 >
                     {renderStandardLayout(!isMobileLayout && (isDocOpen || isWhiteboardOpen))}
                 </motion.div>
+
+                {/* Left: Tool (Desktop only) */}
+                <AnimatePresence>
+                    {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
+                        <motion.div
+                            data-layer="desktop-tool-panel"
+                            className="DesktopToolPanel"
+                            initial={{ x: "-100%" }}
+                            animate={{ x: 0 }}
+                            exit={{ x: "-100%" }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            style={{ flex: 1, position: "relative", zIndex: 10, background: themeColors.background }}
+                        >
+                            {renderActiveTool(false)}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* MOBILE OVERLAY (For Tools) */}
@@ -13873,6 +14506,166 @@ Do not include markdown formatting or explanations.`
                     </div>
                 </div>
             </div>
+
+            {/* SIDEBAR ACTIONS MENU PORTAL */}
+            {menuOpenChatId && menuPosition && savedChats.find(c => c.id === menuOpenChatId) && createPortal(
+                <>
+                    <div 
+                        style={{
+                            position: "fixed", 
+                            top: 0, 
+                            left: 0, 
+                            right: 0, 
+                            bottom: 0, 
+                            zIndex: 9998, 
+                            cursor: "default",
+                            background: isMobileLayout ? "rgba(0, 0, 0, 0.7)" : "transparent"
+                        }} 
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenChatId(null); setMenuPosition(null); setHoveredActionId(null); }}
+                    />
+                    <div 
+                        data-layer="chat actions menu" 
+                        className="ChatActionsMenu" 
+                        onClick={(e) => e.stopPropagation()} 
+                        onMouseLeave={() => !isMobileLayout && setHoveredActionId(null)}
+                        style={{
+                            position: "fixed",
+                            zIndex: 9999,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-start',
+                            alignItems: 'flex-start',
+                            gap: 4,
+                            ...(isMobileLayout ? {
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                top: "auto",
+                                width: "100%",
+                                padding: 10,
+                                background: '#353535', 
+                                borderRadius: "36px 36px 0px 0px",
+                                borderTop: '1px rgba(255, 255, 255, 0.10) solid', 
+                                paddingBottom: 32 // Safe area
+                            } : {
+                                left: menuPosition.left,
+                                top: menuPosition.top,
+                                width: 196, 
+                                padding: 10, 
+                                background: '#353535', 
+                                boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.08)', 
+                                borderRadius: 28, 
+                                outline: '0.33px rgba(255, 255, 255, 0.10) solid', 
+                                outlineOffset: '-0.33px', 
+                            })
+                        }}
+                    >
+                        {(() => {
+                            const chat = savedChats.find(c => c.id === menuOpenChatId)!
+                            
+                            const actions = [
+                                {
+                                    id: 'share',
+                                    label: 'Share',
+                                    icon: (
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M0.796875 11.3786V12.275C0.796875 12.9911 1.08134 13.6778 1.58769 14.1842C2.09403 14.6905 2.78079 14.975 3.49687 14.975H12.4969C13.213 14.975 13.8997 14.6905 14.4061 14.1842C14.9124 13.6778 15.1969 12.9911 15.1969 12.275V11.375M7.99687 10.925V1.025M7.99687 1.025L11.1469 4.175M7.99687 1.025L4.84687 4.175" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    ),
+                                    onClick: () => handleShareChat(chat)
+                                },
+                                {
+                                    id: 'rename',
+                                    label: 'Rename',
+                                    icon: (
+                                        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M13.7466 6.61748L5.43491 14.9325C5.00818 15.3595 4.42939 15.5995 3.82574 15.6H0.601562V12.3967C0.601562 11.7933 0.841563 11.2142 1.26823 10.7875L10.7766 1.2683C10.988 1.05651 11.2392 0.888481 11.5156 0.77381C11.7921 0.659139 12.0884 0.600076 12.3877 0.599999C12.687 0.599921 12.9833 0.65883 13.2598 0.773358C13.5363 0.887886 13.7875 1.05579 13.9991 1.26746L14.9374 2.20663C15.3645 2.63375 15.6045 3.21303 15.6045 3.81705C15.6045 4.42108 15.3645 5.00036 14.9374 5.42747L13.7466 6.61748ZM13.7466 6.61748L9.58742 2.4583" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    ),
+                                    onClick: () => handleStartRename(chat)
+                                },
+                                {
+                                    id: 'pin',
+                                    label: chat.isPinned ? "Unpin" : "Pin",
+                                    icon: (
+                                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M0.601562 16.6008L4.71716 12.4843M2.25047 10.0088C1.40246 9.16164 2.2558 7.34562 3.41493 7.27273C4.46205 7.20606 6.88607 7.58562 7.69231 6.77939L9.90566 4.56603C10.4541 4.01669 10.1057 2.78824 10.0701 2.1109C10.0186 1.20778 11.455 0.0922083 12.2168 0.853994L16.3475 4.98559C17.112 5.74827 15.9919 7.18028 15.0915 7.13228C14.4142 7.09673 13.1848 6.74828 12.6355 7.29673L10.4221 9.51009C9.61677 10.3163 9.99544 12.7395 9.92966 13.7866C9.85677 14.9466 8.04075 15.7999 7.19185 14.951L2.25047 10.0088Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    ),
+                                    onClick: () => handlePinChat(chat.id)
+                                },
+                                { isSeparator: true },
+                                {
+                                    id: 'report',
+                                    label: 'Report chat',
+                                    icon: (
+                                        <svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M1.33594 15.6V11.1726M1.33594 11.1726C6.18414 7.38101 9.82072 14.9641 14.6689 11.1726V1.69449C9.82072 5.48606 6.18414 -2.09708 1.33594 1.69449V11.1726Z" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    ),
+                                    onClick: () => { setShowReportModal(true); setMenuOpenChatId(null); setHoveredActionId(null); }
+                                },
+                                {
+                                    id: 'delete',
+                                    label: 'Delete',
+                                    isDestructive: true,
+                                    icon: (
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M13.3359 4.33333L12.5893 11.7982C12.4764 12.9298 12.4204 13.4951 12.1626 13.9227C11.9365 14.299 11.604 14.6 11.207 14.7876C10.7564 15 10.1893 15 9.05149 15H6.95371C5.81683 15 5.24883 15 4.79816 14.7867C4.40087 14.5992 4.06804 14.2983 3.84172 13.9218C3.58572 13.4951 3.52883 12.9298 3.41505 11.7982L2.66927 4.33333M9.33594 11.3111V6.86667M6.66927 11.3111V6.86667M1.33594 4.11111H5.43816M5.43816 4.11111L5.78127 1.736C5.88083 1.304 6.23994 1 6.65238 1H9.35283C9.76527 1 10.1235 1.304 10.2239 1.736L10.567 4.11111M5.43816 4.11111H10.567M10.567 4.11111H14.6693" stroke="#FB6A6A" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    ),
+                                    onClick: () => handleDeleteChat(chat.id)
+                                }
+                            ]
+
+                            return actions.map((action, i) => {
+                                if (action.isSeparator) {
+                                    return (
+                                        <div key={i} data-layer="Frame 1000007254" className="Frame1000007254" style={{alignSelf: 'stretch', paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex'}}>
+                                            <div data-layer="separator" className="Separator" style={{alignSelf: 'stretch', height: 1, position: 'relative', background: 'rgba(255, 255, 255, 0.10)', borderRadius: 4}} />
+                                        </div>
+                                    )
+                                }
+                                
+                                const isDestructive = action.isDestructive
+                                const isHovered = hoveredActionId === action.id
+                                
+                                return (
+                                    <div 
+                                        key={action.id}
+                                        onClick={action.onClick} 
+                                        data-layer={action.id} 
+                                        className={action.id} 
+                                        style={{
+                                            cursor: "pointer", 
+                                            alignSelf: 'stretch', 
+                                            height: isMobileLayout ? 44 : 36, 
+                                            paddingLeft: 12, 
+                                            paddingRight: 12, 
+                                            borderRadius: 28, 
+                                            justifyContent: 'flex-start', 
+                                            alignItems: 'center', 
+                                            gap: 8, 
+                                            display: 'inline-flex', 
+                                            background: isHovered ? (isDestructive ? 'rgba(251, 106, 106, 0.12)' : 'rgba(255,255,255,0.06)') : 'transparent', 
+                                            transition: 'background 0.2s'
+                                        }} 
+                                        onMouseEnter={() => !isMobileLayout && setHoveredActionId(action.id!)}
+                                    >
+                                        <div data-svg-wrapper className="CenterIconFlexboxSoAllIconsHaveSame15wWidthToMakeSureTextIsAlignedVerticalOnAllButtons" style={{width: 15, display: "flex", justifyContent: "center"}}>
+                                            {action.icon}
+                                        </div>
+                                        <div className="Label" style={{flex: '1 1 0', justifyContent: 'center', display: 'flex', flexDirection: 'column', color: isDestructive ? 'rgba(251, 106, 106, 0.95)' : 'rgba(255, 255, 255, 0.95)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: 19.32, wordWrap: 'break-word'}}>
+                                            {action.label}
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        })()}
+                    </div>
+                </>,
+                document.body
+            )}
         </div>
     )
 }
