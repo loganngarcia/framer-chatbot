@@ -14076,14 +14076,6 @@ Do not include markdown formatting or explanations.`
                     left: 8, 
                     top: 8, 
                     position: 'absolute', 
-                    // Lower z-index on mobile so it sits behind tools (z-index 2000)
-                    // But on desktop, it needs to be accessible.
-                    // Actually, if tool is open on mobile, it covers the whole screen.
-                    // The user said: "sidebar open button should show behind doceditor/whiteboard instead of above"
-                    // MobileToolOverlay has zIndex: 2000.
-                    // This button has zIndex: 9999.
-                    // We need to lower it below 2000 if a tool is open?
-                    // Or just set it to something reasonable like 100, and ensure tools are higher.
                     zIndex: 100, 
                     cursor: 'pointer',
                     background: isSidebarBtnHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
@@ -14102,7 +14094,7 @@ Do not include markdown formatting or explanations.`
                 }}
             >
                 <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 14H26M10 22H26" stroke="#858585" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 14H26M10 22H26" stroke="white" strokeOpacity="0.95" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
             </div>
 
