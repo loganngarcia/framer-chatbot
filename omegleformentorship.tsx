@@ -12886,7 +12886,7 @@ Do not include markdown formatting or explanations.`
                         ))}
                       </div>
                       
-                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 260, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, right: 0, top: 0, position: 'absolute', background: '#141414', borderLeft: '1px rgba(255, 255, 255, 0.10) solid', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
+                      <div data-layer="sidebar fixed top nav" className="SidebarFixedTopNav" style={{width: 260, paddingTop: 16, paddingBottom: 8, paddingLeft: 8, paddingRight: 8, left: 0, top: 0, position: 'absolute', background: '#141414', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 24, display: 'flex'}}>
                         <div data-layer="sidebar top actions" className="SidebarTopActions" style={{alignSelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', display: 'inline-flex'}}>
                           <div data-layer="new chat" className="NewChat" style={{width: 36, height: 36, paddingLeft: 9, paddingRight: 9, justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
                             <div data-svg-wrapper data-layer="thinking" className="Thinking" style={{position: 'relative'}}>
@@ -14061,7 +14061,7 @@ Do not include markdown formatting or explanations.`
                 data-layer="open sidebar (6% white fill on hover)" 
                 className="OpenSidebar6WhiteFillOnHover" 
                 style={{
-                    right: 8, 
+                    left: 8, 
                     top: 8, 
                     position: 'absolute', 
                     zIndex: 9999, 
@@ -14091,7 +14091,6 @@ Do not include markdown formatting or explanations.`
                 <>
                     {isMobileLayout && (
                         <motion.div
-                            key="sidebar-overlay"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
@@ -14112,20 +14111,19 @@ Do not include markdown formatting or explanations.`
                         />
                     )}
                     <motion.div 
-                        key="sidebar-panel"
-                        data-layer="right sidebar"  
-                        className="RightSidebar" 
-                        initial={{ x: "100%" }}
+                        data-layer="left sidebar" 
+                        className="LeftSidebar" 
+                        initial={{ x: -260 }}
                         animate={{ x: 0 }}
-                        exit={{ x: "100%" }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        exit={{ x: -260 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         style={{
                             width: 260, 
                             height: '100%', 
                             paddingTop: 108, 
                             position: 'absolute', 
                             top: 0, 
-                            right: 0, 
+                            left: 0, 
                             bottom: 0, 
                             background: '#141414', 
                             overflow: 'hidden', 
@@ -14134,23 +14132,22 @@ Do not include markdown formatting or explanations.`
                             alignItems: 'flex-start', 
                             gap: 24, 
                             display: 'inline-flex', 
-                            zIndex: 10000,
-                            borderLeft: '0.33px rgba(255, 255, 255, 0.20) solid'
+                            zIndex: 10000
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                    <div 
-                        data-layer="chat history flexbox" 
-                        className="ChatHistoryFlexbox" 
-                        style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}
-                        onScroll={() => {
-                            if (menuOpenChatId) {
-                                setMenuOpenChatId(null)
-                                setMenuPosition(null)
-                                setHoveredActionId(null)
-                            }
-                        }}
-                    >
+                        <div 
+                            data-layer="chat history flexbox" 
+                            className="ChatHistoryFlexbox" 
+                            style={{alignSelf: 'stretch', flex: '1 1 0', padding: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex', overflowY: 'auto'}}
+                            onScroll={() => {
+                                if (menuOpenChatId) {
+                                    setMenuOpenChatId(null)
+                                    setMenuPosition(null)
+                                    setHoveredActionId(null)
+                                }
+                            }}
+                        >
                         {savedChats.filter(chat => !searchQuery || chat.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
                             <div data-layer="Chat title" className="ChatTitle" style={{alignSelf: 'stretch', paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
                                 <div data-layer="Your chats" className="YourChats" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'rgba(255, 255, 255, 0.65)', fontSize: 14, fontFamily: 'Inter', fontWeight: '400', lineHeight: "19.32px", wordWrap: 'break-word'}}>Your chats</div>
@@ -14373,7 +14370,7 @@ Do not include markdown formatting or explanations.`
                             />
                         </div>
                     </div>
-                </motion.div>
+                    </motion.div>
                 </>
             )}
             </AnimatePresence>
@@ -14414,8 +14411,8 @@ Do not include markdown formatting or explanations.`
                     width: "100%", 
                     height: "100%", 
                     overflow: "hidden",
-                    paddingRight: (!isMobileLayout && isSidebarOpen) ? 260 : 0,
-                    transition: "padding-right 0.2s ease-in-out"
+                    paddingLeft: (!isMobileLayout && isSidebarOpen) ? 260 : 0,
+                    transition: "padding-left 0.2s ease-in-out"
                 }}
             >
                 {/* Right: Sidebar / Standard View */}
