@@ -4573,6 +4573,9 @@ interface ChatInputProps {
     onClearMessages?: () => void
     hideGradient?: boolean
     rootStyle?: React.CSSProperties
+    showAddPeopleOverlay?: boolean
+    setShowAddPeopleOverlay?: (show: boolean) => void
+    children?: React.ReactNode
 }
 
 const ChatInput = React.memo(function ChatInput({
@@ -4607,6 +4610,9 @@ const ChatInput = React.memo(function ChatInput({
     onClearMessages,
     hideGradient = false,
     rootStyle,
+    showAddPeopleOverlay: propShowAddPeopleOverlay,
+    setShowAddPeopleOverlay: propSetShowAddPeopleOverlay,
+    children,
 }: ChatInputProps) {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
@@ -4626,8 +4632,13 @@ const ChatInput = React.memo(function ChatInput({
     // }, [isDocOpen, isWhiteboardOpen])
 
     const [showMenu, setShowMenu] = React.useState(false)
-    const [showAddPeopleOverlay, setShowAddPeopleOverlay] =
+    const [localShowAddPeopleOverlay, setLocalShowAddPeopleOverlay] =
         React.useState(false)
+
+    const showAddPeopleOverlay =
+        propShowAddPeopleOverlay ?? localShowAddPeopleOverlay
+    const setShowAddPeopleOverlay =
+        propSetShowAddPeopleOverlay ?? setLocalShowAddPeopleOverlay
     const [hasCopiedLink, setHasCopiedLink] = React.useState(false)
     const [selectedMenuIndex, setSelectedMenuIndex] = React.useState(-1)
     const menuRef = React.useRef<HTMLDivElement>(null)
@@ -4926,81 +4937,6 @@ const ChatInput = React.memo(function ChatInput({
 
         const showReport = isConnected && !isLiveMode
 
-        items.push({
-            id: "add_people",
-            label: "Add people",
-            icon: (
-                <div
-                    data-svg-wrapper
-                    data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
-                    className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 16,
-                        height: 16,
-                    }}
-                >
-                    <svg
-                        width="16"
-                        height="17"
-                        viewBox="0 0 16 17"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M1.34961 15.6C1.58562 10.9628 5.56331 8.89799 9.13135 9.40568M9.275 12.8857H14.649M12.0976 10.226V15.6M11.3137 3.84578C11.3137 2.0779 9.83576 0.599976 8.06787 0.599976C6.29999 0.599976 4.82207 2.0779 4.82207 3.84578C4.82207 5.61367 6.29999 7.09159 8.06787 7.09159C9.83576 7.09159 11.3137 5.61367 11.3137 3.84578Z"
-                            stroke={themeColors.text.primary}
-                            strokeOpacity="0.95"
-                            strokeWidth="1.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                </div>
-            ),
-            onClick: () => {
-                if (!isMobileLayout) {
-                    setShowAddPeopleOverlay(true)
-                    setShowMenu(false)
-                    return
-                }
-
-                const url =
-                    typeof window !== "undefined" ? window.location.href : ""
-                const callId =
-                    typeof window !== "undefined" && window.location.hash
-                        ? window.location.hash.replace("#", "")
-                        : ""
-                const shareTitle = callId
-                    ? `Join my call (${callId}) | #1 free mentorship`
-                    : "Join my call | #1 free mentorship"
-
-                if (typeof document !== "undefined") {
-                    document.title = shareTitle
-                }
-
-                if (typeof navigator !== "undefined") {
-                    navigator.clipboard.writeText(url).catch(console.error)
-                    // @ts-ignore
-                    if (navigator.share) {
-                        // @ts-ignore
-                        navigator
-                            .share({
-                                title: shareTitle,
-                                url: url,
-                            })
-                            .catch(console.error)
-                    }
-                }
-                setShowMenu(false)
-            },
-            className: "AddPeople",
-            isDestructive: false,
-            hasSeparator: true,
-        })
-
         if (showReport) {
             items.push({
                 id: "report",
@@ -5112,7 +5048,7 @@ const ChatInput = React.memo(function ChatInput({
                         alignItems: "center",
                         gap: 4,
                         display: "inline-flex",
-                        marginBottom: 0,
+                        marginBottom: 12,
                     }}
                 >
                     <div
@@ -5139,7 +5075,9 @@ const ChatInput = React.memo(function ChatInput({
                                 wordWrap: "break-word",
                             }}
                         >
-                            Add people
+                            {isDocOpen || isWhiteboardOpen
+                                ? "Invite people"
+                                : "Invite people to join call"}
                         </div>
                         <div
                             data-layer="description"
@@ -5324,6 +5262,8 @@ const ChatInput = React.memo(function ChatInput({
                     </div>
                 </div>
             )}
+
+            {children}
 
             <div
                 data-layer="bottom-controls-container"
@@ -8746,6 +8686,46 @@ export default function OmegleMentorshipUI(props: Props) {
      * volunteer:  "Volunteer" user providing guidance.
      */
     const [role, setRole] = React.useState<"student" | "volunteer" | null>(null)
+    const [showYouSettings, setShowYouSettings] = React.useState(false)
+    const [youButtonOrigin, setYouButtonOrigin] = React.useState<{x: number, y: number} | null>(null)
+    const [youName, setYouName] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("you_name") || ""
+        }
+        return ""
+    })
+    const [youSchool, setYouSchool] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("you_school") || ""
+        }
+        return ""
+    })
+    const [youWork, setYouWork] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("you_work") || ""
+        }
+        return ""
+    })
+    const [youInterests, setYouInterests] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("you_interests") || ""
+        }
+        return ""
+    })
+    const [isSettingsCloseHovered, setIsSettingsCloseHovered] = React.useState(false)
+
+    // Persist "You" settings
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("you_name", youName)
+            localStorage.setItem("you_school", youSchool)
+            localStorage.setItem("you_work", youWork)
+            localStorage.setItem("you_interests", youInterests)
+        }
+    }, [youName, youSchool, youWork, youInterests])
+    
+    // No longer need hasSentYouInfo flag as we will inject dynamically
+    // const [hasSentYouInfo, setHasSentYouInfo] = React.useState(false)
 
     // Clear saved role on mount to ensure fresh selection
     React.useEffect(() => {
@@ -8791,6 +8771,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const [ready, setReady] = React.useState(false) // Tracks if external scripts are loaded
     const [isScreenSharing, setIsScreenSharing] = React.useState(false)
     const [isWhiteboardOpen, setIsWhiteboardOpen] = React.useState(false)
+    const [showAddPeopleOverlay, setShowAddPeopleOverlay] = React.useState(false)
     const [isWhiteboardDownloadHovered, setIsWhiteboardDownloadHovered] =
         React.useState(false)
     const [isWhiteboardCloseHovered, setIsWhiteboardCloseHovered] =
@@ -10485,6 +10466,8 @@ Do not include markdown formatting or explanations.`
     const [isCloseSidebarHovered, setIsCloseSidebarHovered] =
         React.useState(false)
     const [isTopNewChatHovered, setIsTopNewChatHovered] = React.useState(false)
+    const [isAddPeopleHovered, setIsAddPeopleHovered] = React.useState(false)
+    const [isYouHovered, setIsYouHovered] = React.useState(false)
     const [searchQuery, setSearchQuery] = React.useState("")
     const messagesRef = React.useRef(messages)
     // docContentRef already declared above
@@ -11961,6 +11944,7 @@ Do not include markdown formatting or explanations.`
         const newId = Date.now().toString()
         setCurrentChatId(newId)
         setMessages([])
+        // setHasSentYouInfo(false)
 
         // Reset suggestions with default ones if available
         if (defaultSuggestions && defaultSuggestions.length > 0) {
@@ -13494,9 +13478,42 @@ Do not include markdown formatting or explanations.`
             setIsLoading(true)
 
             try {
+                // Construct "You" context if available (Hidden from UI, visible to model)
+                let hiddenContext = ""
+                const hasYouInfo = youName || youSchool || youWork || youInterests
+                if (hasYouInfo && messages.length === 0) { // Only inject on first message turn to establish context, or could be every time? First is usually enough.
+                    const isCall = dataConnectionsRef.current.size > 0 // Heuristic for "in a call"
+                    
+                    if (isCall) {
+                        let identityPrefix = ""
+                        if (role === "student") {
+                            identityPrefix = `Student: ${youName || "Unknown"}`
+                        } else if (role === "volunteer") {
+                            identityPrefix = `Mentor: ${youName || "Unknown"}`
+                        } else {
+                            identityPrefix = `Person: ${youName || "Unknown"}`
+                        }
+                        
+                        const details = []
+                        if (youSchool) details.push(`School: ${youSchool}`)
+                        if (youWork) details.push(`Work: ${youWork}`)
+                        if (youInterests) details.push(`Interests: ${youInterests}`)
+
+                        hiddenContext = `${identityPrefix}\n${details.join("\n")}\n\n[End of User Context]\n\n`
+                    } else {
+                        // "Nicely plopped in" for solo chat
+                        hiddenContext = `User Context:\nName: ${youName}\nSchool: ${youSchool}\nWork: ${youWork}\nInterests: ${youInterests}\n\n`
+                    }
+                }
+
                 let userContent: any = []
-                if (text.trim()) {
-                    userContent.push({ text: text })
+                
+                // If we have hidden context, we prepend it to the text part of the prompt sent to Gemini
+                // This way it is NOT in the 'messages' state (UI), but IS in the request payload.
+                const finalPromptText = hiddenContext + text
+                
+                if (finalPromptText.trim()) {
+                    userContent.push({ text: finalPromptText })
                 }
 
                 for (const att of currentAttachments) {
@@ -14421,8 +14438,9 @@ Do not include markdown formatting or explanations.`
             // Clear AI suggestions when user sends a message
             setAiGeneratedSuggestions([])
 
-            const textToSend = sanitizeMessage(textToCheck)
-
+            let textToSend = sanitizeMessage(textToCheck)
+            // We do NOT inject context here anymore, as it will be injected as hidden system prompt logic in generateAIResponse
+            
             // Input length check
             if (textToSend.length > MAX_INPUT_LENGTH) {
                 setMessages((prev) => [
@@ -16090,6 +16108,8 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         <ChatInput
+                            showAddPeopleOverlay={showAddPeopleOverlay}
+                            setShowAddPeopleOverlay={setShowAddPeopleOverlay}
                             hideGradient={
                                 aiGeneratedSuggestions.length > 0 ||
                                 ((isDocOpen || isWhiteboardOpen) &&
@@ -16371,6 +16391,76 @@ Do not include markdown formatting or explanations.`
                         // touchAction: "none", // Removed to fix mobile tap accuracy issues
                     }}
                 >
+                    <ChatInput
+                        showAddPeopleOverlay={showAddPeopleOverlay}
+                        setShowAddPeopleOverlay={setShowAddPeopleOverlay}
+                        hideGradient={
+                            aiGeneratedSuggestions.length > 0 ||
+                            ((isDocOpen || isWhiteboardOpen) && isMobileLayout)
+                        }
+                        value={inputText}
+                        onChange={(e) => {
+                            const newValue = sanitizeMessage(e.target.value)
+                            setInputText(newValue)
+                            const now = Date.now()
+                            const interval = 50
+                            const timeSinceLastSend =
+                                now - lastInputSendTimeRef.current
+
+                            if (inputTimeoutRef.current)
+                                clearTimeout(inputTimeoutRef.current)
+
+                            if (timeSinceLastSend > interval) {
+                                if (dataConnectionsRef.current.size > 0) {
+                                    broadcastData({
+                                        type: "input-sync",
+                                        payload: newValue,
+                                    })
+                                    lastInputSendTimeRef.current = now
+                                }
+                            } else {
+                                inputTimeoutRef.current = setTimeout(() => {
+                                    if (dataConnectionsRef.current.size > 0) {
+                                        broadcastData({
+                                            type: "input-sync",
+                                            payload: newValue,
+                                        })
+                                        lastInputSendTimeRef.current =
+                                            Date.now()
+                                    }
+                                }, interval - timeSinceLastSend)
+                            }
+                        }}
+                        onSend={handleSendMessage}
+                        onConnectWithAI={handleConnectWithAI}
+                        onStop={handleStop}
+                        onEndCall={() => cleanup(true)}
+                        onFileSelect={handleFileSelect}
+                        onScreenShare={toggleScreenShare}
+                        onReport={handleReport}
+                        placeholder="Ask anything"
+                        showEndCall={status !== "idle"}
+                        showAiLiveButton={
+                            status === "searching" && role === "student"
+                        }
+                        attachments={attachments}
+                        onRemoveAttachment={handleRemoveAttachment}
+                        isLoading={isLoading}
+                        isScreenSharing={isScreenSharing}
+                        isWhiteboardOpen={isWhiteboardOpen}
+                        toggleWhiteboard={toggleWhiteboard}
+                        isDocOpen={isDocOpen}
+                        toggleDoc={toggleDoc}
+                        isConnected={status === "connected" && !isLiveMode}
+                        status={status}
+                        isMobileLayout={isMobileLayout}
+                        isLiveMode={isLiveMode}
+                        onPasteFile={processFiles}
+                        themeColors={themeColors}
+                        role={role}
+                        hasMessages={messages.length > 0}
+                        onClearMessages={handleClearMessages}
+                    >
                     {aiGeneratedSuggestions.length > 0 && (
                         <div
                             style={{
@@ -16397,8 +16487,7 @@ Do not include markdown formatting or explanations.`
                                 justifyContent: "flex-start",
                                 alignItems: "center",
                                 gap: 8,
-                                paddingLeft: isMobileLayout ? 16 : 24,
-                                paddingRight: isMobileLayout ? 16 : 24,
+                                paddingLeft: 1,
                                 paddingBottom: 4,
                                 paddingTop: 1,
                                 overflowX: "auto",
@@ -16482,74 +16571,7 @@ Do not include markdown formatting or explanations.`
                                 ))}
                         </div>
                     )}
-                    <ChatInput
-                        hideGradient={
-                            aiGeneratedSuggestions.length > 0 ||
-                            ((isDocOpen || isWhiteboardOpen) && isMobileLayout)
-                        }
-                        value={inputText}
-                        onChange={(e) => {
-                            const newValue = sanitizeMessage(e.target.value)
-                            setInputText(newValue)
-                            const now = Date.now()
-                            const interval = 50
-                            const timeSinceLastSend =
-                                now - lastInputSendTimeRef.current
-
-                            if (inputTimeoutRef.current)
-                                clearTimeout(inputTimeoutRef.current)
-
-                            if (timeSinceLastSend > interval) {
-                                if (dataConnectionsRef.current.size > 0) {
-                                    broadcastData({
-                                        type: "input-sync",
-                                        payload: newValue,
-                                    })
-                                    lastInputSendTimeRef.current = now
-                                }
-                            } else {
-                                inputTimeoutRef.current = setTimeout(() => {
-                                    if (dataConnectionsRef.current.size > 0) {
-                                        broadcastData({
-                                            type: "input-sync",
-                                            payload: newValue,
-                                        })
-                                        lastInputSendTimeRef.current =
-                                            Date.now()
-                                    }
-                                }, interval - timeSinceLastSend)
-                            }
-                        }}
-                        onSend={handleSendMessage}
-                        onConnectWithAI={handleConnectWithAI}
-                        onStop={handleStop}
-                        onEndCall={() => cleanup(true)}
-                        onFileSelect={handleFileSelect}
-                        onScreenShare={toggleScreenShare}
-                        onReport={handleReport}
-                        placeholder="Ask anything"
-                        showEndCall={status !== "idle"}
-                        showAiLiveButton={
-                            status === "searching" && role === "student"
-                        }
-                        attachments={attachments}
-                        onRemoveAttachment={handleRemoveAttachment}
-                        isLoading={isLoading}
-                        isScreenSharing={isScreenSharing}
-                        isWhiteboardOpen={isWhiteboardOpen}
-                        toggleWhiteboard={toggleWhiteboard}
-                        isDocOpen={isDocOpen}
-                        toggleDoc={toggleDoc}
-                        isConnected={status === "connected" && !isLiveMode}
-                        status={status}
-                        isMobileLayout={isMobileLayout}
-                        isLiveMode={isLiveMode}
-                        onPasteFile={processFiles}
-                        themeColors={themeColors}
-                        role={role}
-                        hasMessages={messages.length > 0}
-                        onClearMessages={handleClearMessages}
-                    />
+                    </ChatInput>
                 </div>
             </div>
         )
@@ -17425,13 +17447,13 @@ Do not include markdown formatting or explanations.`
                             exit={{ x: -260 }}
                             transition={{
                                 type: "spring",
-                                stiffness: 300,
-                                damping: 30,
+                                stiffness: 350,
+                                damping: 40,
                             }}
                             style={{
                                 width: 260,
                                 height: "100%",
-                                paddingTop: 108,
+                                paddingTop: 216, // Makes chat history on visible on left sidebar. Places below top navigation actions on left sidebar 
                                 position: "absolute",
                                 top: 0,
                                 left: 0,
@@ -17843,52 +17865,12 @@ Do not include markdown formatting or explanations.`
                                     className="SidebarTopActions"
                                     style={{
                                         alignSelf: "stretch",
-                                        justifyContent: "space-between",
-                                        alignItems: "flex-start",
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 32,
                                         display: "inline-flex",
                                     }}
                                 >
-                                    <div
-                                        data-svg-wrapper
-                                        data-layer="new chat (6% white fill on HOVER)"
-                                        className="NewChat6WhiteFillOnHover"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleClearMessages()
-                                            if (isMobileLayout)
-                                                setIsSidebarOpen(false)
-                                        }}
-                                        onMouseEnter={() =>
-                                            setIsTopNewChatHovered(true)
-                                        }
-                                        onMouseLeave={() =>
-                                            setIsTopNewChatHovered(false)
-                                        }
-                                        style={{
-                                            cursor: "pointer",
-                                            borderRadius: 28,
-                                            background: isTopNewChatHovered
-                                                ? "rgba(255, 255, 255, 0.06)"
-                                                : "transparent",
-                                        }}
-                                    >
-                                        <svg
-                                            width="36"
-                                            height="36"
-                                            viewBox="0 0 36 36"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                            <path
-                                                d="M25.774 18.0001C25.774 21.5359 25.774 23.3034 24.6351 24.4017C23.4961 25.5 21.6623 25.5 17.9964 25.5C14.3297 25.5 12.4967 25.5 11.3577 24.4017C10.2187 23.3034 10.2188 21.5351 10.2188 18.0001C10.2188 14.4644 10.2187 12.6969 11.3577 11.5986C12.4967 10.5003 14.3305 10.5003 17.9964 10.5003M15.8645 17.2918C15.5695 17.5766 15.4039 17.9626 15.4038 18.3651V20.5001H17.6317C18.0491 20.5001 18.4501 20.3401 18.7456 20.0551L25.3134 13.7185C25.4597 13.5775 25.5757 13.4101 25.6548 13.2259C25.734 13.0417 25.7747 12.8442 25.7747 12.6448C25.7747 12.4454 25.734 12.2479 25.6548 12.0637C25.5757 11.8795 25.4597 11.7121 25.3134 11.5711L24.6644 10.9452C24.5182 10.8041 24.3446 10.6921 24.1534 10.6157C23.9623 10.5393 23.7574 10.5 23.5505 10.5C23.3436 10.5 23.1387 10.5393 22.9476 10.6157C22.7564 10.6921 22.5828 10.8041 22.4366 10.9452L15.8645 17.2918Z"
-                                                stroke="white"
-                                                strokeOpacity="0.95"
-                                                strokeWidth="1.2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                            />
-                                        </svg>
-                                    </div>
                                     <div
                                         data-svg-wrapper
                                         data-layer="close sidebar button (6% white fill on HOVER)"
@@ -17932,7 +17914,7 @@ Do not include markdown formatting or explanations.`
                                     </div>
                                 </div>
                                 <div
-                                    data-layer="search-bar"
+                                    data-layer="search bar"
                                     className="SearchBar"
                                     style={{
                                         alignSelf: "stretch",
@@ -17943,15 +17925,14 @@ Do not include markdown formatting or explanations.`
                                         borderRadius: 50,
                                         justifyContent: "flex-start",
                                         alignItems: "center",
-                                        gap: 6,
+                                        gap: 8,
                                         display: "inline-flex",
                                     }}
                                 >
                                     <div
                                         data-svg-wrapper
-                                        data-layer="search-icon"
+                                        data-layer="search icon"
                                         className="SearchIcon"
-                                        style={{ marginTop: 2 }}
                                     >
                                         <svg
                                             width="16"
@@ -17992,6 +17973,271 @@ Do not include markdown formatting or explanations.`
                                         }}
                                     />
                                 </div>
+                                <div
+                                    data-layer="flexbox"
+                                    className="Flexbox"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        flexDirection: "column",
+                                        justifyContent: "flex-start",
+                                        alignItems: "flex-start",
+                                        gap: 2,
+                                        display: "flex",
+                                    }}
+                                >
+                                    <div
+                                        data-layer="new chat"
+                                        className="NewChat"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleClearMessages()
+                                            if (isMobileLayout)
+                                                setIsSidebarOpen(false)
+                                        }}
+                                        onMouseEnter={() =>
+                                            setIsTopNewChatHovered(true)
+                                        }
+                                        onMouseLeave={() =>
+                                            setIsTopNewChatHovered(false)
+                                        }
+                                        style={{
+                                            alignSelf: "stretch",
+                                            height: 36,
+                                            paddingLeft: 10,
+                                            paddingRight: 10,
+                                            borderRadius: 28,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                            cursor: "pointer",
+                                            background: isTopNewChatHovered
+                                                ? "rgba(255, 255, 255, 0.10)"
+                                                : "transparent",
+                                        }}
+                                    >
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
+                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                        >
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M14.9998 8.00011C14.9998 11.1823 14.9998 12.773 13.9747 13.7615C12.9496 14.75 11.2992 14.75 7.99988 14.75C4.69983 14.75 3.05019 14.75 2.02509 13.7615C1 12.773 1 11.1816 1 8.00011C1 4.81792 1 3.22719 2.02509 2.23871C3.05019 1.25023 4.7006 1.25023 7.99988 1.25023M6.08114 7.36262C5.81571 7.61895 5.66661 7.96637 5.66659 8.32861V10.2501H7.67167C8.04733 10.2501 8.40821 10.1061 8.6742 9.84958L14.5852 4.14668C14.7168 4.01979 14.8213 3.86913 14.8925 3.70332C14.9637 3.53751 15.0004 3.3598 15.0004 3.18032C15.0004 3.00084 14.9637 2.82313 14.8925 2.65732C14.8213 2.49151 14.7168 2.34085 14.5852 2.21396L14.0011 1.65072C13.8695 1.52369 13.7132 1.42291 13.5412 1.35415C13.3692 1.28539 13.1848 1.25 12.9986 1.25C12.8124 1.25 12.628 1.28539 12.4559 1.35415C12.2839 1.42291 12.1276 1.52369 11.996 1.65072L6.08114 7.36262Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div
+                                            data-layer="New chat"
+                                            className="NewChat"
+                                            style={{
+                                                flex: "1 1 0",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.95)",
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: "19.32px",
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            New chat
+                                        </div>
+                                    </div>
+                                    <div
+                                        data-layer="new chat"
+                                        className="NewChat"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (!isMobileLayout) {
+                                                setShowAddPeopleOverlay(true)
+                                                return
+                                            }
+
+                                            const url =
+                                                typeof window !== "undefined"
+                                                    ? window.location.href
+                                                    : ""
+                                            const callId =
+                                                typeof window !== "undefined" &&
+                                                window.location.hash
+                                                    ? window.location.hash.replace(
+                                                          "#",
+                                                          ""
+                                                      )
+                                                    : ""
+                                            const shareTitle = callId
+                                                ? `Join my call (${callId}) | #1 free mentorship`
+                                                : "Join my call | #1 free mentorship"
+
+                                            if (
+                                                typeof document !== "undefined"
+                                            ) {
+                                                document.title = shareTitle
+                                            }
+
+                                            if (
+                                                typeof navigator !== "undefined"
+                                            ) {
+                                                navigator.clipboard
+                                                    .writeText(url)
+                                                    .catch(console.error)
+                                                // @ts-ignore
+                                                if (navigator.share) {
+                                                    // @ts-ignore
+                                                    navigator
+                                                        .share({
+                                                            title: shareTitle,
+                                                            url: url,
+                                                        })
+                                                        .catch(console.error)
+                                                }
+                                            }
+                                        }}
+                                        onMouseEnter={() =>
+                                            setIsAddPeopleHovered(true)
+                                        }
+                                        onMouseLeave={() =>
+                                            setIsAddPeopleHovered(false)
+                                        }
+                                        style={{
+                                            alignSelf: "stretch",
+                                            height: 36,
+                                            paddingLeft: 10,
+                                            paddingRight: 10,
+                                            borderRadius: 28,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                            cursor: "pointer",
+                                            background: isAddPeopleHovered
+                                                ? "rgba(255, 255, 255, 0.10)"
+                                                : "transparent",
+                                        }}
+                                    >
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
+                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                        >
+                                            <svg
+                                                width="16"
+                                                height="18"
+                                                viewBox="0 0 16 18"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M0.90625 16.6C1.15799 11.6536 5.40086 9.45122 9.20677 9.99276M9.36 13.7048H15.0923M12.3708 10.8677V16.6M11.5346 4.0622C11.5346 2.17646 9.95814 0.600006 8.0724 0.600006C6.18665 0.600006 4.6102 2.17646 4.6102 4.0622C4.6102 5.94794 6.18665 7.52439 8.0724 7.52439C9.95814 7.52439 11.5346 5.94794 11.5346 4.0622Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div
+                                            data-layer="Add people"
+                                            className="AddPeople"
+                                            style={{
+                                                flex: "1 1 0",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.95)",
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: "19.32px",
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            Add people
+                                        </div>
+                                    </div>
+                                    <div
+                                        data-layer="You"
+                                        className="You"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setYouButtonOrigin({ x: e.clientX, y: e.clientY })
+                                            setShowYouSettings(true)
+                                        }}
+                                        onMouseEnter={() => setIsYouHovered(true)}
+                                        onMouseLeave={() => setIsYouHovered(false)}
+                                        style={{
+                                            alignSelf: "stretch",
+                                            height: 36,
+                                            paddingLeft: 10,
+                                            paddingRight: 10,
+                                            borderRadius: 28,
+                                            justifyContent: "flex-start",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            display: "inline-flex",
+                                            cursor: "pointer",
+                                            background: isYouHovered
+                                                ? "rgba(255, 255, 255, 0.10)"
+                                                : "transparent",
+                                        }}
+                                    >
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
+                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                        >
+                                            <svg
+                                                width="17"
+                                                height="17"
+                                                viewBox="0 0 17 17"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M8.05538 16.1C9.6313 10.5447 10.2524 11.0933 15.5064 8.3493C9.98573 5.51695 9.55693 5.83813 8.05538 0.600006C6.47805 6.15528 5.85559 5.60536 0.601562 8.3493C6.1166 11.1803 6.55663 10.8745 8.05538 16.1Z"
+                                                    stroke="white"
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div
+                                            data-layer="You"
+                                            className="You"
+                                            style={{
+                                                flex: "1 1 0",
+                                                justifyContent: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                color: "rgba(255, 255, 255, 0.95)",
+                                                fontSize: 14,
+                                                fontFamily: "Inter",
+                                                fontWeight: "400",
+                                                lineHeight: "19.32px",
+                                                wordWrap: "break-word",
+                                            }}
+                                        >
+                                            You
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     </>
@@ -18031,6 +18277,229 @@ Do not include markdown formatting or explanations.`
                 </div>
             )}
 
+            {/* SETTINGS OVERLAY */}
+            <AnimatePresence>
+                {showYouSettings && (
+                    <div
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 30000,
+                            display: "flex",
+                            justifyContent: isMobileLayout ? "flex-end" : "center",
+                            alignItems: isMobileLayout ? "flex-end" : "center",
+                            pointerEvents: "auto",
+                        }}
+                    >
+                        {/* Background Dimmer */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1, transition: isMobileLayout ? { duration: 0.2 } : { duration: 0.1, delay: 0.1 } }}
+                            exit={{ opacity: 0, transition: isMobileLayout ? { duration: 0.2 } : { duration: 0, delay: 0 } }}
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                background: isMobileLayout ? "rgba(0,0,0,0.7)" : "rgba(0, 0, 0, 0.70)",
+                                backdropFilter: isMobileLayout ? "blur(1px)" : "blur(1px)",
+                            }}
+                            onClick={() => setShowYouSettings(false)}
+                        />
+
+                        {/* Content Card */}
+                        <motion.div
+                            data-layer="settings overlay"
+                            className="SettingsOverlay"
+                            initial={
+                                isMobileLayout
+                                    ? { y: "100%", scale: 0, opacity: 0 }
+                                    : { opacity: 0 }
+                            }
+                            animate={
+                                isMobileLayout
+                                    ? { y: "0%", scale: 1, opacity: 1, transition: { duration: 0.25, ease: "easeInOut" } }
+                                    : { opacity: 1, transition: { duration: 0, delay: 0.1 } }
+                            }
+                            exit={
+                                isMobileLayout
+                                    ? { y: "100%", scale: 0, opacity: 0, transition: { duration: 0.25, ease: "easeInOut" } }
+                                    : { opacity: 0, transition: { duration: 0, delay: 0 } }
+                            }
+                            style={{
+                                flex: isMobileLayout ? "none" : "1 1 0",
+                                width: isMobileLayout ? "100%" : undefined,
+                                height: isMobileLayout ? "calc(100% - 16px)" : "100%",
+                                maxWidth: isMobileLayout ? "none" : 400,
+                                maxHeight: isMobileLayout ? "none" : 600,
+                                paddingTop: 24,
+                                paddingBottom: 28,
+                                paddingLeft: isMobileLayout ? 16 : 28,
+                                paddingRight: isMobileLayout ? 16 : 28,
+                                background: "#212121",
+                                boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.04)",
+                                overflow: "hidden",
+                                borderRadius: isMobileLayout ? "24px 24px 0 0" : 48,
+                                outline: "0.33px rgba(255, 255, 255, 0.10) solid",
+                                outlineOffset: "-0.33px",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: 24,
+                                display: "inline-flex",
+                                position: "relative",
+                                zIndex: 1,
+                                transformOrigin: (!isMobileLayout && youButtonOrigin && typeof window !== 'undefined')
+                                    ? `calc(50% + ${youButtonOrigin.x - window.innerWidth/2}px) calc(50% + ${youButtonOrigin.y - window.innerHeight/2}px)`
+                                    : "center"
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div
+                                data-layer="settings header"
+                                className="SettingsHeader"
+                                style={{
+                                    alignSelf: "stretch",
+                                    height: "auto",
+                                    position: "relative",
+                                    flexDirection: "column",
+                                    justifyContent: "center",
+                                    alignItems: "flex-start",
+                                    gap: 8,
+                                    display: "flex",
+                                }}
+                            >
+                                <div
+                                    data-layer="You"
+                                    className="You"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        color: "white",
+                                        fontSize: 18,
+                                        fontFamily: "Inter",
+                                        fontWeight: "400",
+                                        lineHeight: "18px",
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    Your profile
+                                </div>
+                                <div
+                                    data-layer="Make conversations more relevant and personal"
+                                    className="MakeConversationsMoreRelevantAndPersonal"
+                                    style={{
+                                        alignSelf: "stretch",
+                                        justifyContent: "center",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        color: "rgba(255, 255, 255, 0.65)",
+                                        fontSize: 12,
+                                        fontFamily: "Inter",
+                                        fontWeight: "400",
+                                        lineHeight: "17px",
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    Make conversations more relevant and personal. This information may be shared with others.
+                                </div>
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="close settings button"
+                                    className="CloseSettingsButtonHasAFillHoverEffect"
+                                    style={{
+                                        right: isMobileLayout ? 0 : -12,
+                                        top: -12,
+                                        position: "absolute",
+                                        cursor: "pointer",
+                                        width: 36,
+                                        height: 36,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        background: isSettingsCloseHovered ? "rgba(255, 255, 255, 0.10)" : "transparent",
+                                        borderRadius: "50%",
+                                        transition: "background 0.2s",
+                                    }}
+                                    onClick={() => setShowYouSettings(false)}
+                                    onMouseEnter={() => !isMobileLayout && setIsSettingsCloseHovered(true)}
+                                    onMouseLeave={() => setIsSettingsCloseHovered(false)}
+                                >
+                                    <svg
+                                        width="36"
+                                        height="36"
+                                        viewBox="0 0 36 36"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            d="M23.25 12.75L12.75 23.25M12.75 12.75L23.25 23.25"
+                                            stroke="white"
+                                            strokeOpacity="0.95"
+                                            strokeWidth="1.2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Inputs */}
+                            
+                            {/* Name */}
+                            <div className="Flexbox" style={{alignSelf: "stretch", flexDirection: "column", gap: 8, display: "flex"}}>
+                                <div className="Name" style={{color: "rgba(255, 255, 255, 0.95)", fontSize: 14, fontFamily: "Inter", fontWeight: "400"}}>Name</div>
+                                <div style={{alignSelf: "stretch", height: 44, padding: "0 16px", background: "#333333", borderRadius: 28, display: "flex", alignItems: "center"}}>
+                                    <input 
+                                        placeholder="Add a nickname"
+                                        value={youName}
+                                        onChange={(e) => setYouName(e.target.value)}
+                                        style={{width: "100%", background: "transparent", border: "none", color: "white", fontSize: 14, outline: "none", fontFamily: "Inter"}}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* School */}
+                            <div className="Flexbox" style={{alignSelf: "stretch", flexDirection: "column", gap: 8, display: "flex"}}>
+                                <div className="School" style={{color: "rgba(255, 255, 255, 0.95)", fontSize: 14, fontFamily: "Inter", fontWeight: "400"}}>School</div>
+                                <div style={{alignSelf: "stretch", height: 44, padding: "0 16px", background: "#333333", borderRadius: 28, display: "flex", alignItems: "center"}}>
+                                    <input 
+                                        placeholder="Add your college"
+                                        value={youSchool}
+                                        onChange={(e) => setYouSchool(e.target.value)}
+                                        style={{width: "100%", background: "transparent", border: "none", color: "white", fontSize: 14, outline: "none", fontFamily: "Inter"}}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Work */}
+                            <div className="Flexbox" style={{alignSelf: "stretch", flexDirection: "column", gap: 8, display: "flex"}}>
+                                <div className="Work" style={{color: "rgba(255, 255, 255, 0.95)", fontSize: 14, fontFamily: "Inter", fontWeight: "400"}}>Work</div>
+                                <div style={{alignSelf: "stretch", height: 44, padding: "0 16px", background: "#333333", borderRadius: 28, display: "flex", alignItems: "center"}}>
+                                    <input 
+                                        placeholder="Add your job"
+                                        value={youWork}
+                                        onChange={(e) => setYouWork(e.target.value)}
+                                        style={{width: "100%", background: "transparent", border: "none", color: "white", fontSize: 14, outline: "none", fontFamily: "Inter"}}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Interests */}
+                            <div className="Flexbox" style={{alignSelf: "stretch", flexDirection: "column", gap: 8, display: "flex", flex: "1 1 auto"}}>
+                                <div className="InterestsAndPreferences" style={{color: "rgba(255, 255, 255, 0.95)", fontSize: 14, fontFamily: "Inter", fontWeight: "400"}}>Skills and interests</div>
+                                <div style={{alignSelf: "stretch", minHeight: 128, maxHeight: 172, padding: "12px 16px", background: "#333333", borderRadius: 28, display: "flex", alignItems: "flex-start", overflow: "hidden"}}>
+                                    <textarea 
+                                        placeholder="Add things you enjoy"
+                                        value={youInterests}
+                                        onChange={(e) => setYouInterests(e.target.value)}
+                                        style={{width: "100%", height: "100%", background: "transparent", border: "none", color: "white", fontSize: 14, outline: "none", fontFamily: "Inter", resize: "none"}}
+                                    />
+                                </div>
+                            </div>
+
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Hidden file input */}
             <input
                 ref={fileInputRef}
@@ -18058,7 +18527,9 @@ Do not include markdown formatting or explanations.`
                     height: "100%",
                     overflow: "hidden",
                     paddingLeft: !isMobileLayout && isSidebarOpen ? 260 : 0,
-                    transition: "padding-left 0.2s ease-in-out",
+                    // Mobile: Slide content to the right when sidebar is open to reveal it
+                    transform: isMobileLayout && isSidebarOpen ? "translateX(260px)" : "none",
+                    transition: "padding-left 0.2s ease-in-out, transform 0.2s ease-in-out",
                 }}
             >
                 {/* Right: Sidebar / Standard View */}
