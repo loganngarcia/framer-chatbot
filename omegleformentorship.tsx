@@ -5093,8 +5093,8 @@ const ChatInput = React.memo(function ChatInput({
                             }}
                         >
                             {isDocOpen || isWhiteboardOpen
-                                ? "Learn together"
-                                : "Learn together, share ideas, and have fun"}
+                                ? "Collaborate on ideas"
+                                : "Collaborate on ideas and have fun"}
                         </div>
                     </div>
                     <div
@@ -8515,8 +8515,8 @@ const RoleSelectionButton = React.memo(
         const isStudent = type === "student"
         const label = isStudent ? "Get free help" : "Volunteer"
         const desc = isStudent
-            ? "I'm a student looking for a mentor"
-            : "I want to offer free advice"
+            ? "Join a call with a mentor"
+            : "Support students with free advice"
         const textColor = isStudent ? "white" : colors.text.primary
 
         if (isCompact) {
@@ -10936,7 +10936,7 @@ Do not include markdown formatting or explanations.`
                 }
             })
         }
-    }, []) // Empty dependency array = runs once on mount
+    }, [currentChatId]) // Run on mount AND when chat changes
 
     // 2. New Message Scroll (User sends message)
     React.useLayoutEffect(() => {
@@ -11064,6 +11064,7 @@ Do not include markdown formatting or explanations.`
     const containerRef = React.useRef<HTMLDivElement>(null)
     const rafRef = React.useRef<number | null>(null)
     const hasInitialResized = React.useRef(false)
+    const hasResizedWhileSidebarOpen = React.useRef(false)
 
     // Cleanup hover timeout
     React.useEffect(() => {
@@ -11136,6 +11137,12 @@ Do not include markdown formatting or explanations.`
             _isDocOpen: boolean,
             _sharedScreenSize: { width: number; height: number } | null
         ) => {
+            // Adjust available width for tile calculations if sidebar is open on desktop
+            // Note: cWidth passed in is usually the raw container width.
+            // If the caller hasn't already adjusted it, we should ensure we are using the effective width for tiles.
+            // However, the caller (handlePointerMove, resize effect) is now adjusting it.
+            // We'll trust cWidth is the "effective available width for tiles + chat".
+            
             // Calculate target ratio based on number of participants (re-using logic from renderTilesSection conceptually)
             // Ideally we'd pass this in, but we can access the state directly since this is inside the component.
             // Note: We need to add these to the dependency array.
@@ -11336,7 +11343,7 @@ Do not include markdown formatting or explanations.`
         }
 
         const { minHeight, maxHeight } = calculateHeightConstraints(
-            containerSize.width,
+            containerSize.width - (!isMobileLayout && isSidebarOpen ? 260 : 0),
             containerSize.height,
             isMobileLayout,
             isScreenSharing,
@@ -11359,6 +11366,7 @@ Do not include markdown formatting or explanations.`
         sharedScreenSize,
         calculateHeightConstraints,
         hasMessages,
+        isSidebarOpen, // Added dependency
     ])
 
     // --- EFFECT: SNAP CHAT HEIGHT WHEN MESSAGING STARTS ---
@@ -11445,6 +11453,9 @@ Do not include markdown formatting or explanations.`
         }
     }, [hasMessages])
 
+    const chatHeightBeforeSidebar = React.useRef<number | null>(null)
+    const prevSidebarOpen = React.useRef(isSidebarOpen)
+
     // --- EFFECT: MINIMIZE CHAT WHEN DOC OR WHITEBOARD OPENS ---
     // Save previous height and restore when closing
     React.useEffect(() => {
@@ -11458,10 +11469,15 @@ Do not include markdown formatting or explanations.`
             const isSidebarMode =
                 !isMobileLayout && (isWhiteboardOpen || isDocOpen)
             const effectiveWidth = isSidebarMode ? 400 : containerWidth
+            
+            // Adjust effective width if sidebar is open on desktop standard mode
+            const widthReduction = (!isMobileLayout && isSidebarOpen) ? 260 : 0
+            const finalWidth = effectiveWidth - widthReduction
+
             const effectiveMobile = isSidebarMode || isMobileLayout
 
             const { maxHeight } = calculateHeightConstraints(
-                effectiveWidth,
+                finalWidth,
                 containerHeight,
                 effectiveMobile,
                 isScreenSharing,
@@ -11496,6 +11512,70 @@ Do not include markdown formatting or explanations.`
         remoteScreenStream,
         sharedScreenSize,
     ])
+
+    // --- EFFECT: RESTORE CHAT HEIGHT WHEN SIDEBAR CLOSES ---
+    // When the sidebar opens on desktop, chat height might be forced to change due to constraints.
+    // When it closes, we want to restore the previous height so tiles return to their original size.
+    // However, if the user manually resized the drag bar while the sidebar was open, we respect their choice and do NOT restore.
+    React.useEffect(() => {
+        if (isMobileLayout) return
+
+        const wasOpen = prevSidebarOpen.current
+        const isOpen = isSidebarOpen
+        prevSidebarOpen.current = isOpen
+
+        if (!wasOpen && isOpen) {
+            // Sidebar just opened: Save current height
+            chatHeightBeforeSidebar.current = chatHeight
+            hasResizedWhileSidebarOpen.current = false
+        } else if (wasOpen && !isOpen) {
+            // Sidebar just closed: Restore height if saved AND user didn't resize manually
+            if (!hasResizedWhileSidebarOpen.current) {
+                if (chatHeightBeforeSidebar.current !== null) {
+                    setChatHeight(chatHeightBeforeSidebar.current)
+                } else {
+                    // Fallback: If we started open, restore to "normal" desktop tile size (approx 140px)
+                    const topUI = 16 + 8 + 24
+                    const tileH =
+                        140 +
+                        (isScreenSharing || !!remoteScreenStream ? 248 : 0)
+                    const target = containerSize.height - tileH - topUI
+
+                    const { minHeight, maxHeight } = calculateHeightConstraints(
+                        containerSize.width,
+                        containerSize.height,
+                        isMobileLayout,
+                        isScreenSharing,
+                        remoteScreenStream,
+                        isWhiteboardOpen,
+                        isDocOpen,
+                        sharedScreenSize
+                    )
+                    const final = Math.max(
+                        minHeight,
+                        Math.min(maxHeight, target)
+                    )
+                    // Only apply if it increases tile area (makes chat smaller)
+                    if (final < chatHeight) {
+                        setChatHeight(final)
+                    }
+                }
+            }
+            chatHeightBeforeSidebar.current = null
+        }
+    }, [
+        isSidebarOpen,
+        isMobileLayout,
+        chatHeight,
+        containerSize,
+        isScreenSharing,
+        remoteScreenStream,
+        isWhiteboardOpen,
+        isDocOpen,
+        sharedScreenSize,
+        calculateHeightConstraints,
+    ])
+
 
     const handleRoleSelect = React.useCallback(
         (selectedRole: "student" | "volunteer") => {
@@ -14698,6 +14778,11 @@ Do not include markdown formatting or explanations.`
             }
             hasDragged.current = true
 
+            // Track resize during sidebar open
+            if (isSidebarOpen && !hasResizedWhileSidebarOpen.current) {
+                hasResizedWhileSidebarOpen.current = true
+            }
+
             // Batch updates into animation frames for 60fps performance
             if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
@@ -14716,8 +14801,12 @@ Do not include markdown formatting or explanations.`
                     effectiveIsMobile = true
                 }
 
+                // Adjust container width if sidebar is open on desktop standard mode
+                const widthReduction = (!isMobileLayout && isSidebarOpen) ? 260 : 0
+                const finalWidth = containerWidth - widthReduction
+
                 const { minHeight, maxHeight } = calculateHeightConstraints(
-                    containerWidth,
+                    finalWidth,
                     containerHeight,
                     effectiveIsMobile,
                     isScreenSharing,
@@ -14797,6 +14886,7 @@ Do not include markdown formatting or explanations.`
             isDocOpen,
             sharedScreenSize,
             calculateHeightConstraints,
+            isSidebarOpen, // Added dependency
         ]
     )
 
@@ -14825,8 +14915,12 @@ Do not include markdown formatting or explanations.`
                 effectiveIsMobile = true
             }
 
+            // Adjust container width if sidebar is open on desktop standard mode
+            const widthReduction = (!isMobileLayout && isSidebarOpen) ? 260 : 0
+            const finalWidth = containerWidth - widthReduction
+
             const { minHeight, maxHeight } = calculateHeightConstraints(
-                containerWidth,
+                finalWidth,
                 containerHeight,
                 effectiveIsMobile,
                 isScreenSharing,
@@ -14851,6 +14945,11 @@ Do not include markdown formatting or explanations.`
             } else {
                 setChatHeight(maxHeight)
             }
+
+            // If we toggled while sidebar was open, track it as a resize interaction
+            if (isSidebarOpen && !hasResizedWhileSidebarOpen.current) {
+                hasResizedWhileSidebarOpen.current = true
+            }
         }
     }, [
         handlePointerMove,
@@ -14862,6 +14961,7 @@ Do not include markdown formatting or explanations.`
         isWhiteboardOpen,
         isDocOpen,
         sharedScreenSize,
+        isSidebarOpen, // Added dependency
     ])
 
     // --- UI DIMENSION CALCULATIONS ---
@@ -14869,7 +14969,7 @@ Do not include markdown formatting or explanations.`
     // Calculate current constraints for UI feedback (e.g. tooltip)
     const currentConstraints = React.useMemo(() => {
         return calculateHeightConstraints(
-            containerSize.width,
+            containerSize.width - (!isMobileLayout && isSidebarOpen ? 260 : 0),
             containerSize.height,
             isMobileLayout,
             isScreenSharing,
@@ -14888,6 +14988,7 @@ Do not include markdown formatting or explanations.`
         isWhiteboardOpen,
         isDocOpen,
         sharedScreenSize,
+        isSidebarOpen, // Added dependency
     ])
 
     // Calculate dynamic size for screen share container to match aspect ratio
@@ -16523,19 +16624,14 @@ Do not include markdown formatting or explanations.`
                                             paddingBottom: 8,
                                             overflow: "hidden",
                                             borderRadius: 24,
-                                            outline:
-                                                "1px rgba(255, 255, 255, 0.20) solid",
-                                            outlineOffset: "-0.33px",
+                                            outline: "none",
                                             justifyContent: "flex-start",
                                             alignItems: "center",
                                             gap: 6,
                                             display: "inline-flex",
                                             cursor: "pointer",
                                             flexShrink: 0,
-                                            background:
-                                                isDocOpen || isWhiteboardOpen
-                                                    ? themeColors.background
-                                                    : chatThemeColors.background,
+                                            background: themeColors.surface,
                                             color: "rgba(255, 255, 255, 0.65)",
                                             transition:
                                                 "background-color 0.2s ease",
@@ -16547,9 +16643,7 @@ Do not include markdown formatting or explanations.`
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor =
-                                                isDocOpen || isWhiteboardOpen
-                                                    ? themeColors.background
-                                                    : chatThemeColors.background
+                                                themeColors.surface
                                         }}
                                     >
                                         <div
@@ -16659,7 +16753,7 @@ Do not include markdown formatting or explanations.`
         // So available height for tiles = containerHeight - chatHeight - 40px (approx)
 
         const availableHeight = Math.max(0, effectiveH - chatHeight - 40)
-        const availableWidth = Math.max(0, effectiveW - 32) // -32 for padding (16px * 2)
+        const availableWidth = Math.max(0, effectiveW - 32 - (!isMobileLayout && isSidebarOpen ? 260 : 0)) // -32 for padding (16px * 2) - 260 for left sidebar
 
         // Determine aspect ratio
         const numTiles = Math.max(
@@ -18373,7 +18467,7 @@ Do not include markdown formatting or explanations.`
                                     style={{
                                         alignSelf: "stretch",
                                         color: "white",
-                                        fontSize: 18,
+                                        fontSize: 16,
                                         fontFamily: "Inter",
                                         fontWeight: "400",
                                         lineHeight: "18px",
