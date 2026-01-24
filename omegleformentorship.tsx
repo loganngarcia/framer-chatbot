@@ -6,7 +6,13 @@ import {
     RenderTarget,
     useIsStaticRenderer,
 } from "framer"
-import { motion, AnimatePresence } from "framer-motion"
+import {
+    motion,
+    AnimatePresence,
+    useMotionValue,
+    useTransform,
+    animate,
+} from "framer-motion"
 // @ts-ignore
 import {
     Tldraw,
@@ -10488,6 +10494,11 @@ Do not include markdown formatting or explanations.`
         return false
     })
 
+    // Motion values for sidebar gesture
+    const sidebarX = useMotionValue(-260)
+    const sidebarOverlayOpacity = useTransform(sidebarX, [-260, 0], [0, 1])
+    const contentX = useTransform(sidebarX, [-260, 0], [0, 260])
+
     React.useEffect(() => {
         if (typeof window !== "undefined") {
             localStorage.setItem("is_sidebar_open", isSidebarOpen.toString())
@@ -11077,6 +11088,16 @@ Do not include markdown formatting or explanations.`
     const hasSnappedForMessages = React.useRef(false)
     const chatHeightBeforeOverlay = React.useRef<number | null>(null)
     const isMobileLayout = containerSize.width < 768
+
+    React.useEffect(() => {
+        if (isMobileLayout) {
+            animate(sidebarX, isSidebarOpen ? 0 : -260, {
+                type: "spring",
+                stiffness: 350,
+                damping: 40,
+            })
+        }
+    }, [isSidebarOpen, isMobileLayout, sidebarX])
 
     // Default Suggestions Logic
     React.useEffect(() => {
@@ -17647,60 +17668,76 @@ Do not include markdown formatting or explanations.`
                 </svg>
             </div>
 
-            <AnimatePresence>
-                {isSidebarOpen && (
-                    <>
-                        {isMobileLayout && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                style={{
-                                    position: "fixed",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    background: colors.state.overlay,
-                                    zIndex: 9999, // Below sidebar (10000)
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    setIsSidebarOpen(false)
-                                }}
-                            />
-                        )}
+            {/* Sidebar Overlay and Sidebar */}
+            {/* Always render on mobile to allow drag gestures, control visibility via motion values */}
+            {(isMobileLayout || isSidebarOpen) && (
+                <>
+                    {isMobileLayout && (
                         <motion.div
-                            data-layer="left sidebar"
-                            className="LeftSidebar"
-                            initial={{ x: -260 }}
-                            animate={{ x: 0 }}
-                            exit={{ x: -260 }}
-                            transition={{
-                                type: "spring",
-                                stiffness: 350,
-                                damping: 40,
-                            }}
                             style={{
-                                width: 260,
-                                height: "100%",
-                                paddingTop: 216, // Makes chat history on visible on left sidebar. Places below top navigation actions on left sidebar 
-                                position: "absolute",
+                                position: "fixed",
                                 top: 0,
                                 left: 0,
+                                right: 0,
                                 bottom: 0,
-                                background: "#141414",
-                                overflow: "hidden",
-                                flexDirection: "column",
-                                justifyContent: "flex-start",
-                                alignItems: "flex-start",
-                                gap: 24,
-                                display: "inline-flex",
-                                zIndex: 10000,
+                                background: "rgba(255, 255, 255, 0.12)",
+                                zIndex: 9999,
+                                opacity: sidebarOverlayOpacity,
+                                pointerEvents: isSidebarOpen ? "auto" : "none",
                             }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setIsSidebarOpen(false)
+                            }}
+                        />
+                    )}
+                    <motion.div
+                        data-layer="left sidebar"
+                        className="LeftSidebar"
+                        style={{
+                            x: isMobileLayout ? sidebarX : 0,
+                            width: 260,
+                            height: "100%",
+                            paddingTop: 216,
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            bottom: 0,
+                            background: "#141414",
+                            overflow: "hidden",
+                            flexDirection: "column",
+                            justifyContent: "flex-start",
+                            alignItems: "flex-start",
+                            gap: 24,
+                            display: "inline-flex",
+                            zIndex: 10000,
+                            // On mobile, if closed, we want it offscreen but draggable? 
+                            // Actually if it's offscreen (-260), we can't drag IT. We drag the main content.
+                            // But we need to be able to drag IT to close it.
+                        }}
+                        onPan={(event, info) => {
+                            if (!isMobileLayout) return
+                            // Dragging left to close
+                            // Only allow dragging if we are mostly horizontal
+                            if (Math.abs(info.delta.y) > Math.abs(info.delta.x)) return
+
+                            const newX = sidebarX.get() + info.delta.x
+                            if (newX <= 0 && newX >= -260) {
+                                sidebarX.set(newX)
+                            }
+                        }}
+                        onPanEnd={(event, info) => {
+                            if (!isMobileLayout) return
+                            const currentX = sidebarX.get()
+                            // If dragged left enough (more negative) or velocity is high to left
+                            if (currentX < -50 || info.velocity.x < -100) {
+                                setIsSidebarOpen(false)
+                            } else {
+                                setIsSidebarOpen(true) // Snap back to open
+                            }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                             <div
                                 data-layer="chat history flexbox"
                                 className="ChatHistoryFlexbox"
@@ -18475,7 +18512,6 @@ Do not include markdown formatting or explanations.`
                         </motion.div>
                     </>
                 )}
-            </AnimatePresence>
             {/* BAN BANNER */}
             {isBanned && (
                 <div
@@ -18751,7 +18787,7 @@ Do not include markdown formatting or explanations.`
             <style>{markdownStyles}</style>
 
             {/* MAIN CONTENT STRUCTURE */}
-            <div
+            <motion.div
                 data-layer="main-content-layout"
                 className="MainContentLayout"
                 style={{
@@ -18761,8 +18797,8 @@ Do not include markdown formatting or explanations.`
                     overflow: "hidden",
                     paddingLeft: !isMobileLayout && isSidebarOpen ? 260 : 0,
                     // Mobile: Slide content to the right when sidebar is open to reveal it
-                    transform: isMobileLayout && isSidebarOpen ? "translateX(260px)" : "none",
-                    transition: "padding-left 0.2s ease-in-out, transform 0.2s ease-in-out",
+                    x: isMobileLayout ? contentX : 0,
+                    transition: "padding-left 0.2s ease-in-out",
                 }}
             >
                 {/* Right: Sidebar / Standard View */}
@@ -18778,6 +18814,33 @@ Do not include markdown formatting or explanations.`
                     ref={rightContentPanelRef}
                     data-layer="right-content-panel"
                     className="RightContentPanel"
+                    onPan={(event, info) => {
+                        if (!isMobileLayout || isSidebarOpen) return
+                        // Only allow dragging if we are mostly horizontal
+                        if (Math.abs(info.delta.y) > Math.abs(info.delta.x)) return
+
+                        // Dragging right to open
+                        // Start from -260
+                        const currentX = sidebarX.get()
+                        const newX = currentX + info.delta.x
+                        
+                        // Limit between -260 and 0
+                        if (newX <= 0 && newX >= -260) {
+                            sidebarX.set(newX)
+                        }
+                    }}
+                    onPanEnd={(event, info) => {
+                        if (!isMobileLayout || isSidebarOpen) return
+                        
+                        const currentX = sidebarX.get()
+                        // If dragged right enough (closer to 0) or velocity is high to right
+                        // -260 is closed. -210 is 50px dragged.
+                        if (currentX > -210 || info.velocity.x > 100) {
+                            setIsSidebarOpen(true)
+                        } else {
+                            setIsSidebarOpen(false) // Snap back to closed
+                        }
+                    }}
                     // Removed 'layout' prop to prevent distortion of children during width change
                     initial={false}
                     animate={{
@@ -18844,7 +18907,7 @@ Do not include markdown formatting or explanations.`
                         </motion.div>
                     )}
                 </AnimatePresence>
-            </div>
+            </motion.div>
 
             {/* MOBILE OVERLAY (For Tools) */}
             <AnimatePresence>
