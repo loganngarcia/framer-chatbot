@@ -8095,22 +8095,16 @@ const MessageBubble = React.memo(
                                         paddingTop: 8,
                                         paddingBottom: 8,
                                         borderRadius: 28,
-                                        outline:
-                                            themeColors.background === "#FFFFFF"
-                                                ? "1px solid rgba(0, 0, 0, 0.1)"
-                                                : "0.33px rgba(255, 255, 255, 0.20) solid",
-                                        outlineOffset: "-0.33px",
+                                        outline: "none",
                                         justifyContent: "flex-start",
                                         alignItems: "center",
                                         gap: 8,
                                         display: "inline-flex",
                                         cursor: "pointer",
                                         background: isDocHovered
-                                            ? themeColors.background ===
-                                              "#FFFFFF"
-                                                ? "rgba(0,0,0,0.05)"
-                                                : "rgba(255,255,255,0.05)"
-                                            : "transparent",
+                                            ? "#2B2B2B"
+                                            : themeColors.surface,
+                                        transition: "background-color 0.2s ease",
                                     }}
                                 >
                                     <div
@@ -8148,13 +8142,12 @@ const MessageBubble = React.memo(
                                             justifyContent: "center",
                                             display: "flex",
                                             flexDirection: "column",
-                                            color: themeColors.text.primary,
+                                            color: "rgba(255, 255, 255, 0.65)",
                                             fontSize: 15,
                                             fontFamily: "Inter",
                                             fontWeight: "400",
                                             lineHeight: "19.32px",
                                             wordWrap: "break-word",
-                                            opacity: 0.65,
                                         }}
                                     >
                                         {isDocOpen ? "Close" : "Notes"}
@@ -8179,23 +8172,17 @@ const MessageBubble = React.memo(
                                         paddingRight: 12,
                                         paddingTop: 8,
                                         paddingBottom: 8,
-                                        borderRadius: 28,
-                                        outline:
-                                            themeColors.background === "#FFFFFF"
-                                                ? "1px solid rgba(0, 0, 0, 0.1)"
-                                                : "0.33px rgba(255, 255, 255, 0.20) solid",
-                                        outlineOffset: "-0.33px",
+                                        borderRadius: 24,
+                                        outline: "none",
                                         justifyContent: "flex-start",
                                         alignItems: "center",
                                         gap: 8,
                                         display: "inline-flex",
                                         cursor: "pointer",
                                         background: isWhiteboardHovered
-                                            ? themeColors.background ===
-                                              "#FFFFFF"
-                                                ? "rgba(0,0,0,0.05)"
-                                                : "rgba(255,255,255,0.05)"
-                                            : "transparent",
+                                            ? "#2B2B2B"
+                                            : themeColors.surface,
+                                        transition: "background-color 0.2s ease",
                                     }}
                                 >
                                     <div
@@ -8233,13 +8220,12 @@ const MessageBubble = React.memo(
                                             justifyContent: "center",
                                             display: "flex",
                                             flexDirection: "column",
-                                            color: themeColors.text.primary,
+                                            color: "rgba(255, 255, 255, 0.65)",
                                             fontSize: 15,
                                             fontFamily: "Inter",
                                             fontWeight: "400",
                                             lineHeight: "19.32px",
                                             wordWrap: "break-word",
-                                            opacity: 0.65,
                                         }}
                                     >
                                         {isWhiteboardOpen
