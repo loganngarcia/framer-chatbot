@@ -5290,6 +5290,11 @@ const ChatInput = React.memo(function ChatInput({
                     alignItems: "flex-end",
                     gap: 10,
                     display: "flex",
+                    marginLeft: isMobileLayout ? 16 : 24,
+                    marginRight: isMobileLayout ? 16 : 24,
+                    // Account for margin to keep width consistent
+                    width: isMobileLayout ? "calc(100% - 32px)" : "calc(100% - 48px)",
+                    boxSizing: "border-box",
                 }}
             >
                 {/* CHAT INPUT BAR */}
@@ -5301,8 +5306,6 @@ const ChatInput = React.memo(function ChatInput({
                         minHeight: 56,
                         maxHeight: 384,
                         padding: 10,
-                        marginLeft: isMobileLayout ? 16 : 24,
-                        marginRight: isMobileLayout ? 16 : 24,
                         background: themeColors.surface,
                         outline:
                             isDocOpen || isWhiteboardOpen
