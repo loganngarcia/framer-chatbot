@@ -7808,8 +7808,20 @@ const MessageBubble = React.memo(
                         isSharing.current = false
                         return
                     }
-                    const randomNum = Math.floor(10000 + Math.random() * 90000)
-                    const filename = `curastem.org${randomNum}.png`
+                    let filenameSuffix = (msg.text || "")
+                        .replace(/[^\w\s-]/g, "")
+                        .trim()
+                        .split(/\s+/)
+                        .slice(0, 10)
+                        .join("_")
+
+                    if (!filenameSuffix) {
+                        filenameSuffix = Math.floor(
+                            10000 + Math.random() * 90000
+                        ).toString()
+                    }
+
+                    const filename = `curastem.org_${filenameSuffix}.png`
                     const file = new File([blob], filename, {
                         type: "image/png",
                     })
