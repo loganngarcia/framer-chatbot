@@ -16753,6 +16753,11 @@ Do not include markdown formatting or explanations.`
                                 scrollbarWidth: "none",
                                 msOverflowStyle: "none",
                             }}
+                            onPointerDownCapture={(e) => e.stopPropagation()} 
+                            onPanCapture={(e) => e.stopPropagation()} 
+                            onTouchStartCapture={(e) => e.stopPropagation()}
+                            onTouchMoveCapture={(e) => e.stopPropagation()}
+                            onTouchEndCapture={(e) => e.stopPropagation()}
                         >
                             {aiGeneratedSuggestions
                                 .slice(
@@ -17689,6 +17694,36 @@ Do not include markdown formatting or explanations.`
                                 e.stopPropagation()
                                 setIsSidebarOpen(false)
                             }}
+                            onPan={(event, info) => {
+                                if (!isMobileLayout) return
+                                // Dragging left to close
+                                // Only allow dragging if we are mostly horizontal
+                                if (Math.abs(info.delta.y) > Math.abs(info.delta.x)) return
+
+                                // When open, X is 0. Dragging left makes delta.x negative.
+                                // So newX will be negative (e.g. -10).
+                                const newX = sidebarX.get() + info.delta.x
+                                if (newX <= 0 && newX >= -260) {
+                                    sidebarX.set(newX)
+                                }
+                            }}
+                            onPanEnd={(event, info) => {
+                                if (!isMobileLayout) return
+                                const currentX = sidebarX.get()
+                                // If dragged left enough (more negative) or velocity is high to left
+                                // Current X is between -260 and 0.
+                                // 0 is open. -260 is closed.
+                                // If we are open (0) and drag left, X becomes negative (e.g. -50).
+                                // If we drag past -50 (towards closed), we should close.
+                                if (currentX < -50 || info.velocity.x < -100) {
+                                    setIsSidebarOpen(false)
+                                } else {
+                                    // Snap back to open
+                                    // We need to manually animate back to 0 because setIsSidebarOpen(true)
+                                    // won't trigger a change if it was already true.
+                                    animate(sidebarX, 0, { type: "spring", stiffness: 350, damping: 40 })
+                                }
+                            }}
                         />
                     )}
                     <motion.div
@@ -17721,6 +17756,8 @@ Do not include markdown formatting or explanations.`
                             // Only allow dragging if we are mostly horizontal
                             if (Math.abs(info.delta.y) > Math.abs(info.delta.x)) return
 
+                            // When open, X is 0. Dragging left makes delta.x negative.
+                            // So newX will be negative (e.g. -10).
                             const newX = sidebarX.get() + info.delta.x
                             if (newX <= 0 && newX >= -260) {
                                 sidebarX.set(newX)
@@ -17730,10 +17767,17 @@ Do not include markdown formatting or explanations.`
                             if (!isMobileLayout) return
                             const currentX = sidebarX.get()
                             // If dragged left enough (more negative) or velocity is high to left
+                            // Current X is between -260 and 0.
+                            // 0 is open. -260 is closed.
+                            // If we are open (0) and drag left, X becomes negative (e.g. -50).
+                            // If we drag past -50 (towards closed), we should close.
                             if (currentX < -50 || info.velocity.x < -100) {
                                 setIsSidebarOpen(false)
                             } else {
-                                setIsSidebarOpen(true) // Snap back to open
+                                // Snap back to open
+                                // We need to manually animate back to 0 because setIsSidebarOpen(true)
+                                // won't trigger a change if it was already true.
+                                animate(sidebarX, 0, { type: "spring", stiffness: 350, damping: 40 })
                             }
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -18834,11 +18878,17 @@ Do not include markdown formatting or explanations.`
                         
                         const currentX = sidebarX.get()
                         // If dragged right enough (closer to 0) or velocity is high to right
-                        // -260 is closed. -210 is 50px dragged.
+                        // -260 is closed. 
+                        // If we drag right, X increases (e.g. -200).
+                        // If we don't drag enough (e.g. only to -250), we should snap back to closed.
+                        // Threshold: If we passed -210 (dragged 50px), open.
                         if (currentX > -210 || info.velocity.x > 100) {
                             setIsSidebarOpen(true)
                         } else {
-                            setIsSidebarOpen(false) // Snap back to closed
+                            // Snap back to closed
+                            // We need to manually animate back to -260 because setIsSidebarOpen(false) 
+                            // won't trigger a change if it was already false.
+                            animate(sidebarX, -260, { type: "spring", stiffness: 350, damping: 40 })
                         }
                     }}
                     // Removed 'layout' prop to prevent distortion of children during width change
