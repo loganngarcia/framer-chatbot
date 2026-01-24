@@ -31,6 +31,7 @@ interface ChatSession {
     whiteboard: any
     isPinned?: boolean
     pinnedAt?: number
+    suggestions?: string[]
 }
 
 // -----------------------------------------------------------------------------
@@ -10401,24 +10402,6 @@ Do not include markdown formatting or explanations.`
         return []
     })
 
-    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
-        string[]
-    >(() => {
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("ai_suggestions")
-            return saved ? JSON.parse(saved) : []
-        }
-        return []
-    })
-
-    React.useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem(
-                "ai_suggestions",
-                JSON.stringify(aiGeneratedSuggestions)
-            )
-        }
-    }, [aiGeneratedSuggestions])
 
     // --- CHAT HISTORY & SIDEBAR STATE ---
     const [savedChats, setSavedChats] = React.useState<ChatSession[]>([])
@@ -10461,6 +10444,52 @@ Do not include markdown formatting or explanations.`
             localStorage.setItem("current_chat_id", currentChatId)
         }
     }, [currentChatId])
+
+    const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
+        string[]
+    >(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const currentId = localStorage.getItem("current_chat_id")
+                const savedHistory = localStorage.getItem("saved_chat_history")
+                if (currentId && savedHistory) {
+                    const history = JSON.parse(savedHistory)
+                    const chat = history.find((c: any) => c.id === currentId)
+                    if (chat && chat.suggestions) {
+                        return chat.suggestions
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load suggestions from history", e)
+            }
+            const saved = localStorage.getItem("ai_suggestions")
+            return saved ? JSON.parse(saved) : []
+        }
+        return []
+    })
+
+    // Sync suggestions to current chat in savedChats
+    React.useEffect(() => {
+        if (typeof window === "undefined") return
+
+        setSavedChats((prev) => {
+            const index = prev.findIndex((c) => c.id === currentChatId)
+            if (index === -1) return prev
+
+            const chat = prev[index]
+            if (
+                JSON.stringify(chat.suggestions || []) ===
+                JSON.stringify(aiGeneratedSuggestions)
+            ) {
+                return prev
+            }
+
+            const updated = [...prev]
+            updated[index] = { ...chat, suggestions: aiGeneratedSuggestions }
+            localStorage.setItem("saved_chat_history", JSON.stringify(updated))
+            return updated
+        })
+    }, [aiGeneratedSuggestions, currentChatId])
 
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => {
         if (typeof window !== "undefined") {
@@ -10644,6 +10673,7 @@ Do not include markdown formatting or explanations.`
                     whiteboard: whiteboardData,
                     isPinned: existing?.isPinned,
                     pinnedAt: existing?.pinnedAt,
+                    suggestions: aiGeneratedSuggestions,
                 }
 
                 const others = prev.filter((c) => c.id !== currentChatId)
@@ -10666,7 +10696,7 @@ Do not include markdown formatting or explanations.`
                 return updated
             })
         },
-        [remoteStreams, isLiveMode, currentChatId]
+        [remoteStreams, isLiveMode, currentChatId, aiGeneratedSuggestions]
     )
 
     // Title Generation Effect
@@ -15597,6 +15627,7 @@ Do not include markdown formatting or explanations.`
                                         setCurrentChatId(chat.id)
                                         setMessages(chat.messages)
                                         setDocContent(chat.notes || "")
+                                        setAiGeneratedSuggestions(chat.suggestions || [])
                                         if (
                                             chat.whiteboard &&
                                             editorRef.current
@@ -17835,6 +17866,7 @@ Do not include markdown formatting or explanations.`
                                                 setCurrentChatId(chat.id)
                                                 setMessages(chat.messages)
                                                 setDocContent(chat.notes || "")
+                                                setAiGeneratedSuggestions(chat.suggestions || [])
                                                 if (
                                                     chat.whiteboard &&
                                                     editorRef.current
