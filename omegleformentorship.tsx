@@ -15293,11 +15293,19 @@ Do not include markdown formatting or explanations.`
 
                 // 3. Compare: If Horizontal offers larger videos (better fit), use it
                 // BUT: In Sidebar mode (Desktop Tool Open), we strongly prefer vertical stack for 1-2 peers
-                // to fill the width, unless the vertical stack is extremely constrained (tiny tiles).
-                // If we are in sidebar mode (isSidebarMode=true), we bias towards vertical.
+                // to fill the width, unless the vertical stack is extremely constrained (tiny tiles)
+                // OR the sidebar is wide enough to support horizontal tiles comfortably (> 500px).
                 
-                if (isSidebarMode && numTiles <= 2) {
-                     // In sidebar mode, prefer vertical unless vertical tiles are tiny (< 120px height?)
+                // TODO: ugly because vertical tiles exist when chat is wide and whiteboard/doceditor is thin.
+                const isWideSidebar = isSidebarMode && availableWidth > 500
+
+                if (isWideSidebar) {
+                     // If sidebar is wide, force horizontal layout for better use of space
+                     shouldUseHorizontalLayout = true
+                     finalWidth = h_finalWidth
+                     finalHeight = h_finalHeight
+                } else if (isSidebarMode && numTiles <= 2) {
+                     // In narrow sidebar mode, prefer vertical unless vertical tiles are tiny (< 120px height?)
                      // v_finalHeight is the height of a single tile in vertical stack.
                      if (v_finalHeight < 120 && h_finalHeight > v_finalHeight) {
                          shouldUseHorizontalLayout = true
