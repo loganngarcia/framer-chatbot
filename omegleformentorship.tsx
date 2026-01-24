@@ -8761,6 +8761,26 @@ export default function OmegleMentorshipUI(props: Props) {
         // No longer persisting role to localStorage as per requirement
     }, [role])
 
+    const [chatWidth, setChatWidth] = React.useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("omeg_chat_width")
+            if (saved) {
+                const parsed = parseInt(saved, 10)
+                if (!isNaN(parsed)) return parsed
+            }
+        }
+        return 440
+    })
+    
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("omeg_chat_width", String(chatWidth))
+        }
+    }, [chatWidth])
+
+    const dragStartWidth = React.useRef(440)
+    const [isResizing, setIsResizing] = React.useState(false)
+
     // --- STATE: WEBRTC & CONNECTIVITY ---
     // status: tracks the lifecycle of the connection (idle -> searching -> connected)
     const [status, setStatus] = React.useState("idle")
@@ -10998,6 +11018,44 @@ Do not include markdown formatting or explanations.`
         }
         return { width: 0, height: 0 }
     })
+
+    // Handle window resize to update container size
+    React.useEffect(() => {
+        if (typeof window === "undefined") return
+        const handleResize = () => {
+            setContainerSize({ width: window.innerWidth, height: window.innerHeight })
+        }
+        window.addEventListener("resize", handleResize)
+        return () => window.removeEventListener("resize", handleResize)
+    }, [])
+
+    // Enforce layout constraints (min 400px for tool)
+    React.useEffect(() => {
+        if (typeof window === "undefined") return
+        
+        // Only enforce on desktop
+        if (containerSize.width >= 768) {
+            const leftSidebarWidth = isSidebarOpen ? 260 : 0
+            const availableWidth = containerSize.width - leftSidebarWidth
+            
+            // Tool needs at least 400px
+            const maxChatWidth = Math.max(0, availableWidth - 400)
+            
+            setChatWidth(prev => {
+                // If current chat width violates the tool's space, shrink it
+                // We also respect the chat's own min width (400) if possible, 
+                // but Tool Min Width is the hard constraint.
+                // Logic: Clamp(prev, 400, maxChatWidth)
+                // If maxChatWidth < 400, we clamp to maxChatWidth (Tool wins).
+                
+                const target = Math.min(Math.max(prev, 400), maxChatWidth)
+                
+                // Only update if different to avoid loops
+                if (prev !== target) return target
+                return prev
+            })
+        }
+    }, [containerSize.width, isSidebarOpen])
     // Track previous container size to handle virtual keyboard resizing logic
     const prevContainerSize = React.useRef({ width: 0, height: 0 })
     const hasSnappedForMessages = React.useRef(false)
@@ -14729,7 +14787,7 @@ Do not include markdown formatting or explanations.`
     const handlePointerDown = React.useCallback(
         (
             e: React.PointerEvent,
-            mode: "vertical" | "left" | "right" = "vertical"
+            mode: "vertical" | "left" | "right" | "horizontal-sidebar" = "vertical"
         ) => {
             e.preventDefault()
             e.stopPropagation() // Prevent bubbling to parent handlers
@@ -14740,6 +14798,11 @@ Do not include markdown formatting or explanations.`
             dragStartY.current = e.clientY
             dragStartX.current = e.clientX
             dragStartHeight.current = chatHeight
+            dragStartWidth.current = chatWidth
+
+            if (mode === "horizontal-sidebar") {
+                setIsResizing(true)
+            }
 
             // Calculate current aspect ratio if needed
             // Ratio = Width / Height
@@ -14756,9 +14819,10 @@ Do not include markdown formatting or explanations.`
             window.addEventListener("pointermove", handlePointerMove)
             window.addEventListener("pointerup", handlePointerUp)
         },
-        [chatHeight]
+        [chatHeight, chatWidth]
     )
 
+    const rightContentPanelRef = React.useRef<HTMLDivElement>(null)
     const handlePointerMove = React.useCallback(
         (e: PointerEvent) => {
             if (!isDragging.current) return
@@ -14791,6 +14855,24 @@ Do not include markdown formatting or explanations.`
                     containerRef.current?.clientHeight || window.innerHeight
                 let containerWidth =
                     containerRef.current?.clientWidth || window.innerWidth
+
+                if (dragMode.current === "horizontal-sidebar") {
+                    const deltaX = e.clientX - dragStartX.current
+                    const newWidth = dragStartWidth.current + deltaX
+                    
+                    // Constraints
+                    const minChatWidth = 400
+                    const leftSidebarWidth = (!isMobileLayout && isSidebarOpen) ? 260 : 0
+                    const availableWidth = containerWidth - leftSidebarWidth
+                    const maxChatWidth = availableWidth - 400 // Ensure at least 400px for tool
+                    
+                    const clampedWidth = Math.max(minChatWidth, Math.min(newWidth, maxChatWidth))
+                    
+                    if (rightContentPanelRef.current) {
+                        rightContentPanelRef.current.style.width = `${clampedWidth}px`
+                    }
+                    return
+                }
 
                 const isToolOpen = isWhiteboardOpen || isDocOpen
                 const isSidebarMode = !isMobileLayout && isToolOpen
@@ -14898,6 +14980,18 @@ Do not include markdown formatting or explanations.`
         }
         window.removeEventListener("pointermove", handlePointerMove)
         window.removeEventListener("pointerup", handlePointerUp)
+
+        if (dragMode.current === "horizontal-sidebar") {
+            if (rightContentPanelRef.current) {
+                // Read the final width from the DOM and commit to state
+                const finalWidth = parseInt(rightContentPanelRef.current.style.width, 10)
+                if (!isNaN(finalWidth)) {
+                    setChatWidth(finalWidth)
+                }
+            }
+            setTimeout(() => setIsResizing(false), 50)
+            return
+        }
 
         // Handle Click Toggle Logic
         if (!hasDragged.current && dragMode.current === "vertical") {
@@ -15198,7 +15292,23 @@ Do not include markdown formatting or explanations.`
                 }
 
                 // 3. Compare: If Horizontal offers larger videos (better fit), use it
-                if (v_finalWidth < h_finalWidth) {
+                // BUT: In Sidebar mode (Desktop Tool Open), we strongly prefer vertical stack for 1-2 peers
+                // to fill the width, unless the vertical stack is extremely constrained (tiny tiles).
+                // If we are in sidebar mode (isSidebarMode=true), we bias towards vertical.
+                
+                if (isSidebarMode && numTiles <= 2) {
+                     // In sidebar mode, prefer vertical unless vertical tiles are tiny (< 120px height?)
+                     // v_finalHeight is the height of a single tile in vertical stack.
+                     if (v_finalHeight < 120 && h_finalHeight > v_finalHeight) {
+                         shouldUseHorizontalLayout = true
+                         finalWidth = h_finalWidth
+                         finalHeight = h_finalHeight
+                     } else {
+                         shouldUseHorizontalLayout = false
+                         finalWidth = v_finalWidth
+                         finalHeight = v_finalHeight
+                     }
+                } else if (v_finalWidth < h_finalWidth) {
                     shouldUseHorizontalLayout = true
                     finalWidth = h_finalWidth
                     finalHeight = h_finalHeight
@@ -16725,8 +16835,8 @@ Do not include markdown formatting or explanations.`
         const isSidebarOrMobile = isMobileLayout || isSidebar
 
         // Use calculateHeightConstraints to get the 'ideal' dimensions based on the *current* layout context
-        // If isSidebar, we pass the sidebar width (400) instead of full container width
-        const effectiveW = isSidebar ? 400 : containerSize.width
+        // If isSidebar, we pass the sidebar width (chatWidth) instead of full container width
+        const effectiveW = isSidebar ? chatWidth : containerSize.width
         const effectiveH = containerSize.height
 
         const constraints = calculateHeightConstraints(
@@ -16753,7 +16863,10 @@ Do not include markdown formatting or explanations.`
         // So available height for tiles = containerHeight - chatHeight - 40px (approx)
 
         const availableHeight = Math.max(0, effectiveH - chatHeight - 40)
-        const availableWidth = Math.max(0, effectiveW - 32 - (!isMobileLayout && isSidebarOpen ? 260 : 0)) // -32 for padding (16px * 2) - 260 for left sidebar
+        // If isSidebar is true, effectiveW is ALREADY the panel width. We don't subtract the left sidebar (260) from it.
+        // If isSidebar is false, effectiveW is the container width (window), so we MUST subtract the left sidebar if open.
+        const leftSidebarOffset = !isSidebar && !isMobileLayout && isSidebarOpen ? 260 : 0
+        const availableWidth = Math.max(0, effectiveW - 32 - leftSidebarOffset) // -32 for padding (16px * 2)
 
         // Determine aspect ratio
         const numTiles = Math.max(
@@ -18636,6 +18749,7 @@ Do not include markdown formatting or explanations.`
                      - Flex 1
                 */}
                 <motion.div
+                    ref={rightContentPanelRef}
                     data-layer="right-content-panel"
                     className="RightContentPanel"
                     // Removed 'layout' prop to prevent distortion of children during width change
@@ -18643,14 +18757,14 @@ Do not include markdown formatting or explanations.`
                     animate={{
                         width:
                             !isMobileLayout && (isDocOpen || isWhiteboardOpen)
-                                ? 400
+                                ? chatWidth
                                 : "100%",
                         flexGrow:
                             !isMobileLayout && (isDocOpen || isWhiteboardOpen)
                                 ? 0
                                 : 1,
                     }}
-                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    transition={{ duration: isResizing ? 0 : 0.25, ease: "easeInOut" }}
                     style={{
                         flexShrink: 0,
                         display: "flex",
@@ -18665,6 +18779,23 @@ Do not include markdown formatting or explanations.`
                         !isMobileLayout && (isDocOpen || isWhiteboardOpen)
                     )}
                 </motion.div>
+
+                {/* Resize Handle */}
+                {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
+                    <div
+                        onPointerDown={(e) =>
+                            handlePointerDown(e, "horizontal-sidebar")
+                        }
+                        style={{
+                            width: 12, // Wider hit area
+                            marginLeft: -6, // Center over the border
+                            marginRight: -6,
+                            cursor: "ew-resize",
+                            zIndex: 30,
+                            position: "relative",
+                        }}
+                    />
+                )}
 
                 {/* Left: Tool (Desktop only) */}
                 <AnimatePresence>
