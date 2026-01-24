@@ -4997,21 +4997,22 @@ const ChatInput = React.memo(function ChatInput({
 
     return (
         <div
-            data-layer="flexbox"
-            className="Flexbox"
+            data-layer="chat-input-wrapper"
+            className="ChatInputWrapper"
             onPointerDown={(e) => e.stopPropagation()}
             style={{
                 width: "100%",
-                maxWidth: 728,
+                maxWidth: 816,
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "flex-end",
                 paddingBottom: 0,
-                paddingLeft: isMobileLayout ? 16 : 24,
-                paddingRight: isMobileLayout ? 16 : 24,
+                paddingLeft: 0,
+                paddingRight: 0,
                 boxSizing: "border-box",
                 pointerEvents: "auto",
+                overflowX: "visible",
                 ...rootStyle,
             }}
         >
@@ -5042,6 +5043,9 @@ const ChatInput = React.memo(function ChatInput({
                         paddingBottom: 14,
                         paddingLeft: 20,
                         paddingRight: 16,
+                        marginLeft: isMobileLayout ? 16 : 24,
+                        marginRight: isMobileLayout ? 16 : 24,
+                        width: "auto",
                         background: themeColors.surface,
                         outline:
                             isDocOpen || isWhiteboardOpen
@@ -5049,7 +5053,7 @@ const ChatInput = React.memo(function ChatInput({
                                 : "none",
                         outlineOffset:
                             isDocOpen || isWhiteboardOpen ? "-0.33px" : 0,
-                        overflow: "hidden",
+                        overflow: "visible",
                         borderRadius: 28,
                         justifyContent: "flex-start",
                         alignItems: "center",
@@ -5297,6 +5301,8 @@ const ChatInput = React.memo(function ChatInput({
                         minHeight: 56,
                         maxHeight: 384,
                         padding: 10,
+                        marginLeft: isMobileLayout ? 16 : 24,
+                        marginRight: isMobileLayout ? 16 : 24,
                         background: themeColors.surface,
                         outline:
                             isDocOpen || isWhiteboardOpen
@@ -7812,7 +7818,7 @@ const MessageBubble = React.memo(
                         .replace(/[^\w\s-]/g, "")
                         .trim()
                         .split(/\s+/)
-                        .slice(0, 10)
+                        .slice(0, 10) // Helps with SEO. First 10 words of AI message is in name of downloaded file. Example: curastem.org_I_am_an_AI_assistant_for_career_advice_and_support
                         .join("_")
 
                     if (!filenameSuffix) {
@@ -7821,7 +7827,7 @@ const MessageBubble = React.memo(
                         ).toString()
                     }
 
-                    const filename = `curastem.org_${filenameSuffix}.png`
+                    const filename = `Curastem.org_${filenameSuffix}.png`
                     const file = new File([blob], filename, {
                         type: "image/png",
                     })
@@ -15539,7 +15545,7 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         <div
-                            data-layer="chat history flexbox"
+                            data-layer="chat-history-container"
                             className="ChatHistoryFlexbox"
                             style={{
                                 alignSelf: "stretch",
@@ -16013,8 +16019,8 @@ Do not include markdown formatting or explanations.`
                             <div
                                 onClick={handleClearMessages}
                                 style={{ cursor: "pointer" }}
-                                data-layer="flexbox"
-                                className="Flexbox"
+                                data-layer="new-chat-button-wrapper"
+                                className="NewChatButtonWrapper"
                             >
                                 <div
                                     data-layer="new chat"
@@ -16034,7 +16040,8 @@ Do not include markdown formatting or explanations.`
                                 >
                                     <div
                                         data-svg-wrapper
-                                        className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                        data-layer="icon-wrapper"
+                                        className="IconWrapper"
                                     >
                                         <svg
                                             width="16"
@@ -16526,7 +16533,7 @@ Do not include markdown formatting or explanations.`
                         padding: "0 24px",
                         paddingBottom: 140,
                         overflowY: "auto",
-                        overflowX: "hidden",
+                        overflowX: "visible",
                         display: "flex",
                         flexDirection: "column",
                         gap: 16,
@@ -16750,13 +16757,14 @@ Do not include markdown formatting or explanations.`
                             className="AiSuggestedReplies"
                             style={{
                                 width: "100%",
-                                maxWidth: 728,
+                                maxWidth: 816,
                                 display: "flex",
                                 flexDirection: "row",
                                 justifyContent: "flex-start",
                                 alignItems: "center",
                                 gap: 8,
-                                paddingLeft: 1,
+                                paddingLeft: isMobileLayout ? 16 : 24,
+                                paddingRight: isMobileLayout ? 16 : 24,
                                 paddingBottom: 4,
                                 paddingTop: 1,
                                 overflowX: "auto",
@@ -16795,7 +16803,7 @@ Do not include markdown formatting or explanations.`
                                             paddingRight: 12,
                                             paddingTop: 8,
                                             paddingBottom: 8,
-                                            overflow: "hidden",
+                                            overflow: "visible",
                                             borderRadius: 24,
                                             outline: "none",
                                             justifyContent: "flex-start",
@@ -17599,11 +17607,11 @@ Do not include markdown formatting or explanations.`
                         style={{
                             paddingTop: 0,
                             width: "100%",
-                            maxWidth: 728,
+                            maxWidth: 816,
                             position: "relative",
                             display: "flex",
                             flexDirection: "column",
-                            overflow: "hidden",
+                            overflow: "visible",
                         }}
                     >
                         {renderChatSection(isSidebarContext)}
@@ -17795,7 +17803,7 @@ Do not include markdown formatting or explanations.`
                         onClick={(e) => e.stopPropagation()}
                     >
                             <div
-                                data-layer="chat history flexbox"
+                                data-layer="chat-history-container"
                                 className="ChatHistoryFlexbox"
                                 style={{
                                     alignSelf: "stretch",
@@ -18300,8 +18308,8 @@ Do not include markdown formatting or explanations.`
                                     />
                                 </div>
                                 <div
-                                    data-layer="flexbox"
-                                    className="Flexbox"
+                                    data-layer="sidebar-new-chat-wrapper"
+                                    className="SidebarNewChatWrapper"
                                     style={{
                                         alignSelf: "stretch",
                                         flexDirection: "column",
@@ -18344,8 +18352,8 @@ Do not include markdown formatting or explanations.`
                                     >
                                         <div
                                             data-svg-wrapper
-                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
-                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                            data-layer="icon-wrapper"
+                                            className="IconWrapper"
                                         >
                                             <svg
                                                 width="16"
@@ -18457,8 +18465,8 @@ Do not include markdown formatting or explanations.`
                                     >
                                         <div
                                             data-svg-wrapper
-                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
-                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                            data-layer="icon-wrapper"
+                                            className="IconWrapper"
                                         >
                                             <svg
                                                 width="16"
@@ -18524,8 +18532,8 @@ Do not include markdown formatting or explanations.`
                                     >
                                         <div
                                             data-svg-wrapper
-                                            data-layer="center icon flexbox. so all icons have same 16w width to make sure text is aligned vertical on all buttons."
-                                            className="CenterIconFlexboxSoAllIconsHaveSame16wWidthToMakeSureTextIsAlignedVerticalOnAllButtons"
+                                            data-layer="icon-wrapper"
+                                            className="IconWrapper"
                                         >
                                             <svg
                                                 width="17"
