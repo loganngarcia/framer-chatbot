@@ -28,6 +28,11 @@ const SUGGESTION_MODEL_ID = "gemini-2.5-flash-lite"
 const MODEL_OUTPUT_SAMPLE_RATE = 24000
 const INPUT_TARGET_SAMPLE_RATE = 16000
 
+const DEFAULT_DOC_CONTENT = `
+<h1>Welcome to Docs </h1>
+<p>You can start typing or ask Curastem to write resumes, make study guides, draft messages, and anything you can imagine </p>
+`.trim()
+
 interface ChatSession {
     id: string
     title: string
@@ -35,6 +40,7 @@ interface ChatSession {
     messages: Message[]
     notes: string
     whiteboard: any
+    app?: { code: string; mode: "editor" | "player" }
     isPinned?: boolean
     pinnedAt?: number
     suggestions?: string[]
@@ -4568,6 +4574,8 @@ interface ChatInputProps {
     toggleWhiteboard?: () => void
     isDocOpen?: boolean
     toggleDoc?: () => void
+    isAppOpen?: boolean
+    toggleApp?: () => void
     isConnected?: boolean
     status?: string
     isMobileLayout?: boolean
@@ -4605,6 +4613,8 @@ const ChatInput = React.memo(function ChatInput({
     toggleWhiteboard,
     isDocOpen = false,
     toggleDoc,
+    isAppOpen = false,
+    toggleApp,
     isConnected = false,
     status = "idle",
     isMobileLayout = false,
@@ -4765,6 +4775,7 @@ const ChatInput = React.memo(function ChatInput({
     const hasContent = value.trim() || attachments.length > 0
 
     const menuItems = React.useMemo(() => {
+        const showReport = isConnected && !isLiveMode
         const items: {
             id: string
             label: string
@@ -4773,10 +4784,12 @@ const ChatInput = React.memo(function ChatInput({
             className: string
             isDestructive: boolean
             hasSeparator?: boolean
-        }[] = [
-            {
-                id: "files",
-                label: "Add files & photos",
+        }[] = []
+
+        if (showReport) {
+            items.push({
+                id: "report",
+                label: "Report user",
                 icon: (
                     <svg
                         width="15"
@@ -4786,23 +4799,53 @@ const ChatInput = React.memo(function ChatInput({
                         xmlns="http://www.w3.org/2000/svg"
                     >
                         <path
-                            d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691"
-                            stroke={themeColors.text.primary}
-                            strokeWidth="1.06918"
+                            d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z"
+                            stroke="#FB6A6A"
+                            strokeOpacity="0.95"
+                            strokeWidth="1.1458"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                         />
                     </svg>
                 ),
                 onClick: () => {
-                    onFileSelect()
+                    if (onReport) onReport()
                     setShowMenu(false)
                 },
-                className: "AddFilesPhotos",
-                isDestructive: false,
+                className: "Report",
+                isDestructive: true,
                 hasSeparator: false,
+            })
+        }
+
+        items.push({
+            id: "files",
+            label: "Add files & photos",
+            icon: (
+                <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 15 15"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M3.19141 4.59193L3.29675 10.2717C3.39352 15.6476 11.9099 16.019 11.8096 10.4239L11.6836 3.38078C11.6181 -0.267308 5.83901 -0.519317 5.90706 3.27745L6.03155 10.2193C6.06633 12.1391 9.10707 12.2717 9.07179 10.2737L8.94881 4.52691"
+                        stroke={themeColors.text.primary}
+                        strokeWidth="1.06918"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+            onClick: () => {
+                onFileSelect()
+                setShowMenu(false)
             },
-        ]
+            className: "AddFilesPhotos",
+            isDestructive: false,
+            hasSeparator: false,
+        })
 
         if (canShareScreen) {
             items.push({
@@ -4851,6 +4894,97 @@ const ChatInput = React.memo(function ChatInput({
         }
 
         items.push({
+            id: "create_app",
+            label: isAppOpen ? "Close app" : "Create app",
+            icon: isAppOpen ? (
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M14 2L2 14M2 2L14 14"
+                        stroke="#FB6A6A"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ) : (
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M8.47522 8.47522L14.3764 6.95631C15.2457 6.58346 15.1941 5.33387 14.297 5.03485L2.35569 1.05442C1.55185 0.786777 0.786777 1.55185 1.05442 2.35569L5.03485 14.297C5.33387 15.1941 6.58346 15.2457 6.95631 14.3764L8.47522 8.47522Z"
+                        stroke={themeColors.text.primary}
+                        strokeOpacity="0.95"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+            onClick: () => {
+                toggleApp?.()
+                setShowMenu(false)
+            },
+            className: "CreateApp",
+            isDestructive: isAppOpen,
+            hasSeparator: true,
+        })
+
+        items.push({
+            id: "doc",
+            label: isDocOpen ? "Close docs" : "Make docs",
+            icon: isDocOpen ? (
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M14 2L2 14M2 2L14 14"
+                        stroke="#FB6A6A"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ) : (
+                <svg
+                    width="16"
+                    height="12"
+                    viewBox="0 0 16 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M0.599609 11.0021L8.48004 11.0018M0.599609 5.64345H15.0996M0.599609 0.599976H15.0996"
+                        stroke={themeColors.text.primary}
+                        strokeOpacity="0.95"
+                        strokeWidth="1.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+            onClick: () => {
+                if (toggleDoc) toggleDoc()
+                setShowMenu(false)
+            },
+            className: "Doc",
+            isDestructive: isDocOpen,
+        })
+
+        items.push({
             id: "whiteboard",
             label: isWhiteboardOpen ? "Close whiteboard" : "Whiteboard",
             icon: isWhiteboardOpen ? (
@@ -4895,86 +5029,7 @@ const ChatInput = React.memo(function ChatInput({
             isDestructive: isWhiteboardOpen,
         })
 
-        items.push({
-            id: "doc",
-            label: isDocOpen ? "Close notes" : "Notes",
-            icon: isDocOpen ? (
-                <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="M14 2L2 14M2 2L14 14"
-                        stroke="#FB6A6A"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
-            ) : (
-                <svg
-                    width="16"
-                    height="12"
-                    viewBox="0 0 16 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="M0.599609 11.0021L8.48004 11.0018M0.599609 5.64345H15.0996M0.599609 0.599976H15.0996"
-                        stroke={themeColors.text.primary}
-                        strokeOpacity="0.95"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
-            ),
-            onClick: () => {
-                if (toggleDoc) toggleDoc()
-                setShowMenu(false)
-            },
-            className: "Doc",
-            isDestructive: isDocOpen,
-        })
-
         // Show "New Chat" button logic removed as per user request
-
-        const showReport = isConnected && !isLiveMode
-
-        if (showReport) {
-            items.push({
-                id: "report",
-                label: "Report user",
-                icon: (
-                    <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 15 15"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M1.38867 14.375V10.3166M1.38867 10.3166C5.83286 6.84096 9.16639 13.7922 13.6106 10.3166V1.62832C9.16639 5.10392 5.83286 -1.84728 1.38867 1.62832V10.3166Z"
-                            stroke="#FB6A6A"
-                            strokeOpacity="0.95"
-                            strokeWidth="1.1458"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                ),
-                onClick: () => {
-                    if (onReport) onReport()
-                    setShowMenu(false)
-                },
-                className: "Report",
-                isDestructive: true,
-                hasSeparator: false,
-            })
-        }
 
         return items
     }, [
@@ -4982,12 +5037,14 @@ const ChatInput = React.memo(function ChatInput({
         isScreenSharing,
         isWhiteboardOpen,
         isDocOpen,
+        isAppOpen,
         isConnected,
         isLiveMode,
         onFileSelect,
         onScreenShare,
         toggleWhiteboard,
         toggleDoc,
+        toggleApp,
         onReport,
         themeColors,
         role,
@@ -5105,7 +5162,7 @@ const ChatInput = React.memo(function ChatInput({
                         >
                             {isDocOpen || isWhiteboardOpen
                                 ? "Collaborate on ideas"
-                                : "Collaborate on ideas and have fun"}
+                                : "Collaborate on ideas, resumes, and portfolios"}
                         </div>
                     </div>
                     <div
@@ -7148,10 +7205,13 @@ const MessageBubble = React.memo(
         onCopy,
         showDocButton,
         showWhiteboardButton,
+        showAppButton,
         onToggleDoc,
         onToggleWhiteboard,
+        onToggleApp,
         isDocOpen,
         isWhiteboardOpen,
+        isAppOpen,
     }: {
         msg: Message
         isMobileLayout: boolean
@@ -7164,10 +7224,13 @@ const MessageBubble = React.memo(
         onCopy?: (msgId: string) => void
         showDocButton?: boolean
         showWhiteboardButton?: boolean
+        showAppButton?: boolean
         onToggleDoc?: () => void
         onToggleWhiteboard?: () => void
+        onToggleApp?: () => void
         isDocOpen?: boolean
         isWhiteboardOpen?: boolean
+        isAppOpen?: boolean
     }) => {
         // Memoize base styles to avoid recreation
         const baseTextStyle = React.useMemo(
@@ -7198,6 +7261,7 @@ const MessageBubble = React.memo(
         const [isDocHovered, setIsDocHovered] = React.useState(false)
         const [isWhiteboardHovered, setIsWhiteboardHovered] =
             React.useState(false)
+        const [isAppHovered, setIsAppHovered] = React.useState(false)
 
         const actionButtonBaseStyle: React.CSSProperties = {
             width: 28,
@@ -8106,7 +8170,7 @@ const MessageBubble = React.memo(
                     )}
 
                     {/* Tool Buttons */}
-                    {(showDocButton || showWhiteboardButton) && (
+                    {(showDocButton || showWhiteboardButton || showAppButton) && (
                         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                             {showDocButton && (
                                 <div
@@ -8177,7 +8241,7 @@ const MessageBubble = React.memo(
                                             wordWrap: "break-word",
                                         }}
                                     >
-                                        {isDocOpen ? "Close" : "Notes"}
+                                        {isDocOpen ? "Close" : "Docs"}
                                     </div>
                                 </div>
                             )}
@@ -8258,6 +8322,96 @@ const MessageBubble = React.memo(
                                         {isWhiteboardOpen
                                             ? "Close"
                                             : "Whiteboard"}
+                                    </div>
+                                </div>
+                            )}
+
+                            {showAppButton && (
+                                <div
+                                    onClick={onToggleApp}
+                                    data-layer="app"
+                                    className="App"
+                                    onMouseEnter={() => setIsAppHovered(true)}
+                                    onMouseLeave={() => setIsAppHovered(false)}
+                                    style={{
+                                        height: 36,
+                                        paddingLeft: 12,
+                                        paddingRight: 12,
+                                        paddingTop: 8,
+                                        paddingBottom: 8,
+                                        borderRadius: 24,
+                                        outline: "none",
+                                        justifyContent: "flex-start",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        display: "inline-flex",
+                                        cursor: "pointer",
+                                        background: isAppHovered
+                                            ? "#2B2B2B"
+                                            : themeColors.surface,
+                                        transition: "background-color 0.2s ease",
+                                    }}
+                                >
+                                    <div
+                                        data-svg-wrapper
+                                        style={{
+                                            display: "flex",
+                                            opacity: 0.65,
+                                        }}
+                                    >
+                                        {isAppOpen ? (
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M14 2L2 14M2 2L14 14"
+                                                    stroke={
+                                                        themeColors.text.primary
+                                                    }
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        ) : (
+                                            <svg
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M8.47522 8.47522L14.3764 6.95631C15.2457 6.58346 15.1941 5.33387 14.297 5.03485L2.35569 1.05442C1.55185 0.786777 0.786777 1.55185 1.05442 2.35569L5.03485 14.297C5.33387 15.1941 6.58346 15.2457 6.95631 14.3764L8.47522 8.47522Z"
+                                                    stroke={
+                                                        themeColors.text.primary
+                                                    }
+                                                    strokeOpacity="0.95"
+                                                    strokeWidth="1.2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div
+                                        style={{
+                                            justifyContent: "center",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            color: "rgba(255, 255, 255, 0.65)",
+                                            fontSize: 15,
+                                            fontFamily: "Inter",
+                                            fontWeight: "400",
+                                            lineHeight: "19.32px",
+                                            wordWrap: "break-word",
+                                        }}
+                                    >
+                                        {isAppOpen ? "Close" : "App"}
                                     </div>
                                 </div>
                             )}
@@ -8678,6 +8832,757 @@ const captureVideoFrame = async (
     }
 }
 
+// --- MINI IDE COMPONENT ---
+interface MiniIDEProps {
+    code: string
+    onChange: (code: string) => void
+    mode: "editor" | "player"
+    onModeChange: (mode: "editor" | "player") => void
+    onClose: () => void
+    onDownload: () => void
+    isMobileLayout: boolean
+    themeColors?: typeof darkColors
+    remoteCursors?: Map<string, { x: number; y: number; color: string }>
+    onCursorMove?: (x: number, y: number) => void
+    onAppInteraction?: (event: any) => void
+    remoteAppEvent?: any
+    onAppMutation?: (mutation: any) => void
+    remoteAppMutation?: any
+    amIHost?: boolean
+    isResizing?: boolean
+}
+
+// Simple syntax highlighter
+const highlightSyntax = (code: string) => {
+    const tokens: React.ReactNode[] = []
+    const regex = /((?:\/\/.*)|(?:\/\*[\s\S]*?\*\/)|(?:"(?:[^"\\]|\\.)*")|(?:'(?:[^'\\]|\\.)*')|(?:`(?:[^`\\]|\\.)*`)|(?:\b(?:function|const|let|var|return|if|else|for|while|switch|case|break|continue|import|export|from|default|class|interface|type|extends|implements|new|this|super|try|catch|finally|throw|async|await|void|typeof|instanceof|in|of)\b)|(?:\b(?:true|false|null|undefined|NaN|Infinity)\b)|(?:\b\d+(?:\.\d+)?\b)|(?:<[^>]+>))/g
+    
+    let lastIndex = 0
+    let match
+    
+    while ((match = regex.exec(code)) !== null) {
+        const [text] = match
+        const index = match.index
+        if (index > lastIndex) tokens.push(code.slice(lastIndex, index))
+        
+        let color = "#e0e0e0" // default
+        if (text.startsWith("//") || text.startsWith("/*")) color = "#6A9955" // Comment (Green)
+        else if (text.startsWith('"') || text.startsWith("'") || text.startsWith("`")) color = "#CE9178" // String (Orange/Red)
+        else if (/^[0-9]/.test(text)) color = "#B5CEA8" // Number (Light Green)
+        else if (text.startsWith("<")) color = "#569CD6" // Tag (Blue)
+        else if (/^(true|false|null|undefined)$/.test(text)) color = "#569CD6" // Boolean/Null (Blue)
+        else color = "#C586C0" // Keyword (Purple)
+        
+        tokens.push(<span key={index} style={{ color }}>{text}</span>)
+        lastIndex = index + text.length
+    }
+    if (lastIndex < code.length) tokens.push(code.slice(lastIndex))
+    return tokens
+}
+
+const MiniIDE = React.memo(function MiniIDE({
+    code,
+    onChange,
+    mode,
+    onModeChange,
+    onClose,
+    onDownload,
+    isMobileLayout,
+    themeColors = darkColors,
+    remoteCursors,
+    onCursorMove,
+    onAppInteraction,
+    remoteAppEvent,
+    onAppMutation,
+    remoteAppMutation,
+    amIHost,
+    isResizing,
+}: MiniIDEProps) {
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+    const containerRef = React.useRef<HTMLDivElement>(null)
+
+    // Line numbers generator
+    const lineNumbers = React.useMemo(() => {
+        const lines = code.split("\n").length
+        return Array.from({ length: lines }, (_, i) => i + 1).join(
+            "\n"
+        )
+    }, [code])
+
+    // Track pointer for cursor sync
+    const handlePointerMove = React.useCallback(
+        (e: React.PointerEvent) => {
+            if (!onCursorMove || !containerRef.current) return
+
+            const rect = containerRef.current.getBoundingClientRect()
+            const x = (e.clientX - rect.left) / rect.width
+            const y = (e.clientY - rect.top) / rect.height
+
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                onCursorMove(x, y)
+            }
+        },
+        [onCursorMove]
+    )
+
+    // Auto-resize textarea logic
+    React.useLayoutEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+        }
+    }, [code, mode])
+
+    const isPlayable = code.trim().length > 0
+
+    const editorStyles: React.CSSProperties = {
+        fontFamily: '"Google Sans Code", monospace',
+        fontSize: 14,
+        lineHeight: "24px",
+        whiteSpace: "pre",
+        padding: "20px",
+        paddingBottom: "80px",
+        margin: 0,
+        border: "none",
+        outline: "none",
+        width: "100%",
+        height: "100%",
+        boxSizing: "border-box",
+        tabSize: 4,
+        overflow: "hidden", // Hide scrollbars on textarea, let parent scroll
+    }
+
+    const iframeRef = React.useRef<HTMLIFrameElement>(null)
+
+    // Listen for cursor updates from iframe
+    React.useEffect(() => {
+        if (mode !== "player") return
+
+        const handleMessage = (e: MessageEvent) => {
+            if (e.data) {
+                if (e.data.type === 'iframe-cursor-move') {
+                    if (onCursorMove) {
+                        onCursorMove(e.data.x, e.data.y)
+                    }
+                } else if (e.data.type === 'iframe-interaction') {
+                    if (onAppInteraction) {
+                        onAppInteraction(e.data)
+                    }
+                } else if (e.data.type === 'iframe-mutation') {
+                    if (onAppMutation) {
+                        onAppMutation(e.data.payload)
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('message', handleMessage)
+        return () => window.removeEventListener('message', handleMessage)
+    }, [mode, onCursorMove, onAppInteraction, onAppMutation])
+
+    // Replay remote events
+    React.useEffect(() => {
+        if (remoteAppEvent && iframeRef.current && iframeRef.current.contentWindow) {
+             iframeRef.current.contentWindow.postMessage({
+                 type: 'replay-interaction',
+                 ...remoteAppEvent
+             }, '*')
+        }
+    }, [remoteAppEvent])
+
+    // Apply remote mutations (Client only)
+    React.useEffect(() => {
+        if (remoteAppMutation && !amIHost && iframeRef.current && iframeRef.current.contentWindow) {
+             iframeRef.current.contentWindow.postMessage({
+                 type: 'apply-mutation',
+                 mutation: remoteAppMutation
+             }, '*')
+        }
+    }, [remoteAppMutation, amIHost])
+
+    return (
+        <div
+            ref={containerRef}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={() => {
+                if (onCursorMove) {
+                    onCursorMove(-9999, -9999)
+                }
+            }}
+            data-layer="code editor and app player"
+            className="CodeEditorAndAppPlayer"
+            style={{
+                width: "100%",
+                height: "100%",
+                paddingTop: 0,
+                background: "#141414",
+                overflow: "hidden",
+                borderRadius: isMobileLayout ? 0 : 28,
+                flexDirection: "column",
+                justifyContent: "flex-start",
+                alignItems: "stretch",
+                gap: 0,
+                display: "flex",
+                position: "relative",
+            }}
+        >
+            {/* Scrollable Content Area */}
+            <div
+                data-layer="text area"
+                className="TextArea"
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    display: mode === "editor" ? "flex" : "none",
+                    position: "absolute", // Absolute to cover full area
+                    top: 0,
+                    left: 0,
+                    overflow: "auto",
+                    background: "#141414",
+                    alignItems: "stretch",
+                    zIndex: 0, // Behind toolbar
+                }}
+            >
+                {/* Line Numbers Container */}
+                <div
+                    data-layer="line numbers toolbar"
+                    className="LineNumbersToolbar"
+                    style={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 20,
+                        height: "min-content",
+                        minHeight: "100%",
+                        flexShrink: 0,
+                        background: "#141414",
+                        paddingTop: 80, // Added padding for toolbar
+                        paddingBottom: 80,
+                        paddingLeft: 12,
+                        paddingRight: 12,
+                        userSelect: "none",
+                    }}
+                >
+                    <div
+                        style={{
+                            textAlign: "right",
+                            color: "rgba(255, 255, 255, 0.45)",
+                            fontSize: 14,
+                            fontFamily: '"Google Sans Code", monospace',
+                            lineHeight: "24px",
+                            whiteSpace: "pre",
+                        }}
+                    >
+                        {lineNumbers}
+                    </div>
+                </div>
+
+                {/* Code Editor Container */}
+                <div
+                    data-layer="code content"
+                    className="CodeContent"
+                    style={{
+                        flex: "1",
+                        minHeight: "100%",
+                        position: "relative",
+                        minWidth: 0, // Allow flex item to shrink/grow properly
+                        display: "flex", // Ensure children can expand
+                        flexDirection: "column",
+                    }}
+                >
+                    {/* Wrapper for content to allow horizontal expansion */}
+                    <div style={{ 
+                        position: 'relative', 
+                        minWidth: '100%', 
+                        width: 'fit-content', // Allow expanding beyond 100%
+                        minHeight: '100%',
+                        flex: 1
+                    }}>
+                        {/* Syntax Highlight Layer */}
+                        <pre
+                            aria-hidden="true"
+                            style={{
+                                ...editorStyles,
+                                paddingTop: "80px", // Match line numbers padding
+                                position: "relative", // Drive the size
+                                top: 0,
+                                left: 0,
+                                pointerEvents: "none",
+                                color: "#e0e0e0",
+                                overflow: "hidden",
+                                zIndex: 1,
+                                minHeight: "100%",
+                                height: "max-content",
+                                width: "100%",
+                            }}
+                        >
+                            {highlightSyntax(code)}
+                        </pre>
+
+                        {/* Input Layer */}
+                        <textarea
+                            ref={textareaRef}
+                            className="UseFontGoogleSansCode"
+                            value={code}
+                            onChange={(e) => {
+                                // Resize handled by layout effect
+                                onChange(e.target.value)
+                            }}
+                            spellCheck={false}
+                            autoCapitalize="off"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            style={{
+                                ...editorStyles,
+                                paddingTop: "80px", // Match line numbers padding
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                color: "transparent",
+                                caretColor: "white",
+                                background: "transparent",
+                                resize: "none",
+                                zIndex: 2,
+                                overflow: "hidden",
+                                minHeight: "100%",
+                                width: "100%",
+                                height: "100%",
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Mini IDE Toolbar */}
+            <div
+                data-layer="toolbar"
+                className="Toolbar"
+                style={{
+                    position: "absolute",
+                    top: 16,
+                    zIndex: 30,
+                    pointerEvents: "none",
+                    width: '100%',
+                    height: 40,
+                    maxWidth: 1800,
+                    paddingLeft: 16,
+                    paddingRight: 16,
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    display: 'inline-flex'
+                }}
+            >
+                <div
+                    data-layer="left toolbar"
+                    className="LeftToolbar"
+                    style={{
+                        width: 40,
+                        height: 40,
+                        paddingLeft: 6,
+                        paddingRight: 4,
+                        background: '#333333',
+                        borderRadius: 31.11,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignContent: 'center',
+                        pointerEvents: "auto"
+                    }}
+                >
+                    {mode === "player" ? (
+                        <div
+                            data-svg-wrapper
+                            data-layer="open code editor button."
+                            className="OpenCodeEditorButton"
+                            onClick={() => onModeChange("editor")}
+                            style={{ cursor: "pointer" }}
+                        >
+                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M25.093 15.974L25.323 16.204C27.112 17.994 28.007 18.888 28.007 20C28.007 21.112 27.112 22.007 25.323 23.796L25.093 24.026M21.879 13L18.128 27M14.913 15.974L14.683 16.204C12.895 17.994 12 18.888 12 20C12 21.112 12.895 22.007 14.685 23.796L14.915 24.026" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    ) : (
+                        <div
+                            data-svg-wrapper
+                            data-layer="play button. opens the working app. (50% greyed out when IDE is already open)"
+                            className="PlayButtonOpensTheWorkingApp50GreyedOutWhenIdeIsAlreadyOpen"
+                            onClick={() => {
+                                if (isPlayable) onModeChange("player")
+                            }}
+                            style={{
+                                cursor: isPlayable ? "pointer" : "default",
+                                opacity: isPlayable ? 1 : 0.5
+                            }}
+                        >
+                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M25.1692 20C25.1692 20.7614 18.9674 24.5629 16.2377 25.9728C15.4682 26.3702 14.9347 26.0432 14.903 25.1777C14.8118 22.6836 14.8146 17.3166 14.9054 14.8224C14.9369 13.957 15.4717 13.6195 16.2432 14.013C18.9845 15.4113 25.1692 19.236 25.1692 20Z" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    )}
+                </div>
+                <div
+                    data-layer="right toolbar"
+                    className="RightToolbar"
+                    style={{
+                        maxWidth: 808.89,
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                        background: '#333333',
+                        borderRadius: 31.11,
+                        justifyContent: 'flex-start',
+                        alignItems: 'center',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignContent: 'center',
+                        pointerEvents: "auto"
+                    }}
+                >
+                    <div
+                        data-svg-wrapper
+                        data-layer="download button"
+                        className="DownloadButton"
+                        onClick={onDownload}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div
+                        data-svg-wrapper
+                        data-layer="close code editor button"
+                        className="CloseCodeEditorButton"
+                        onClick={onClose}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M25.25 14.75L14.75 25.25M14.75 14.75L25.25 25.25" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            {/* App Player (iframe) */}
+            {mode === "player" && (
+                <div
+                    style={{
+                        alignSelf: "stretch",
+                        flex: "1 1 0",
+                        width: "100%",
+                        height: "100%",
+                        background: "#141414",
+                        position: "relative",
+                        boxSizing: "border-box",
+                        pointerEvents: isResizing ? "none" : "auto",
+                    }}
+                >
+                    <div style={{ width: "100%", height: "100%", background: "#141414" }}>
+                        <iframe
+                            ref={iframeRef}
+                            srcDoc={(() => {
+                                // HOST SCRIPT: Captures mutations + Replays interactions
+                                const hostScript = `<script>
+                                    // Utility to generate a selector for an element
+                                    function getSelector(el) {
+                                        if (!el) return null;
+                                        if (el.nodeType === 3) return getSelector(el.parentNode); // Handle text nodes
+                                        if (el.tagName.toLowerCase() === 'html') return 'html';
+                                        if (el.tagName.toLowerCase() === 'body') return 'body';
+                                        if (el.id) return '#' + el.id;
+                                        
+                                        let selector = el.tagName.toLowerCase();
+                                        if (el.className && typeof el.className === 'string') {
+                                            const classes = el.className.trim().split(/\s+/).filter(c => c);
+                                            if (classes.length > 0) {
+                                                selector += '.' + classes.join('.');
+                                            }
+                                        }
+                                        
+                                        // Add nth-child if needed for uniqueness
+                                        let sibling = el;
+                                        let nth = 1;
+                                        while (sibling = sibling.previousElementSibling) {
+                                            if (sibling.tagName.toLowerCase() == el.tagName.toLowerCase())
+                                                nth++;
+                                        }
+                                        if (nth > 1) selector += ':nth-of-type(' + nth + ')';
+                                        
+                                        return selector;
+                                    }
+
+                                    // Listen for interactions
+                                    document.addEventListener('mousemove', (e) => {
+                                        const x = e.clientX / window.innerWidth;
+                                        const y = e.clientY / window.innerHeight;
+                                        window.parent.postMessage({ type: 'iframe-cursor-move', x, y }, '*');
+                                    });
+                                    document.addEventListener('mouseleave', () => {
+                                         window.parent.postMessage({ type: 'iframe-cursor-move', x: -9999, y: -9999 }, '*');
+                                    });
+
+                                    // HOST: Capture Interactions (Replay logic is below)
+                                    // Note: Host doesn't need to capture its own interactions to send to itself, 
+                                    // but if we wanted to broadcast "Host Clicked" we could.
+                                    // For now, Host just runs natively.
+
+                                    // HOST: Mutation Observer
+                                    const observer = new MutationObserver((mutations) => {
+                                        mutations.forEach((mutation) => {
+                                            // DEBUG: Log mutation
+                                            console.log('[Host] Mutation observed:', mutation.type, mutation.target);
+
+                                            // Filter out non-element nodes for simplicity if needed, 
+                                            // but text nodes are important for characterData
+                                            
+                                            let payload = {
+                                                type: mutation.type,
+                                                selector: getSelector(mutation.target)
+                                            };
+
+                                            if (mutation.type === 'characterData') {
+                                                payload.value = mutation.target.textContent;
+                                                // Ensure selector points to the parent element for text nodes
+                                                if (mutation.target.nodeType === 3) {
+                                                     payload.selector = getSelector(mutation.target.parentNode);
+                                                     // For text nodes, we often just want to update the parent's text content or innerHTML
+                                                     // But characterData is specific. 
+                                                     // Simplification: Treat characterData on text node as childList update on parent
+                                                     // to ensure robust sync (re-rendering the text node).
+                                                     payload.type = 'childList';
+                                                     payload.value = mutation.target.parentNode.innerHTML;
+                                                }
+                                            } else if (mutation.type === 'attributes') {
+                                                payload.attributeName = mutation.attributeName;
+                                                payload.value = mutation.target.getAttribute(mutation.attributeName);
+                                            } else if (mutation.type === 'childList') {
+                                                // For simplicity in this lightweight implementation,
+                                                // we send the full innerHTML of the parent when children change.
+                                                // This handles complex additions/removals robustly.
+                                                if (mutation.target.nodeType === 1) { // ELEMENT_NODE
+                                                     payload.value = mutation.target.innerHTML;
+                                                } else {
+                                                     // If target is text node, use parent
+                                                     payload.selector = getSelector(mutation.target.parentNode);
+                                                     payload.value = mutation.target.parentNode.innerHTML;
+                                                }
+                                            }
+                                            
+                                            window.parent.postMessage({
+                                                type: 'iframe-mutation',
+                                                payload: payload
+                                            }, '*');
+                                        });
+                                    });
+                                    
+                                    observer.observe(document.documentElement, {
+                                        attributes: true,
+                                        childList: true,
+                                        subtree: true,
+                                        characterData: true
+                                    });
+
+                                    // Listen for replay events (from Client)
+                                    window.addEventListener('message', (e) => {
+                                        if (e.data && e.data.type === 'replay-interaction') {
+                                            const { kind, selector, value, checked, scrollTop, scrollLeft } = e.data;
+                                            const el = document.querySelector(selector);
+                                            if (!el) return;
+
+                                            if (kind === 'click') {
+                                                const opts = {
+                                                    view: window,
+                                                    bubbles: true,
+                                                    cancelable: true,
+                                                    clientX: e.data.x * window.innerWidth,
+                                                    clientY: e.data.y * window.innerHeight
+                                                };
+                                                el.dispatchEvent(new MouseEvent('click', opts));
+                                                el.dispatchEvent(new MouseEvent('mousedown', opts));
+                                                el.dispatchEvent(new MouseEvent('mouseup', opts));
+                                            } else if (kind === 'input') {
+                                                el.value = value;
+                                                if (checked !== undefined) el.checked = checked;
+                                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                                            } else if (kind === 'scroll') {
+                                                if (selector === 'html' || selector === 'body') {
+                                                    window.scrollTo(scrollLeft, scrollTop);
+                                                } else {
+                                                    el.scrollTop = scrollTop;
+                                                    el.scrollLeft = scrollLeft;
+                                                }
+                                            }
+                                        }
+                                    });
+                                </script>`
+
+                                // CLIENT SCRIPT: Captures interactions + Applies mutations
+                                const clientScript = `<script>
+                                    function getSelector(el) {
+                                        if (!el) return null;
+                                        if (el.nodeType === 3) return getSelector(el.parentNode);
+                                        if (el.tagName.toLowerCase() === 'html') return 'html';
+                                        if (el.tagName.toLowerCase() === 'body') return 'body';
+                                        if (el.id) return '#' + el.id;
+                                        let selector = el.tagName.toLowerCase();
+                                        if (el.className && typeof el.className === 'string') {
+                                            const classes = el.className.trim().split(/\s+/).filter(c => c);
+                                            if (classes.length > 0) selector += '.' + classes.join('.');
+                                        }
+                                        let sibling = el;
+                                        let nth = 1;
+                                        while (sibling = sibling.previousElementSibling) {
+                                            if (sibling.tagName.toLowerCase() == el.tagName.toLowerCase()) nth++;
+                                        }
+                                        if (nth > 1) selector += ':nth-of-type(' + nth + ')';
+                                        return selector;
+                                    }
+
+                                    // Capture Interactions to send to Host
+                                    document.addEventListener('mousemove', (e) => {
+                                        const x = e.clientX / window.innerWidth;
+                                        const y = e.clientY / window.innerHeight;
+                                        window.parent.postMessage({ type: 'iframe-cursor-move', x, y }, '*');
+                                    });
+                                    document.addEventListener('mouseleave', () => {
+                                         window.parent.postMessage({ type: 'iframe-cursor-move', x: -9999, y: -9999 }, '*');
+                                    });
+
+                                    document.addEventListener('click', (e) => {
+                                        if (!e.isTrusted) return;
+                                        e.preventDefault(); // Prevent local action
+                                        e.stopPropagation();
+                                        const selector = getSelector(e.target);
+                                        window.parent.postMessage({ 
+                                            type: 'iframe-interaction', 
+                                            kind: 'click',
+                                            selector: selector,
+                                            x: e.clientX / window.innerWidth,
+                                            y: e.clientY / window.innerHeight
+                                        }, '*');
+                                    }, true);
+
+                                    document.addEventListener('input', (e) => {
+                                        if (!e.isTrusted) return;
+                                        e.preventDefault();
+                                        const selector = getSelector(e.target);
+                                        window.parent.postMessage({ 
+                                            type: 'iframe-interaction', 
+                                            kind: 'input',
+                                            selector: selector,
+                                            value: e.target.value,
+                                            checked: e.target.checked
+                                        }, '*');
+                                    }, true);
+                                    
+                                    let scrollTimeout;
+                                    document.addEventListener('scroll', (e) => {
+                                        if (!e.isTrusted) return;
+                                        if (scrollTimeout) return;
+                                        scrollTimeout = setTimeout(() => {
+                                            scrollTimeout = null;
+                                            const target = e.target === document ? document.documentElement : e.target;
+                                            const selector = e.target === document ? 'html' : getSelector(target);
+                                            window.parent.postMessage({
+                                                type: 'iframe-interaction',
+                                                kind: 'scroll',
+                                                selector: selector,
+                                                scrollTop: target.scrollTop,
+                                                scrollLeft: target.scrollLeft
+                                            }, '*');
+                                        }, 50);
+                                    }, true);
+
+                                    // Apply Mutations from Host
+                                    window.addEventListener('message', (e) => {
+                                        if (e.data && e.data.type === 'apply-mutation') {
+                                            const { type, selector, value, attributeName } = e.data.mutation;
+                                            console.log('[Client] Applying mutation:', type, selector);
+                                            
+                                            // Special case for HTML/Body which might not be queryable in some contexts or need special handling
+                                            let el;
+                                            if (selector === 'html') el = document.documentElement;
+                                            else if (selector === 'body') el = document.body;
+                                            else el = document.querySelector(selector);
+
+                                            if (!el) {
+                                                console.warn('[Client] Element not found for selector:', selector);
+                                                // Retry once after a small delay in case of race condition
+                                                setTimeout(() => {
+                                                    const retryEl = document.querySelector(selector);
+                                                    if (retryEl) {
+                                                        console.log('[Client] Found element on retry:', selector);
+                                                        applyMutation(retryEl, type, value, attributeName);
+                                                    }
+                                                }, 50);
+                                                return;
+                                            }
+                                            
+                                            applyMutation(el, type, value, attributeName);
+                                        }
+                                    });
+
+                                    function applyMutation(el, type, value, attributeName) {
+                                        if (type === 'characterData') {
+                                            el.textContent = value;
+                                        } else if (type === 'attributes') {
+                                            if (value === null) el.removeAttribute(attributeName);
+                                            else el.setAttribute(attributeName, value);
+                                        } else if (type === 'childList') {
+                                            el.innerHTML = value;
+                                        }
+                                    }
+                                </script>`
+
+                                if (amIHost) {
+                                    // Host loads full code + Host Script
+                                    return code.includes("<head>")
+                                        ? code.replace("<head>", `<head><base target="_blank">${hostScript}`)
+                                        : `<base target="_blank">${hostScript}${code}`
+                                } else {
+                                    // Client loads Sanitized Code (No JS) + Client Script
+                                    // We strip scripts to prevent local execution logic
+                                    const sanitized = code.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "")
+                                        .replace(/\bon\w+="[^"]*"/gim, ""); // Remove inline handlers
+                                    
+                                    // If code has no body/head, wrap it
+                                    let finalCode = sanitized;
+                                    if (!finalCode.includes("<body")) {
+                                        finalCode = `<body>${finalCode}</body>`;
+                                    }
+                                    
+                                    return finalCode.includes("<head>")
+                                        ? finalCode.replace("<head>", `<head><base target="_blank">${clientScript}`)
+                                        : `<base target="_blank">${clientScript}${finalCode}`
+                                }
+                            })()}
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                border: "none",
+                            }}
+                            title="App Player"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Remote Cursors */}
+            {remoteCursors &&
+                Array.from(remoteCursors.entries()).map(([peerId, cursor]) => (
+                    <LiveCursor
+                        key={peerId}
+                        x={cursor.x}
+                        y={cursor.y}
+                        color={cursor.color}
+                        containerRef={containerRef}
+                    />
+                ))}
+        </div>
+    )
+})
+
 export default function OmegleMentorshipUI(props: Props) {
     const {
         geminiApiKey,
@@ -8795,9 +9700,31 @@ export default function OmegleMentorshipUI(props: Props) {
     const dragStartWidth = React.useRef(440)
     const [isResizing, setIsResizing] = React.useState(false)
 
+    const [remoteAppMutation, setRemoteAppMutation] = React.useState<any>(null)
+    const [remoteAppEvent, setRemoteAppEvent] = React.useState<any>(null)
+    const [amIHost, setAmIHost] = React.useState(false)
+
     // --- STATE: WEBRTC & CONNECTIVITY ---
     // status: tracks the lifecycle of the connection (idle -> searching -> connected)
     const [status, setStatus] = React.useState("idle")
+    
+    // Refs for WebRTC (declared early so they can be used in useEffect dependencies)
+    const activeCalls = React.useRef<Map<string, any>>(new Map())
+    const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
+
+    // Calculate if I am the host based on peer IDs
+    React.useEffect(() => {
+        if (!myId.current) return
+        
+        const allPeers = [myId.current, ...Array.from(activeCalls.current.keys())]
+        // Simple stable election: Lowest ID is host
+        allPeers.sort()
+        const hostId = allPeers[0]
+        const isHost = myId.current === hostId
+        
+        setAmIHost(isHost)
+        // log(`Host Election: Me=${myId.current}, Host=${hostId}, AmIHost=${isHost}`)
+    }, [status]) // Re-evaluate when connection status changes (peers connect/disconnect change status)
     const statusRef = React.useRef(status)
     React.useEffect(() => {
         statusRef.current = status
@@ -8829,6 +9756,18 @@ export default function OmegleMentorshipUI(props: Props) {
         isDocOpenRef.current = isDocOpen
     }, [isDocOpen])
 
+    // --- STATE: APP BUILDER ---
+    const [isAppOpen, setIsAppOpen] = React.useState(false)
+    const isAppOpenRef = React.useRef(false)
+    const [appCode, setAppCode] = React.useState(
+`Welcome to Apps
+Ask Curastem to build anything you can imagine`);
+    const [appMode, setAppMode] = React.useState<"editor" | "player">("editor")
+
+    React.useEffect(() => {
+        isAppOpenRef.current = isAppOpen
+    }, [isAppOpen])
+
     // Track pending connections (black tiles)
     const [pendingPeerIds, setPendingPeerIds] = React.useState<Set<string>>(
         new Set()
@@ -8847,12 +9786,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const chatThemeColors = isDocOpen ? pureBlackColors : themeColors
     // Shadow global styles with themed styles
     const styles = React.useMemo(() => getStyles(themeColors), [themeColors])
-    const [docContent, setDocContent] = React.useState(
-        `
-<h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
-    `.trim()
-    )
+    const [docContent, setDocContent] = React.useState(DEFAULT_DOC_CONTENT)
     interface DocSettings {
         fontStyle: "serif" | "sans"
         fontSize: number // Base font size
@@ -8971,9 +9905,21 @@ export default function OmegleMentorshipUI(props: Props) {
         docContentRef.current = docContent
     }, [docContent])
 
+    const appCodeRef = React.useRef(appCode)
+    React.useEffect(() => {
+        appCodeRef.current = appCode
+    }, [appCode])
+
+    const appModeRef = React.useRef(appMode)
+    React.useEffect(() => {
+        appModeRef.current = appMode
+    }, [appMode])
+
     const isWhiteboardOpenRef = React.useRef(false)
     const docTimeoutRef = React.useRef<any>(null) // Debounce/Throttle for doc editor
     const lastDocSendTimeRef = React.useRef<number>(0)
+    const appTimeoutRef = React.useRef<any>(null) // Debounce/Throttle for app editor
+    const lastAppSendTimeRef = React.useRef<number>(0)
     const inputTimeoutRef = React.useRef<any>(null)
     const lastInputSendTimeRef = React.useRef<number>(0)
     const lastAISendTimeRef = React.useRef<number>(0)
@@ -9026,6 +9972,26 @@ export default function OmegleMentorshipUI(props: Props) {
                     "scroll",
                     handleResize
                 )
+            }
+        }
+    }, [])
+
+    // Google Sans Code font injection
+    React.useEffect(() => {
+        if (typeof document === "undefined") return
+        
+        // Check if already injected
+        const existingLink = document.querySelector('link[href*="Google+Sans+Code"]')
+        if (existingLink) return
+
+        const link = document.createElement("link")
+        link.href = "https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400&display=swap"
+        link.rel = "stylesheet"
+        document.head.appendChild(link)
+
+        return () => {
+            if (document.head.contains(link)) {
+                document.head.removeChild(link)
             }
         }
     }, [])
@@ -9550,12 +10516,7 @@ Do not include markdown formatting or explanations.`
                     setHasWhiteboardStarted(false)
                     setEditor(null)
                     setIsDocOpen(false)
-                    setDocContent(
-                        `
-<h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
-            `.trim()
-                    )
+                    setDocContent(DEFAULT_DOC_CONTENT)
 
                     setMessages([])
                     setAttachments([])
@@ -10250,12 +11211,12 @@ Do not include markdown formatting or explanations.`
     const mqttClient = React.useRef<any>(null)
     const peerInstance = React.useRef<any>(null)
     const activeCall = React.useRef<any>(null) // Deprecated: Use activeCalls
-    const activeCalls = React.useRef<Map<string, any>>(new Map())
+    // activeCalls and myId are declared earlier (before status useEffect)
     const dataConnectionRef = React.useRef<any>(null)
     const dataConnectionsRef = React.useRef<Map<string, any>>(new Map())
 
     // Unique session ID for the user (per tab/refresh)
-    const myId = React.useRef("user_" + Math.random().toString(36).substr(2, 6))
+    // myId is declared earlier (before status useEffect)
     // Session ID (per tab) - used for anti-echo but allows multi-tab testing
     const sessionId = React.useRef(
         "session_" + Math.random().toString(36).substr(2, 9)
@@ -10458,6 +11419,17 @@ Do not include markdown formatting or explanations.`
         }
     }, [currentChatId])
 
+    // Automatically save chat history when code changes (debounced)
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            if (currentChatId && saveChatHistoryRef.current) {
+                 saveChatHistoryRef.current()
+            }
+        }, 1000)
+
+        return () => clearTimeout(timer)
+    }, [appCode, appMode, currentChatId])
+
     const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
         string[]
     >(() => {
@@ -10525,7 +11497,38 @@ Do not include markdown formatting or explanations.`
             localStorage.setItem("is_sidebar_open", isSidebarOpen.toString())
         }
     }, [isSidebarOpen])
+
+    // Store sidebar state before tool opened
+    const wasSidebarOpenBeforeTool = React.useRef<boolean | null>(null)
+
+    React.useEffect(() => {
+        const isAnyToolOpen = isDocOpen || isWhiteboardOpen || isAppOpen
+
+        if (isAnyToolOpen) {
+            // Tool(s) just opened or switched
+            if (wasSidebarOpenBeforeTool.current === null) {
+                // If this is the transition from No Tool -> Tool
+                // Save current sidebar state
+                wasSidebarOpenBeforeTool.current = isSidebarOpen
+                // Close sidebar if it was open
+                if (isSidebarOpen) {
+                    setIsSidebarOpen(false)
+                }
+            }
+        } else {
+            // All tools closed
+            if (wasSidebarOpenBeforeTool.current !== null) {
+                // Restore sidebar state
+                if (wasSidebarOpenBeforeTool.current !== isSidebarOpen) {
+                    setIsSidebarOpen(wasSidebarOpenBeforeTool.current)
+                }
+                wasSidebarOpenBeforeTool.current = null
+            }
+        }
+    }, [isDocOpen, isWhiteboardOpen, isAppOpen])
+
     const [isSidebarBtnHovered, setIsSidebarBtnHovered] = React.useState(false)
+    const [isNewChatBtnHovered, setIsNewChatBtnHovered] = React.useState(false)
     const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(
         null
     )
@@ -10689,6 +11692,9 @@ Do not include markdown formatting or explanations.`
                     })),
                     notes: docContentRef.current,
                     whiteboard: whiteboardData,
+                    app: appCodeRef.current
+                        ? { code: appCodeRef.current, mode: appModeRef.current }
+                        : undefined,
                     isPinned: existing?.isPinned,
                     pinnedAt: existing?.pinnedAt,
                     suggestions: aiGeneratedSuggestions,
@@ -10757,6 +11763,15 @@ Do not include markdown formatting or explanations.`
                             setDocContent(savedDoc)
                         }
                     }
+                    // Restore App Code
+                    const savedAppCode = localStorage.getItem("student_app_code")
+                    if (savedAppCode) {
+                        setAppCode(savedAppCode)
+                    }
+                    const savedAppMode = localStorage.getItem("student_app_mode")
+                    if (savedAppMode) {
+                        setAppMode(savedAppMode as any)
+                    }
                     // Restore Whiteboard (pending snapshot)
                     if (!editor) {
                         const savedWhiteboard =
@@ -10775,6 +11790,8 @@ Do not include markdown formatting or explanations.`
                     localStorage.removeItem("student_messages")
                     localStorage.removeItem("student_doc")
                     localStorage.removeItem("student_whiteboard")
+                    localStorage.removeItem("student_app_code")
+                    localStorage.removeItem("student_app_mode")
                     localStorage.removeItem("student_data_timestamp")
                 }
             }
@@ -10813,6 +11830,8 @@ Do not include markdown formatting or explanations.`
 
             localStorage.setItem("student_messages", JSON.stringify(messages))
             localStorage.setItem("student_doc", docContent)
+            localStorage.setItem("student_app_code", appCode)
+            localStorage.setItem("student_app_mode", appMode)
             localStorage.setItem(
                 "student_data_timestamp",
                 Date.now().toString()
@@ -10831,7 +11850,7 @@ Do not include markdown formatting or explanations.`
                 }
             }
         }
-    }, [role, messages, docContent, editor, status])
+    }, [role, messages, docContent, appCode, appMode, editor, status])
 
     // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
     React.useEffect(() => {
@@ -10860,6 +11879,15 @@ Do not include markdown formatting or explanations.`
                             setDocContent(savedDoc)
                         }
                     }
+                    // Restore App Code
+                    const savedAppCode = localStorage.getItem("student_app_code")
+                    if (savedAppCode) {
+                        setAppCode(savedAppCode)
+                    }
+                    const savedAppMode = localStorage.getItem("student_app_mode")
+                    if (savedAppMode) {
+                        setAppMode(savedAppMode as any)
+                    }
                     // Restore Whiteboard (pending snapshot)
                     if (!editor) {
                         const savedWhiteboard =
@@ -10878,6 +11906,8 @@ Do not include markdown formatting or explanations.`
                     localStorage.removeItem("student_messages")
                     localStorage.removeItem("student_doc")
                     localStorage.removeItem("student_whiteboard")
+                    localStorage.removeItem("student_app_code")
+                    localStorage.removeItem("student_app_mode")
                     localStorage.removeItem("student_data_timestamp")
                 }
             }
@@ -10916,6 +11946,8 @@ Do not include markdown formatting or explanations.`
 
             localStorage.setItem("student_messages", JSON.stringify(messages))
             localStorage.setItem("student_doc", docContent)
+            localStorage.setItem("student_app_code", appCode)
+            localStorage.setItem("student_app_mode", appMode)
             localStorage.setItem(
                 "student_data_timestamp",
                 Date.now().toString()
@@ -10934,7 +11966,7 @@ Do not include markdown formatting or explanations.`
                 }
             }
         }
-    }, [role, messages, docContent, editor, status]) // Triggers on message/doc change. Whiteboard might lag if no other activity.
+    }, [role, messages, docContent, appCode, appMode, editor, status]) // Triggers on message/doc change. Whiteboard might lag if no other activity.
 
     const hasMessages = messages.length > 0
     const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
@@ -11251,6 +12283,7 @@ Do not include markdown formatting or explanations.`
             _remoteScreenStream: MediaStream | null,
             _isWhiteboardOpen: boolean,
             _isDocOpen: boolean,
+            _isAppOpen: boolean,
             _sharedScreenSize: { width: number; height: number } | null
         ) => {
             // Adjust available width for tile calculations if sidebar is open on desktop
@@ -11271,7 +12304,8 @@ Do not include markdown formatting or explanations.`
                 _isScreenSharing ||
                 !!_remoteScreenStream ||
                 _isWhiteboardOpen ||
-                _isDocOpen
+                _isDocOpen ||
+                _isAppOpen
             const targetRatio =
                 isMultiParty || (isContentOpen && isMultiParty) ? 1.0 : 1.55
 
@@ -11282,7 +12316,8 @@ Do not include markdown formatting or explanations.`
                 !_isScreenSharing &&
                 !_remoteScreenStream &&
                 !_isWhiteboardOpen &&
-                !_isDocOpen
+                !_isDocOpen &&
+                !_isAppOpen
             ) {
                 let maxVideoHeightNeeded = 0
 
@@ -11317,6 +12352,15 @@ Do not include markdown formatting or explanations.`
                     // A4 Dimensions
                     activeWidth = 1240
                     activeHeight = 1754
+                } else if (_isAppOpen) {
+                    // App IDE dimensions (similar to whiteboard)
+                    if (_isMobileLayout) {
+                        activeWidth = 1080
+                        activeHeight = 1350
+                    } else {
+                        activeWidth = 1920
+                        activeHeight = 1080
+                    }
                 }
 
                 if (activeWidth && activeHeight) {
@@ -11348,7 +12392,8 @@ Do not include markdown formatting or explanations.`
                 !_isScreenSharing &&
                 !_remoteScreenStream &&
                 !_isWhiteboardOpen &&
-                !_isDocOpen
+                !_isDocOpen &&
+                !_isAppOpen
             ) {
                 const minVideoSectionHeight = 80
                 maxHeight = Math.max(
@@ -11361,7 +12406,8 @@ Do not include markdown formatting or explanations.`
                 _isScreenSharing ||
                 !!_remoteScreenStream ||
                 _isWhiteboardOpen ||
-                _isDocOpen
+                _isDocOpen ||
+                _isAppOpen
             ) {
                 let topRowHeight = 140
                 if (_isMobileLayout) {
@@ -11466,6 +12512,7 @@ Do not include markdown formatting or explanations.`
             remoteScreenStream,
             isWhiteboardOpen,
             isDocOpen,
+            isAppOpen,
             sharedScreenSize
         )
 
@@ -11479,6 +12526,7 @@ Do not include markdown formatting or explanations.`
         remoteScreenStream,
         isWhiteboardOpen,
         isDocOpen,
+        isAppOpen,
         sharedScreenSize,
         calculateHeightConstraints,
         hasMessages,
@@ -11516,6 +12564,7 @@ Do not include markdown formatting or explanations.`
             remoteScreenStream,
             isWhiteboardOpen,
             isDocOpen,
+            isAppOpen,
             sharedScreenSize
         )
 
@@ -11600,6 +12649,7 @@ Do not include markdown formatting or explanations.`
                 remoteScreenStream,
                 isWhiteboardOpen,
                 isDocOpen,
+                isAppOpen,
                 sharedScreenSize
             )
 
@@ -11665,6 +12715,7 @@ Do not include markdown formatting or explanations.`
                         remoteScreenStream,
                         isWhiteboardOpen,
                         isDocOpen,
+                        isAppOpen,
                         sharedScreenSize
                     )
                     const final = Math.max(
@@ -11688,6 +12739,7 @@ Do not include markdown formatting or explanations.`
         remoteScreenStream,
         isWhiteboardOpen,
         isDocOpen,
+        isAppOpen,
         sharedScreenSize,
         calculateHeightConstraints,
     ])
@@ -11877,6 +12929,12 @@ Do not include markdown formatting or explanations.`
                         broadcastData({ type: "tldraw-stop" })
                     }
                 }
+                if (isAppOpen) {
+                    setIsAppOpen(false)
+                    if (!isMobileLayout) {
+                        broadcastData({ type: "app-stop" })
+                    }
+                }
                 // Allow screenshare to remain open
                 // if (isScreenSharing) stopLocalScreenShare()
             }
@@ -11884,6 +12942,7 @@ Do not include markdown formatting or explanations.`
         })
     }, [
         isWhiteboardOpen,
+        isAppOpen,
         isScreenSharing,
         stopLocalScreenShare,
         isMobileLayout,
@@ -11900,6 +12959,12 @@ Do not include markdown formatting or explanations.`
         } else {
             log("Starting whiteboard...")
             if (isDocOpen) setIsDocOpen(false)
+            if (isAppOpen) {
+                setIsAppOpen(false)
+                if (!isMobileLayout) {
+                    broadcastData({ type: "app-stop" })
+                }
+            }
             // Allow screenshare to remain open
             // if (isScreenSharing) stopLocalScreenShare()
 
@@ -11928,6 +12993,7 @@ Do not include markdown formatting or explanations.`
         }
     }, [
         isWhiteboardOpen,
+        isAppOpen,
         isScreenSharing,
         stopLocalScreenShare,
         isDocOpen,
@@ -11951,6 +13017,110 @@ Do not include markdown formatting or explanations.`
             }
         })
     }, [])
+
+    const toggleApp = React.useCallback(() => {
+        if (isAppOpen) {
+            setIsAppOpen(false)
+            if (!isMobileLayout) {
+                broadcastData({ type: "app-stop" })
+            }
+        } else {
+            setIsAppOpen(true)
+
+            // Close other tools to make room (mutual exclusivity)
+            if (isDocOpen) {
+                setIsDocOpen(false)
+                if (!isMobileLayout) {
+                    broadcastData({ type: "doc-stop" })
+                }
+            }
+            if (isWhiteboardOpen) {
+                setIsWhiteboardOpen(false)
+                if (!isMobileLayout) {
+                    broadcastData({ type: "tldraw-stop" })
+                }
+            }
+
+            // Broadcast start
+            if (dataConnectionsRef.current.size > 0) {
+                broadcastData({ type: "app-start" })
+                if (appCode) {
+                    broadcastData({ type: "app-update", payload: appCode })
+                    broadcastData({ type: "app-mode-change", payload: appMode })
+                }
+            }
+        }
+    }, [isAppOpen, isDocOpen, isWhiteboardOpen, isMobileLayout, appCode, appMode])
+
+    const handleAppChange = React.useCallback((code: string) => {
+        setAppCode(code)
+
+        const now = Date.now()
+        const interval = 50 // Match cursor update rate (20fps)
+        const timeSinceLastSend = now - lastAppSendTimeRef.current
+
+        if (appTimeoutRef.current) clearTimeout(appTimeoutRef.current)
+
+        if (timeSinceLastSend > interval) {
+            // Send immediately if enough time has passed
+            broadcastData({
+                type: "app-update",
+                payload: code,
+            })
+            lastAppSendTimeRef.current = now
+        } else {
+            // Otherwise schedule for the end of the interval
+            appTimeoutRef.current = setTimeout(() => {
+                broadcastData({
+                    type: "app-update",
+                    payload: code,
+                })
+                lastAppSendTimeRef.current = Date.now()
+            }, interval - timeSinceLastSend)
+        }
+    }, [])
+
+    const handleAppModeChange = React.useCallback((mode: "editor" | "player") => {
+        setAppMode(mode)
+        if (dataConnectionsRef.current.size > 0) {
+            broadcastData({ type: "app-mode-change", payload: mode })
+        }
+    }, [])
+
+    const handleAppPointerMove = React.useCallback((x: number, y: number) => {
+        // If no active connections, skip
+        if (dataConnectionsRef.current.size === 0) return
+
+        const now = Date.now()
+        if (now - lastCursorUpdate.current < 50) return // Limit to 20fps
+        lastCursorUpdate.current = now
+
+        broadcastData({
+            type: "cursor-update",
+            payload: { x, y, color: myCursorColor.current },
+        })
+    }, [])
+
+    const handleAppInteraction = React.useCallback((event: any) => {
+        if (dataConnectionsRef.current.size === 0) return
+        
+        broadcastData({
+            type: "app-interaction",
+            payload: event,
+        })
+    }, [])
+
+    const handleAppMutation = React.useCallback((mutation: any) => {
+        if (dataConnectionsRef.current.size === 0) return
+        
+        // Debug log
+        if (debugMode) console.log('[App] Broadcasting mutation:', mutation);
+
+        broadcastData({
+            type: "app-mutation",
+            payload: mutation,
+        })
+    }, [debugMode])
 
     const handleDocChange = React.useCallback((content: string) => {
         setDocContent(content)
@@ -12153,11 +13323,15 @@ Do not include markdown formatting or explanations.`
         }
 
         setDocContent("") // Reset docs too? Usually yes for new chat.
+        setAppCode("")
+        setAppMode("editor")
 
         // Clear persistence
         localStorage.removeItem("student_messages")
         localStorage.removeItem("student_doc")
         localStorage.removeItem("student_whiteboard")
+        localStorage.removeItem("student_app_code")
+        localStorage.removeItem("student_app_mode")
 
         // Ensure new ID is saved
         if (typeof window !== "undefined") {
@@ -12620,12 +13794,7 @@ Do not include markdown formatting or explanations.`
                     setAttachments([])
                     setLogs([])
                     setIsDocOpen(false)
-                    setDocContent(
-                        `
-<h1>Welcome to your notes 🩵 </h1>
-<p>You can start typing or ask AI to write resumes, make study guides, draft messages, and so much more. </p>
-                    `.trim()
-                    )
+                    setDocContent(DEFAULT_DOC_CONTENT)
                     setIsWhiteboardOpen(false)
                     setHasWhiteboardStarted(false)
                     setEditor(null)
@@ -13412,6 +14581,16 @@ Do not include markdown formatting or explanations.`
             } else if (data.type === "ai-suggestions") {
                 // Receive and display shared AI suggestions
                 setAiGeneratedSuggestions(data.payload)
+            } else if (data.type === "app-start") {
+                if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
+                setIsDocOpen(false)
+                setIsAppOpen(true)
+            } else if (data.type === "app-stop") {
+                setIsAppOpen(false)
+            } else if (data.type === "app-update") {
+                setAppCode(data.payload)
+            } else if (data.type === "app-mode-change") {
+                setAppMode(data.payload)
             } else if (data.type === "doc-start") {
                 // if (isScreenSharingRef.current) stopLocalScreenShare()
                 if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
@@ -13488,6 +14667,11 @@ Do not include markdown formatting or explanations.`
                     }
                     return newMap
                 })
+            } else if (data.type === "app-interaction") {
+                setRemoteAppEvent(data.payload)
+            } else if (data.type === "app-mutation") {
+                if (debugMode) console.log('[App] Received remote mutation:', data.payload);
+                setRemoteAppMutation(data.payload)
             } else if (data.type === "tldraw-update") {
                 if (editorRef.current) {
                     try {
@@ -13827,6 +15011,47 @@ Do not include markdown formatting or explanations.`
                     {
                         functionDeclarations: [
                             {
+                                name: "create_app",
+                                description:
+                                    "Creates a mini app/website (HTML/CSS/JS) for the user. Use this when the user asks to build a game, tool, calculator, interactive demo, or any web application. The code should be a single HTML file with embedded CSS and JavaScript.",
+                                parameters: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        code: {
+                                            type: "STRING",
+                                            description: `The complete HTML code for the app, including embedded CSS (<style>) and JavaScript (<script>). Must be a valid, self-contained HTML document.
+
+You create apps in HTML with CSS and JS scripts. No non-interactive buttons, instructions, or comments. Only working features.
+
+DO NOT:
+- no shadows
+- no borders/strokes
+- no gradients
+- no blurs
+- no animations
+
+DO:
+- must have desktop and mobile support
+- must have 48px top margin
+- must add a label in bottom right corner 12px font size, #0B87DA color saying Curastem.org 
+- must use #141414 background
+- must have links open in new tab
+
+PICK ONE STYLE:
+- bright, huge neobrutalist for all portfolios
+- 3D Three.js for all games
+- modern 28px rounded corners for easy to use 
+
+PREFERENCES:
+- prefer to fill width of screen
+- prefer absolute-positioned, overlayed action buttons
+- prefer accessible hierarchy. important buttons placed in reachable places`,
+                                        },
+                                    },
+                                    required: ["code"],
+                                },
+                            },
+                            {
                                 name: "update_doc",
                                 description:
                                     "Updates the document editor. Use this to write documents, resumes, and emails. You have full control over HTML formatting.",
@@ -13929,6 +15154,7 @@ Do not include markdown formatting or explanations.`
                             {
                                 text:
                                     currentSystemPrompt +
+                                    " If the user asks to build, create, or make a game, app, tool, calculator, or website, use the create_app tool." +
                                     " If the user asks to create, make, edit the document or take notes, use the update_doc tool." +
                                     " If the user asks to draw, diagram, or visualize something, use the update_whiteboard tool." +
                                     " For whiteboard shapes, use valid tldraw JSON records. Use 'geo' type for shapes (props: { w, h, geo: 'rectangle'|'ellipse' }), 'text' for labels, 'arrow' for connections (props: { start, end })." +
@@ -14083,6 +15309,40 @@ Do not include markdown formatting or explanations.`
                                         }
 
                                         // Streaming Tool Call Support:
+                                        // Check both accumulated and current chunk for the name to be safe
+                                        const toolName = accumulatedFunctionCall.name || fnCall.name
+
+                                        // If it's the `create_app` tool, OPEN IDE IMMEDIATELY and stream code
+                                        if (toolName === "create_app") {
+                                            // Ensure name is set in accumulated object if we found it in chunk
+                                            if (!accumulatedFunctionCall.name && fnCall.name) {
+                                                accumulatedFunctionCall.name = fnCall.name
+                                            }
+
+                                            // Force open IDE via ref to bypass closure staleness
+                                            if (!isAppOpenRef.current) {
+                                                console.log("Opening App Editor (Streaming)...")
+                                                setIsAppOpen(true)
+                                                setIsDocOpen(false)
+                                                setIsWhiteboardOpen(false)
+                                                isAppOpenRef.current = true
+                                            }
+
+                                            // Force editor mode if not already
+                                            if (appModeRef.current !== "editor") {
+                                                setAppMode("editor")
+                                                appModeRef.current = "editor"
+                                            }
+
+                                            // Stream code updates in real-time
+                                            if (accumulatedFunctionCall.args) {
+                                                const args =
+                                                    accumulatedFunctionCall.args as any
+                                                const newCode = args.code || ""
+                                                if (newCode) setAppCode(newCode)
+                                            }
+                                        }
+
                                         // If it's the `update_doc` tool, OPEN IMMEDIATELY.
                                         if (
                                             accumulatedFunctionCall.name ===
@@ -14122,7 +15382,62 @@ Do not include markdown formatting or explanations.`
 
                 // Handle Tool Call - Final Execution
                 if (accumulatedFunctionCall) {
-                    if (accumulatedFunctionCall.name === "update_doc") {
+                    if (accumulatedFunctionCall.name === "create_app") {
+                        const args = accumulatedFunctionCall.args as any
+                        const code = args.code || ""
+                        
+                        setAppCode(code)
+                        
+                        // Auto-open IDE if not already open
+                        if (!isAppOpen) {
+                            setIsAppOpen(true)
+                            setIsDocOpen(false)
+                            setIsWhiteboardOpen(false)
+                        }
+                        
+                        // Auto-switch to player mode when complete
+                        setAppMode("player")
+
+                        // BROADCAST APP UPDATE
+                        if (dataConnectionsRef.current.size > 0) {
+                            broadcastData({
+                                type: "app-update",
+                                payload: code,
+                            })
+                            broadcastData({
+                                type: "app-mode-change",
+                                payload: "player",
+                            })
+                            broadcastData({
+                                type: "app-start",
+                            })
+                        }
+
+                        if (!accumulatedText) {
+                            accumulatedText = "I've created an app for you:"
+                            setMessages((prev) => {
+                                const newArr = [...prev]
+                                if (
+                                    newArr.length > 0 &&
+                                    newArr[newArr.length - 1].role === "model"
+                                ) {
+                                    newArr[newArr.length - 1] = {
+                                        ...newArr[newArr.length - 1],
+                                        text: accumulatedText,
+                                        functionCall: accumulatedFunctionCall,
+                                        functionResponse: {
+                                            name: "create_app",
+                                            response: {
+                                                content:
+                                                    "App created successfully.",
+                                            },
+                                        },
+                                    }
+                                }
+                                return newArr
+                            })
+                        }
+                    } else if (accumulatedFunctionCall.name === "update_doc") {
                         const args = accumulatedFunctionCall.args as any
                         const newContent = args.content || ""
                         setDocContent(newContent)
@@ -14932,7 +16247,7 @@ Do not include markdown formatting or explanations.`
                     return
                 }
 
-                const isToolOpen = isWhiteboardOpen || isDocOpen
+                const isToolOpen = isWhiteboardOpen || isDocOpen || isAppOpen || isAppOpen
                 const isSidebarMode = !isMobileLayout && isToolOpen
                 let effectiveIsMobile = isMobileLayout
 
@@ -14953,6 +16268,7 @@ Do not include markdown formatting or explanations.`
                     remoteScreenStream,
                     isWhiteboardOpen,
                     isDocOpen,
+                    isAppOpen,
                     sharedScreenSize
                 )
 
@@ -15058,7 +16374,7 @@ Do not include markdown formatting or explanations.`
             let containerWidth =
                 containerRef.current?.clientWidth || window.innerWidth
 
-            const isToolOpen = isWhiteboardOpen || isDocOpen
+            const isToolOpen = isWhiteboardOpen || isDocOpen || isAppOpen
             const isSidebarMode = !isMobileLayout && isToolOpen
             let effectiveIsMobile = isMobileLayout
 
@@ -15079,6 +16395,7 @@ Do not include markdown formatting or explanations.`
                 remoteScreenStream,
                 isWhiteboardOpen,
                 isDocOpen,
+                isAppOpen,
                 sharedScreenSize
             )
 
@@ -15086,7 +16403,8 @@ Do not include markdown formatting or explanations.`
                 isScreenSharing ||
                 !!remoteScreenStream ||
                 isWhiteboardOpen ||
-                isDocOpen
+                isDocOpen ||
+                isAppOpen
             const effectiveMinHeight = isOverlayActive
                 ? MIN_CHAT_HEIGHT
                 : minHeight
@@ -15128,6 +16446,7 @@ Do not include markdown formatting or explanations.`
             remoteScreenStream,
             isWhiteboardOpen,
             isDocOpen,
+            isAppOpen,
             sharedScreenSize
         )
     }, [
@@ -15254,7 +16573,7 @@ Do not include markdown formatting or explanations.`
     ])
 
     // Sidebar Logic Definition (Hoist for layout calc)
-    const isToolOpen = isWhiteboardOpen || isDocOpen
+    const isToolOpen = isWhiteboardOpen || isDocOpen || isAppOpen
     const isSidebarMode = !isMobileLayout && isToolOpen
     const isMobileToolMode = isMobileLayout && isToolOpen
 
@@ -15652,6 +16971,7 @@ Do not include markdown formatting or explanations.`
                                 <div
                                     key={chat.id}
                                     onClick={() => {
+                                        saveChatHistory()
                                         setCurrentChatId(chat.id)
                                         setMessages(chat.messages)
                                         setDocContent(chat.notes || "")
@@ -15667,6 +16987,19 @@ Do not include markdown formatting or explanations.`
                                             } catch (e) {
                                                 console.error(e)
                                             }
+                                        }
+                                        // Restore app state
+                                        if (chat.app) {
+                                            setAppCode(chat.app.code || "")
+                                            // If code exists and is valid HTML, auto-open in player mode
+                                            if (chat.app.code && chat.app.code.trim().length > 0) {
+                                                setAppMode("player")
+                                            } else {
+                                                setAppMode(chat.app.mode || "editor")
+                                            }
+                                        } else {
+                                            setAppCode("")
+                                            setAppMode("editor")
                                         }
                                         setIsSidebarOpen(false)
                                     }}
@@ -16109,10 +17442,10 @@ Do not include markdown formatting or explanations.`
                         }}
                     >
                         <div style={{ fontWeight: 600, fontSize: 16 }}>
-                            {isDocOpen ? "Notes" : "Whiteboard"}
+                            {isDocOpen ? "Docs" : isWhiteboardOpen ? "Whiteboard" : isAppOpen ? "App" : ""}
                         </div>
                         <button
-                            onClick={isDocOpen ? toggleDoc : toggleWhiteboard}
+                            onClick={isDocOpen ? toggleDoc : isWhiteboardOpen ? toggleWhiteboard : isAppOpen ? toggleApp : undefined}
                             style={{
                                 background: "rgba(0,0,0,0.05)",
                                 border: "none",
@@ -16139,6 +17472,45 @@ Do not include markdown formatting or explanations.`
                         overflow: "hidden",
                     }}
                 >
+                    {isAppOpen && !isDocOpen && !isWhiteboardOpen ? (
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                zIndex: 10,
+                            }}
+                        >
+                            <MiniIDE
+                                code={appCode}
+                                onChange={handleAppChange}
+                                mode={appMode}
+                                onModeChange={handleAppModeChange}
+                                onClose={toggleApp}
+                                isResizing={isResizing}
+                                onDownload={() => {
+                                    const blob = new Blob([appCode], {
+                                        type: "text/html",
+                                    })
+                                    const url = URL.createObjectURL(blob)
+                                    const a = document.createElement("a")
+                                    a.href = url
+                                    a.download = "mini-app.html"
+                                    a.click()
+                                    URL.revokeObjectURL(url)
+                                }}
+                                isMobileLayout={isMobileLayout}
+                                themeColors={chatThemeColors}
+                                remoteCursors={remoteCursors}
+                                onCursorMove={handleAppPointerMove}
+                                onAppInteraction={handleAppInteraction}
+                                remoteAppEvent={remoteAppEvent}
+                                onAppMutation={handleAppMutation}
+                                remoteAppMutation={remoteAppMutation}
+                                amIHost={amIHost}
+                            />
+                        </div>
+                    ) : null}
+
                     {isDocOpen ? (
                         <div
                             style={{
@@ -16162,7 +17534,8 @@ Do not include markdown formatting or explanations.`
                     ) : null}
 
                     {(isWhiteboardOpen || hasWhiteboardStarted) &&
-                        !isDocOpen && (
+                        !isDocOpen &&
+                        !isAppOpen && (
                             <div
                                 ref={whiteboardContainerRef}
                                 onPointerMove={handleWhiteboardPointerMove}
@@ -16440,7 +17813,9 @@ Do not include markdown formatting or explanations.`
                                 isLoading
                                     ? "Thinking..."
                                     : isDocOpen
-                                      ? "Edit notes"
+                                      ? "Edit docs"
+                                      : isAppOpen
+                                      ? "Edit app"
                                       : "Edit whiteboard"
                             }
                             showEndCall={status !== "idle"}
@@ -16455,6 +17830,8 @@ Do not include markdown formatting or explanations.`
                             toggleWhiteboard={toggleWhiteboard}
                             isDocOpen={isDocOpen}
                             toggleDoc={toggleDoc}
+                            isAppOpen={isAppOpen}
+                            toggleApp={toggleApp}
                             isConnected={status === "connected" && !isLiveMode}
                             status={status}
                             isMobileLayout={isMobileLayout}
@@ -16477,6 +17854,7 @@ Do not include markdown formatting or explanations.`
         // --- Calculate Last Tool Calls ---
         let lastDocCallIdx = -1
         let lastWhiteboardCallIdx = -1
+        let lastAppCallIdx = -1
 
         messages.forEach((msg, idx) => {
             if (msg.functionCall) {
@@ -16485,6 +17863,9 @@ Do not include markdown formatting or explanations.`
                 }
                 if (msg.functionCall.name === "update_whiteboard") {
                     lastWhiteboardCallIdx = idx
+                }
+                if (msg.functionCall.name === "create_app") {
+                    lastAppCallIdx = idx
                 }
             }
         })
@@ -16575,14 +17956,17 @@ Do not include markdown formatting or explanations.`
                                     showWhiteboardButton={
                                         idx === lastWhiteboardCallIdx
                                     }
+                                    showAppButton={idx === lastAppCallIdx}
                                     onToggleDoc={() =>
                                         setIsDocOpen((prev) => !prev)
                                     }
                                     onToggleWhiteboard={() =>
                                         setIsWhiteboardOpen((prev) => !prev)
                                     }
+                                    onToggleApp={() => toggleApp && toggleApp()}
                                     isDocOpen={isDocOpen}
                                     isWhiteboardOpen={isWhiteboardOpen}
+                                    isAppOpen={isAppOpen}
                                 />
                                 {shouldShowAd && (
                                     <AdCarousel
@@ -16675,7 +18059,8 @@ Do not include markdown formatting or explanations.`
                         setShowAddPeopleOverlay={setShowAddPeopleOverlay}
                         hideGradient={
                             aiGeneratedSuggestions.length > 0 ||
-                            ((isDocOpen || isWhiteboardOpen) && isMobileLayout)
+                            ((isDocOpen || isWhiteboardOpen || isAppOpen) &&
+                                isMobileLayout)
                         }
                         value={inputText}
                         onChange={(e) => {
@@ -16730,6 +18115,8 @@ Do not include markdown formatting or explanations.`
                         toggleWhiteboard={toggleWhiteboard}
                         isDocOpen={isDocOpen}
                         toggleDoc={toggleDoc}
+                        isAppOpen={isAppOpen}
+                        toggleApp={toggleApp}
                         isConnected={status === "connected" && !isLiveMode}
                         status={status}
                         isMobileLayout={isMobileLayout}
@@ -16921,6 +18308,7 @@ Do not include markdown formatting or explanations.`
             remoteScreenStream,
             isWhiteboardOpen,
             isDocOpen,
+            isAppOpen,
             sharedScreenSize
         )
 
@@ -16955,7 +18343,8 @@ Do not include markdown formatting or explanations.`
             isScreenSharing ||
             !!remoteScreenStream ||
             isWhiteboardOpen ||
-            isDocOpen
+            isDocOpen ||
+            isAppOpen
         const targetRatio =
             isMultiParty || (isContentOpen && isMultiParty) ? 1.0 : 1.55
 
@@ -17059,7 +18448,7 @@ Do not include markdown formatting or explanations.`
                     justifyContent: "center",
                     ...(isScreenSharing ||
                     !!remoteScreenStream ||
-                    ((isWhiteboardOpen || isDocOpen) && !isSidebar)
+                    ((isWhiteboardOpen || isDocOpen || isAppOpen) && !isSidebar)
                         ? {
                               // If content is open, tiles are small strip
                               height:
@@ -17407,6 +18796,13 @@ Do not include markdown formatting or explanations.`
     // 2. Mobile Background Layer
     // 3. Desktop Sidebar (400px Right Column) when Tool is Open
     const renderStandardLayout = (isSidebarContext: boolean) => {
+        const isContentActive =
+            isScreenSharing ||
+            !!remoteScreenStream ||
+            isWhiteboardOpen ||
+            isDocOpen ||
+            isAppOpen
+
         // In sidebar context, we force the container to act like a mobile container
         // But we rely on the parent container (400px width) to constrain it.
         // The renderTilesSection and renderChatSection helpers already accept isSidebarContext to adjust their internal logic.
@@ -17429,11 +18825,7 @@ Do not include markdown formatting or explanations.`
                 }}
             >
                 {/* 1. Tiles & Main Content Area */}
-                {(isScreenSharing ||
-                    !!remoteScreenStream ||
-                    isWhiteboardOpen ||
-                    isDocOpen ||
-                    !isBanned) && (
+                {(isContentActive || !isBanned) && (
                     <div
                         data-layer="tiles-main-content-area"
                         className="TilesMainContentArea"
@@ -17444,10 +18836,7 @@ Do not include markdown formatting or explanations.`
                             // Sidebar context: Always column (vertical stack). Standard context: Adaptive.
                             flexDirection: isSidebarContext
                                 ? "column"
-                                : isScreenSharing ||
-                                    !!remoteScreenStream ||
-                                    isWhiteboardOpen ||
-                                    isDocOpen
+                                : isContentActive
                                   ? "column"
                                   : shouldUseHorizontalLayout
                                     ? "row"
@@ -17459,20 +18848,14 @@ Do not include markdown formatting or explanations.`
                             paddingBottom: 0,
                             alignItems: isSidebarContext
                                 ? "center"
-                                : isScreenSharing ||
-                                    !!remoteScreenStream ||
-                                    isWhiteboardOpen ||
-                                    isDocOpen
+                                : isContentActive
                                   ? "center"
                                   : !isMobileLayout
                                     ? "center"
                                     : "center",
                             justifyContent: isSidebarContext
                                 ? "flex-start"
-                                : isScreenSharing ||
-                                    !!remoteScreenStream ||
-                                    isWhiteboardOpen ||
-                                    isDocOpen
+                                : isContentActive
                                   ? "flex-start"
                                   : "center",
                             boxSizing: "border-box",
@@ -17507,11 +18890,7 @@ Do not include markdown formatting or explanations.`
                 )}
 
                 {/* 2. Drag Handle (Present in both Standard and Sidebar) */}
-                {(!isBanned ||
-                    isScreenSharing ||
-                    !!remoteScreenStream ||
-                    isWhiteboardOpen ||
-                    isDocOpen) && (
+                {(!isBanned || isContentActive) && (
                     <motion.div
                         data-layer="drag-handle-container"
                         className="DragHandleContainer"
@@ -17573,13 +18952,7 @@ Do not include markdown formatting or explanations.`
                     style={{
                         width: "100%",
                         height:
-                            isBanned &&
-                            !(
-                                isScreenSharing ||
-                                !!remoteScreenStream ||
-                                isWhiteboardOpen ||
-                                isDocOpen
-                            )
+                            isBanned && !isContentActive
                                 ? "100%"
                                 : "auto",
                         background: "transparent",
@@ -17593,13 +18966,7 @@ Do not include markdown formatting or explanations.`
                         initial={false}
                         animate={{
                             height:
-                                isBanned &&
-                                !(
-                                    isScreenSharing ||
-                                    !!remoteScreenStream ||
-                                    isWhiteboardOpen ||
-                                    isDocOpen
-                                )
+                                isBanned && !isContentActive
                                     ? "100%"
                                     : chatHeight,
                         }}
@@ -17968,6 +19335,19 @@ Do not include markdown formatting or explanations.`
                                                     } catch (e) {
                                                         console.error(e)
                                                     }
+                                                }
+                                                // Restore app state
+                                                if (chat.app) {
+                                                    setAppCode(chat.app.code || "")
+                                                    // If code exists and is valid HTML, auto-open in player mode
+                                                    if (chat.app.code && chat.app.code.trim().length > 0) {
+                                                        setAppMode("player")
+                                                    } else {
+                                                        setAppMode(chat.app.mode || "editor")
+                                                    }
+                                                } else {
+                                                    setAppCode("")
+                                                    setAppMode("editor")
                                                 }
                                                 if (isMobileLayout)
                                                     setIsSidebarOpen(false)
@@ -18918,11 +20298,13 @@ Do not include markdown formatting or explanations.`
                     initial={false}
                     animate={{
                         width:
-                            !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                            !isMobileLayout &&
+                            (isDocOpen || isWhiteboardOpen || isAppOpen)
                                 ? chatWidth
                                 : "100%",
                         flexGrow:
-                            !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                            !isMobileLayout &&
+                            (isDocOpen || isWhiteboardOpen || isAppOpen)
                                 ? 0
                                 : 1,
                     }}
@@ -18938,12 +20320,60 @@ Do not include markdown formatting or explanations.`
                     }}
                 >
                     {renderStandardLayout(
-                        !isMobileLayout && (isDocOpen || isWhiteboardOpen)
+                        !isMobileLayout &&
+                        (isDocOpen || isWhiteboardOpen || isAppOpen)
+                    )}
+
+                    {/* New Chat Button (Top Right of RightContentPanel) */}
+                    {messages.length > 0 && (
+                        <div
+                            data-svg-wrapper
+                            data-layer="new chat"
+                            style={{
+                                right: 8,
+                                top: 8,
+                                position: "absolute",
+                                zIndex: 100,
+                                cursor: "pointer",
+                                background: isNewChatBtnHovered
+                                    ? "rgba(255, 255, 255, 0.06)"
+                                    : "transparent",
+                                borderRadius: "50%",
+                                width: 36,
+                                height: 36,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                            onMouseEnter={() => setIsNewChatBtnHovered(true)}
+                            onMouseLeave={() => setIsNewChatBtnHovered(false)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleClearMessages()
+                            }}
+                        >
+                            <svg
+                                width="36"
+                                height="36"
+                                viewBox="0 0 36 36"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M24.9998 18.0001C24.9998 21.1823 24.9998 22.773 23.9747 23.7615C22.9496 24.75 21.2992 24.75 17.9999 24.75C14.6998 24.75 13.0502 24.75 12.0251 23.7615C11 22.773 11 21.1816 11 18.0001C11 14.8179 11 13.2272 12.0251 12.2387C13.0502 11.2502 14.7006 11.2502 17.9999 11.2502M16.0811 17.3626C15.8157 17.619 15.6666 17.9664 15.6666 18.3286V20.2501H17.6717C18.0473 20.2501 18.4082 20.1061 18.6742 19.8496L24.5852 14.1467C24.7168 14.0198 24.8213 13.8691 24.8925 13.7033C24.9637 13.5375 25.0004 13.3598 25.0004 13.1803C25.0004 13.0008 24.9637 12.8231 24.8925 12.6573C24.8213 12.4915 24.7168 12.3409 24.5852 12.214L24.0011 11.6507C23.8695 11.5237 23.7132 11.4229 23.5412 11.3541C23.3692 11.2854 23.1848 11.25 22.9986 11.25C22.8124 11.25 22.628 11.2854 22.4559 11.3541C22.2839 11.4229 22.1276 11.5237 21.996 11.6507L16.0811 17.3626Z"
+                                    stroke="white"
+                                    strokeOpacity="0.95"
+                                    strokeWidth="1.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
+                        </div>
                     )}
                 </motion.div>
 
                 {/* Resize Handle */}
-                {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
+                {!isMobileLayout && (isDocOpen || isWhiteboardOpen || isAppOpen) && (
                     <div
                         onPointerDown={(e) =>
                             handlePointerDown(e, "horizontal-sidebar")
@@ -18961,7 +20391,7 @@ Do not include markdown formatting or explanations.`
 
                 {/* Left: Tool (Desktop only) */}
                 <AnimatePresence>
-                    {!isMobileLayout && (isDocOpen || isWhiteboardOpen) && (
+                    {!isMobileLayout && (isDocOpen || isWhiteboardOpen || isAppOpen) && (
                         <motion.div
                             data-layer="desktop-tool-panel"
                             className="DesktopToolPanel"
