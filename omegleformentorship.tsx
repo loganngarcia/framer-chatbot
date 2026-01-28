@@ -480,6 +480,23 @@ function removeUtmParams(url: string): string {
     return newQuery ? `${baseUrl}?${newQuery}` : baseUrl
 }
 
+function cleanDisplayUrl(url: string): string {
+    // 1. Remove specific UTM params like ?utm_source=curastem.org entirely from display
+    //    (Regex matches ? or & followed by utm_source=curastem.org, and optionally more params)
+    let clean = url.replace(/([?&])utm_source=curastem\.org(&|$)/gi, "$1")
+    
+    // Cleanup if we left a dangling '?' or '&' at the end
+    if (clean.endsWith("?") || clean.endsWith("&")) {
+        clean = clean.slice(0, -1)
+    }
+
+    // Also remove generic UTM params for cleaner display
+    // (Optional: strict mode to only remove curastem if requested, but generally good for UX)
+    // clean = removeUtmParams(clean)
+
+    return clean
+}
+
 const applyInlineFormatting = (
     textSegment: string,
     keyPrefix: string,
@@ -580,7 +597,7 @@ const applyInlineFormatting = (
                     style={linkStyle}
                 >
                     {applyInlineFormatting(
-                        linkText,
+                        cleanDisplayUrl(linkText),
                         `${keyPrefix}-${match.index}-a-inner`,
                         linkStyle
                     )}
@@ -596,7 +613,7 @@ const applyInlineFormatting = (
                     style={linkStyle}
                 >
                     {applyInlineFormatting(
-                        htmlLinkText,
+                        cleanDisplayUrl(htmlLinkText),
                         `${keyPrefix}-${match.index}-html-a-inner`,
                         linkStyle
                     )}
@@ -656,7 +673,7 @@ const applyInlineFormatting = (
                     rel="noopener noreferrer"
                     style={linkStyle}
                 >
-                    {url}
+                    {cleanDisplayUrl(url)}
                 </a>
             )
             if (tail) {
@@ -8484,7 +8501,12 @@ const highlightSyntax = (code: string) => {
     return tokens
 }
 
-const MiniIDE = React.memo(function MiniIDE({
+export interface MiniIDEHandle {
+    applyMutation: (mutation: any) => void;
+    replayInteraction: (interaction: any) => void;
+}
+
+const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(function MiniIDE({
     code,
     onChange,
     mode,
@@ -8498,12 +8520,36 @@ const MiniIDE = React.memo(function MiniIDE({
     onAppInteraction,
     remoteAppEvent,
     onAppMutation,
-    remoteAppMutation,
+    remoteAppMutation, // Keep for backward compat or remove
     amIHost,
     isResizing,
-}: MiniIDEProps) {
-    const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+}, ref) {
+    const iframeRef = React.useRef<HTMLIFrameElement>(null)
+    
+    // Expose handle for direct mutations (bypassing React state batching)
+    React.useImperativeHandle(ref, () => ({
+        applyMutation: (mutation: any) => {
+             if (iframeRef.current && iframeRef.current.contentWindow) {
+                 iframeRef.current.contentWindow.postMessage({
+                     type: 'apply-mutation',
+                     mutation: mutation
+                 }, '*')
+            }
+        },
+        replayInteraction: (interaction: any) => {
+             if (iframeRef.current && iframeRef.current.contentWindow) {
+                 iframeRef.current.contentWindow.postMessage({
+                     ...interaction,
+                     type: 'replay-interaction'
+                 }, '*')
+            }
+        }
+    }));
+
     const containerRef = React.useRef<HTMLDivElement>(null)
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+    const [isDownloadHovered, setIsDownloadHovered] = React.useState(false)
+    const [isCloseHovered, setIsCloseHovered] = React.useState(false)
 
     // Line numbers generator
     const lineNumbers = React.useMemo(() => {
@@ -8556,7 +8602,7 @@ const MiniIDE = React.memo(function MiniIDE({
         overflow: "hidden", // Hide scrollbars on textarea, let parent scroll
     }
 
-    const iframeRef = React.useRef<HTMLIFrameElement>(null)
+    // iframeRef is defined at the top of the component for useImperativeHandle
 
     // Listen for cursor updates from iframe
     React.useEffect(() => {
@@ -8569,6 +8615,7 @@ const MiniIDE = React.memo(function MiniIDE({
                         onCursorMove(e.data.x, e.data.y)
                     }
                 } else if (e.data.type === 'iframe-interaction') {
+                    if (debugMode) console.log('[MiniIDE] Received iframe-interaction:', e.data);
                     if (onAppInteraction) {
                         onAppInteraction(e.data)
                     }
@@ -8588,8 +8635,8 @@ const MiniIDE = React.memo(function MiniIDE({
     React.useEffect(() => {
         if (remoteAppEvent && iframeRef.current && iframeRef.current.contentWindow) {
              iframeRef.current.contentWindow.postMessage({
-                 type: 'replay-interaction',
-                 ...remoteAppEvent
+                 ...remoteAppEvent,
+                 type: 'replay-interaction'
              }, '*')
         }
     }, [remoteAppEvent])
@@ -8621,7 +8668,7 @@ const MiniIDE = React.memo(function MiniIDE({
                 paddingTop: 0,
                 background: "#141414",
                 overflow: "hidden",
-                borderRadius: isMobileLayout ? 0 : 28,
+                borderRadius: isMobileLayout ? 0 : "28px 0 0 28px",
                 flexDirection: "column",
                 justifyContent: "flex-start",
                 alignItems: "stretch",
@@ -8762,14 +8809,15 @@ const MiniIDE = React.memo(function MiniIDE({
                 className="Toolbar"
                 style={{
                     position: "absolute",
-                    top: 16,
+                    top: 12,
+                    left: 12,
+                    right: 12,
                     zIndex: 30,
                     pointerEvents: "none",
-                    width: '100%',
                     height: 40,
                     maxWidth: 1800,
-                    paddingLeft: 16,
-                    paddingRight: 16,
+                    paddingLeft: 0,
+                    paddingRight: 0,
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
                     display: 'inline-flex'
@@ -8781,10 +8829,10 @@ const MiniIDE = React.memo(function MiniIDE({
                     style={{
                         width: 40,
                         height: 40,
-                        paddingLeft: 6,
+                        paddingLeft: 4,
                         paddingRight: 4,
-                        background: '#333333',
-                        borderRadius: 31.11,
+                        background: themeColors.surface,
+                        borderRadius: 28,
                         justifyContent: 'center',
                         alignItems: 'center',
                         display: 'flex',
@@ -8801,7 +8849,7 @@ const MiniIDE = React.memo(function MiniIDE({
                             onClick={() => onModeChange("editor")}
                             style={{ cursor: "pointer" }}
                         >
-                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M25.093 15.974L25.323 16.204C27.112 17.994 28.007 18.888 28.007 20C28.007 21.112 27.112 22.007 25.323 23.796L25.093 24.026M21.879 13L18.128 27M14.913 15.974L14.683 16.204C12.895 17.994 12 18.888 12 20C12 21.112 12.895 22.007 14.685 23.796L14.915 24.026" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
@@ -8818,52 +8866,21 @@ const MiniIDE = React.memo(function MiniIDE({
                                 opacity: isPlayable ? 1 : 0.5
                             }}
                         >
-                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M25.1692 20C25.1692 20.7614 18.9674 24.5629 16.2377 25.9728C15.4682 26.3702 14.9347 26.0432 14.903 25.1777C14.8118 22.6836 14.8146 17.3166 14.9054 14.8224C14.9369 13.957 15.4717 13.6195 16.2432 14.013C18.9845 15.4113 25.1692 19.236 25.1692 20Z" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
                     )}
                 </div>
-                <div
-                    data-layer="right toolbar"
-                    className="RightToolbar"
-                    style={{
-                        maxWidth: 808.89,
-                        paddingLeft: 4,
-                        paddingRight: 4,
-                        background: '#333333',
-                        borderRadius: 31.11,
-                        justifyContent: 'flex-start',
-                        alignItems: 'center',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignContent: 'center',
-                        pointerEvents: "auto"
-                    }}
-                >
-                    <div
-                        data-svg-wrapper
-                        data-layer="download button"
-                        className="DownloadButton"
-                        onClick={onDownload}
-                        style={{ cursor: "pointer" }}
-                    >
-                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M13.2891 23.1485V23.9839C13.2891 24.6512 13.5542 25.2912 14.026 25.763C14.4979 26.2349 15.1379 26.5 15.8052 26.5H24.1923C24.8596 26.5 25.4996 26.2349 25.9715 25.763C26.4433 25.2912 26.7084 24.6512 26.7084 23.9839V23.1452M19.9987 13.5V22.7258M19.9987 22.7258L22.9342 19.7903M19.9987 22.7258L17.0633 19.7903" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div
-                        data-svg-wrapper
-                        data-layer="close code editor button"
-                        className="CloseCodeEditorButton"
-                        onClick={onClose}
-                        style={{ cursor: "pointer" }}
-                    >
-                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M25.25 14.75L14.75 25.25M14.75 14.75L25.25 25.25" stroke="white" stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                </div>
+                <HeaderActions
+                    themeColors={themeColors}
+                    onDownloadClick={onDownload}
+                    onCloseClick={onClose}
+                    isDownloadHovered={isDownloadHovered}
+                    onDownloadHoverChange={setIsDownloadHovered}
+                    isCloseHovered={isCloseHovered}
+                    onCloseHoverChange={setIsCloseHovered}
+                />
             </div>
 
             {/* App Player (iframe) */}
@@ -8933,7 +8950,7 @@ const MiniIDE = React.memo(function MiniIDE({
                                     const observer = new MutationObserver((mutations) => {
                                         mutations.forEach((mutation) => {
                                             // DEBUG: Log mutation
-                                            console.log('[Host] Mutation observed:', mutation.type, mutation.target);
+                                            if (debugMode) console.log('[Host] Mutation observed:', mutation.type, mutation.target);
 
                                             // Filter out non-element nodes for simplicity if needed, 
                                             // but text nodes are important for characterData
@@ -8988,28 +9005,63 @@ const MiniIDE = React.memo(function MiniIDE({
                                     // Listen for replay events (from Client)
                                     window.addEventListener('message', (e) => {
                                         if (e.data && e.data.type === 'replay-interaction') {
-                                            const { kind, selector, value, checked, scrollTop, scrollLeft } = e.data;
-                                            const el = document.querySelector(selector);
+                                            const { kind, id, x, y, value, checked, scrollTop, scrollLeft } = e.data;
+                                            
+                                            //                                             // if (debugMode) console.log('[Host Script] Replaying:', kind, id, x, y);
+
+                                            // FIND ELEMENT: 1. ID, 2. Coordinates (Click), 3. Selector (Legacy/Scroll)
+                                            let el = null;
+                                            
+                                            // 1. Try ID (Best match)
+                                            if (id) el = document.getElementById(id);
+                                            
+                                            // 2. Fallback to Coordinates (Best for clicks without ID)
+                                            if (!el && kind === 'click' && x !== undefined && y !== undefined) {
+                                                const clientX = x * window.innerWidth;
+                                                const clientY = y * window.innerHeight;
+                                                el = document.elementFromPoint(clientX, clientY);
+                                            }
+                                            
+                                            // 3. Fallback to Selector (Legacy or Scroll/Input without ID)
+                                            if (!el && e.data.selector) {
+                                                if (e.data.selector === 'html') el = document.documentElement;
+                                                else if (e.data.selector === 'body') el = document.body;
+                                                else el = document.querySelector(e.data.selector);
+                                            }
+                                            
                                             if (!el) return;
 
                                             if (kind === 'click') {
-                                                const opts = {
-                                                    view: window,
-                                                    bubbles: true,
-                                                    cancelable: true,
-                                                    clientX: e.data.x * window.innerWidth,
-                                                    clientY: e.data.y * window.innerHeight
-                                                };
-                                                el.dispatchEvent(new MouseEvent('click', opts));
-                                                el.dispatchEvent(new MouseEvent('mousedown', opts));
-                                                el.dispatchEvent(new MouseEvent('mouseup', opts));
+                                                // if (debugMode) console.log('[Host Script] Clicking element:', el);
+                                                // Prefer native .click() to trigger inline handlers reliably
+                                                if (typeof el.click === 'function') {
+                                                    el.click();
+                                                } else {
+                                                    const clientX = (x || 0.5) * window.innerWidth;
+                                                    const clientY = (y || 0.5) * window.innerHeight;
+                                                    const opts = {
+                                                        view: window,
+                                                        bubbles: true,
+                                                        cancelable: true,
+                                                        clientX: clientX,
+                                                        clientY: clientY
+                                                    };
+                                                    el.dispatchEvent(new MouseEvent('click', opts));
+                                                    el.dispatchEvent(new MouseEvent('mousedown', opts));
+                                                    el.dispatchEvent(new MouseEvent('mouseup', opts));
+                                                }
+                                                
+                                                // Focus inputs
+                                                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                                                    el.focus();
+                                                }
                                             } else if (kind === 'input') {
                                                 el.value = value;
                                                 if (checked !== undefined) el.checked = checked;
                                                 el.dispatchEvent(new Event('input', { bubbles: true }));
                                                 el.dispatchEvent(new Event('change', { bubbles: true }));
                                             } else if (kind === 'scroll') {
-                                                if (selector === 'html' || selector === 'body') {
+                                                if (e.data.selector === 'html' || e.data.selector === 'body') {
                                                     window.scrollTo(scrollLeft, scrollTop);
                                                 } else {
                                                     el.scrollTop = scrollTop;
@@ -9054,12 +9106,31 @@ const MiniIDE = React.memo(function MiniIDE({
 
                                     document.addEventListener('click', (e) => {
                                         if (!e.isTrusted) return;
-                                        e.preventDefault(); // Prevent local action
-                                        e.stopPropagation();
+                                        // Stop local execution of inline handlers on Client to prevent ReferenceErrors
+                                        // But allow default behavior for inputs/links if needed, though usually we want to mirror Host.
+                                        // Actually, if we stop propagation here, inputs might not focus.
+                                        // So we only stop if it's NOT an input-like element.
+                                        const tag = e.target.tagName.toLowerCase();
+                                        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+                                            // This prevents the element's onclick from firing (which causes ReferenceError)
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.stopImmediatePropagation();
+                                        }
+                                        
                                         const selector = getSelector(e.target);
+                                        
+                                        // Get ID (Check target or closest parent with ID)
+                                        let targetId = e.target.id;
+                                        if (!targetId && e.target.parentElement) {
+                                            const closest = e.target.closest('[id]');
+                                            if (closest) targetId = closest.id;
+                                        }
+
                                         window.parent.postMessage({ 
                                             type: 'iframe-interaction', 
                                             kind: 'click',
+                                            id: targetId,
                                             selector: selector,
                                             x: e.clientX / window.innerWidth,
                                             y: e.clientY / window.innerHeight
@@ -9068,11 +9139,11 @@ const MiniIDE = React.memo(function MiniIDE({
 
                                     document.addEventListener('input', (e) => {
                                         if (!e.isTrusted) return;
-                                        e.preventDefault();
                                         const selector = getSelector(e.target);
                                         window.parent.postMessage({ 
                                             type: 'iframe-interaction', 
                                             kind: 'input',
+                                            id: e.target.id,
                                             selector: selector,
                                             value: e.target.value,
                                             checked: e.target.checked
@@ -9101,7 +9172,7 @@ const MiniIDE = React.memo(function MiniIDE({
                                     window.addEventListener('message', (e) => {
                                         if (e.data && e.data.type === 'apply-mutation') {
                                             const { type, selector, value, attributeName } = e.data.mutation;
-                                            console.log('[Client] Applying mutation:', type, selector);
+                                            if (debugMode) console.log('[Client] Applying mutation:', type, selector);
                                             
                                             // Special case for HTML/Body which might not be queryable in some contexts or need special handling
                                             let el;
@@ -9115,7 +9186,7 @@ const MiniIDE = React.memo(function MiniIDE({
                                                 setTimeout(() => {
                                                     const retryEl = document.querySelector(selector);
                                                     if (retryEl) {
-                                                        console.log('[Client] Found element on retry:', selector);
+                                                        if (debugMode) console.log('[Client] Found element on retry:', selector);
                                                         applyMutation(retryEl, type, value, attributeName);
                                                     }
                                                 }, 50);
@@ -9130,10 +9201,16 @@ const MiniIDE = React.memo(function MiniIDE({
                                         if (type === 'characterData') {
                                             el.textContent = value;
                                         } else if (type === 'attributes') {
+                                            // Strip event handlers to prevent ReferenceErrors on Client
+                                            if (attributeName.startsWith('on')) return;
+                                            
                                             if (value === null) el.removeAttribute(attributeName);
                                             else el.setAttribute(attributeName, value);
                                         } else if (type === 'childList') {
-                                            el.innerHTML = value;
+                                            // Strip event handlers from innerHTML to prevent ReferenceErrors
+                                            // This regex removes onEvent="..." attributes
+                                            const safeValue = value.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+                                            el.innerHTML = safeValue;
                                         }
                                     }
                                 </script>`
@@ -9146,8 +9223,9 @@ const MiniIDE = React.memo(function MiniIDE({
                                 } else {
                                     // Client loads Sanitized Code (No JS) + Client Script
                                     // We strip scripts to prevent local execution logic
+                                    // And strip inline handlers more robustly
                                     const sanitized = code.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "")
-                                        .replace(/\bon\w+="[^"]*"/gim, ""); // Remove inline handlers
+                                        .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, ""); // Remove inline handlers
                                     
                                     // If code has no body/head, wrap it
                                     let finalCode = sanitized;
@@ -9185,7 +9263,7 @@ const MiniIDE = React.memo(function MiniIDE({
                 ))}
         </div>
     )
-})
+}))
 
 export default function OmegleMentorshipUI(props: Props) {
     const {
@@ -9202,6 +9280,9 @@ export default function OmegleMentorshipUI(props: Props) {
     const googleAdsClient = "ca-pub-9747624035157768"
     const googleAdsSlot = "9605545126"
     const googleAdsLayoutKey = "-ic+5+1+2-3"
+    
+    // REF for Direct Mutation Access (Fixes P2P App Sync Lag)
+    const miniIDERef = React.useRef<MiniIDEHandle>(null)
 
     /**
      * User's session role.
@@ -9418,6 +9499,23 @@ Ask Curastem to build anything you can imagine`);
     const pendingWhiteboardUpdates = React.useRef<any[]>([])
     React.useEffect(() => {
         editorRef.current = editor
+    }, [editor])
+
+    const whiteboardSaveTimeout = React.useRef<any>(null)
+    React.useEffect(() => {
+        if (!editor) return
+
+        const cleanup = editor.store.listen(() => {
+             if (whiteboardSaveTimeout.current) clearTimeout(whiteboardSaveTimeout.current)
+             whiteboardSaveTimeout.current = setTimeout(() => {
+                 if (saveChatHistoryRef.current) saveChatHistoryRef.current()
+             }, 2000)
+        })
+        
+        return () => {
+            cleanup()
+            if (whiteboardSaveTimeout.current) clearTimeout(whiteboardSaveTimeout.current)
+        }
     }, [editor])
 
     // --- LOCATION & SYSTEM PROMPT ENHANCEMENT ---
@@ -10774,13 +10872,8 @@ Do not include markdown formatting or explanations.`
     // Helper for standardized console logging
     // Use this wrapper instead of console.log to ensure output appears in the UI debug console
     const log = (msg: string) => {
-        console.log(`[Curastem Mentorship] ${msg}`)
-        if (debugMode) {
-            setLogs((prev) => [
-                ...prev,
-                `${new Date().toLocaleTimeString()} - ${msg}`,
-            ])
-        }
+        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
+        if (debugMode) console.log(`[Curastem Mentorship] ${msg}`)
     }
 
     // (Role state moved to top of component to fix scoping for system prompt)
@@ -11032,7 +11125,7 @@ Do not include markdown formatting or explanations.`
         }, 1000)
 
         return () => clearTimeout(timer)
-    }, [appCode, appMode, currentChatId])
+    }, [appCode, appMode, docContent, currentChatId])
 
     const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
         string[]
@@ -11350,10 +11443,47 @@ Do not include markdown formatting or explanations.`
         saveChatHistoryRef.current = saveChatHistory
     }, [saveChatHistory])
 
+    const loadedChatIdRef = React.useRef<string | null>(null)
+
     // --- PERSISTENCE: STUDENT / NO-ROLE DATA (24H) ---
     React.useEffect(() => {
         // Restore OTHER state if student OR if no role (initial state)
         if (role === "student" || role === null) {
+            // Prevent loop: if we already processed this chat ID, don't re-restore
+            // just because savedChats updated (e.g. auto-save).
+            if (loadedChatIdRef.current === currentChatId) return
+
+            // First try to restore from savedChats (Per-Chat Isolation)
+            if (savedChats.length > 0 && currentChatId) {
+                const chat = savedChats.find(c => c.id === currentChatId)
+                if (chat) {
+                    if (chat.notes) setDocContent(chat.notes)
+                    if (chat.app) {
+                        setAppCode(chat.app.code)
+                        setAppMode(chat.app.mode)
+                    }
+                    if (chat.whiteboard) {
+                        pendingSnapshotRef.current = chat.whiteboard
+                        if (editorRef.current) {
+                            try {
+                                editorRef.current.store.loadSnapshot(chat.whiteboard)
+                            } catch(e) {}
+                        }
+                    }
+                    // Mark as loaded so we don't loop or re-process
+                    loadedChatIdRef.current = currentChatId
+                    return 
+                } else {
+                    // Chat not found in savedChats (likely a New Chat).
+                    // We should NOT fall back to legacy storage (which mirrors previous chat).
+                    // Just mark as loaded and keep current (default) state.
+                    loadedChatIdRef.current = currentChatId
+                    return
+                }
+            }
+
+            // Only fall back to legacy localStorage if we have NO saved chats yet (e.g. very first load ever)
+            // or if savedChats hasn't loaded yet (length 0).
             const savedTime = localStorage.getItem("student_data_timestamp")
             if (savedTime) {
                 const timeDiff = Date.now() - parseInt(savedTime, 10)
@@ -11400,7 +11530,7 @@ Do not include markdown formatting or explanations.`
                 }
             }
         }
-    }, [role])
+    }, [role, savedChats, currentChatId])
 
     // Save student / no-role / volunteer-pre-connect data
     React.useEffect(() => {
@@ -12706,7 +12836,11 @@ Do not include markdown formatting or explanations.`
     }, [])
 
     const handleAppInteraction = React.useCallback((event: any) => {
-        if (dataConnectionsRef.current.size === 0) return
+        if (debugMode) console.log('[Host] handleAppInteraction received:', event);
+        if (dataConnectionsRef.current.size === 0) {
+             if (debugMode) console.log('[Host] No data connections to broadcast to.');
+             return;
+        }
         
         broadcastData({
             type: "app-interaction",
@@ -12926,16 +13060,27 @@ Do not include markdown formatting or explanations.`
             setAiGeneratedSuggestions([])
         }
 
-        setDocContent("") // Reset docs too? Usually yes for new chat.
-        setAppCode("")
+        setDocContent(DEFAULT_DOC_CONTENT)
+        setAppCode("Welcome to Apps\nAsk Curastem to build anything you can imagine")
         setAppMode("editor")
+
+        // Clear Whiteboard
+        if (editorRef.current) {
+            try {
+                editorRef.current.store.loadSnapshot({
+                    store: {},
+                    schema: editorRef.current.store.schema.serialize()
+                })
+            } catch (e) {
+                console.error("Failed to clear whiteboard", e)
+            }
+        }
+        pendingSnapshotRef.current = null
 
         // Clear persistence
         localStorage.removeItem("student_messages")
-        localStorage.removeItem("student_doc")
-        localStorage.removeItem("student_whiteboard")
-        localStorage.removeItem("student_app_code")
-        localStorage.removeItem("student_app_mode")
+        // We don't remove other keys to avoid messing with other tabs/legacy, 
+        // but since we rely on chat ID now, these global keys matter less.
 
         // Ensure new ID is saved
         if (typeof window !== "undefined") {
@@ -13200,7 +13345,16 @@ Do not include markdown formatting or explanations.`
         log(`🟢 [PeerJS] Initializing with ID: ${myId.current}`)
         // @ts-ignore
         const peer = new window.Peer(myId.current, {
-            config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
+            config: {
+                iceServers: [
+                    { urls: "stun:stun.l.google.com:19302" },
+                    { urls: "stun:stun1.l.google.com:19302" },
+                    { urls: "stun:stun2.l.google.com:19302" },
+                    { urls: "stun:stun3.l.google.com:19302" },
+                    { urls: "stun:stun4.l.google.com:19302" },
+                ],
+                iceCandidatePoolSize: 10,
+            },
         })
         peerInstance.current = peer
 
@@ -13347,6 +13501,37 @@ Do not include markdown formatting or explanations.`
 
         // Add to active calls map
         activeCalls.current.set(peerId, call)
+
+        // START OF NEW CODE: Connection State Monitoring
+        // We attach listeners to the underlying RTCPeerConnection to detect dropped connections (e.g. closed tabs)
+        // Access internal peer connection
+        const pc = call.peerConnection
+        if (pc) {
+            pc.oniceconnectionstatechange = () => {
+                const state = pc.iceConnectionState
+                log(`[ICE State] ${peerId}: ${state}`)
+
+                // 'disconnected' means a temporary network glitch or tab close.
+                // 'failed' means it gave up trying to reconnect.
+                if (state === "disconnected" || state === "failed") {
+                    // Give it 5 seconds to recover (e.g. switching WiFi->LTE)
+                    setTimeout(() => {
+                        // Check if still broken
+                        if (
+                            (pc.iceConnectionState === "disconnected" ||
+                                pc.iceConnectionState === "failed") &&
+                            activeCalls.current.has(peerId)
+                        ) {
+                            log(
+                                `💀 Peer ${peerId} connection lost (>5s). Force closing.`
+                            )
+                            call.close() // This triggers the standard .on("close") handler below
+                        }
+                    }, 5000)
+                }
+            }
+        }
+        // END OF NEW CODE
 
         // Add to pending peers (show black tile)
         setPendingPeerIds((prev) => {
@@ -13526,16 +13711,8 @@ Do not include markdown formatting or explanations.`
                 client.subscribe(privateTopic)
                 log(`🟡 [Passive MQTT] Subscribed to: ${privateTopic}`)
 
-                // Broadcast our presence periodically so others can find us
-                const passiveHeartbeat = setInterval(() => {
-                    if (!client.connected || statusRef.current !== "idle") {
-                        log(
-                            `🟡 [Passive MQTT] Stopping heartbeat - connected: ${client.connected}, status: ${statusRef.current}`
-                        )
-                        clearInterval(passiveHeartbeat)
-                        return
-                    }
-
+                // Define broadcast function for reuse
+                const broadcastPassive = () => {
                     const message = {
                         id: myId.current,
                         sessionId: sessionId.current, // Add Session ID
@@ -13544,11 +13721,25 @@ Do not include markdown formatting or explanations.`
                         isPassive: true,
                         timestamp: Date.now(),
                     }
-                    // log(`📡 [Passive MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
                     client.publish(privateTopic, JSON.stringify(message), {
                         retain: false,
                     })
-                }, 2000)
+                }
+
+                // Broadcast IMMEDIATELY
+                broadcastPassive()
+
+                // Broadcast our presence periodically so others can find us (Reduced to 1000ms)
+                const passiveHeartbeat = setInterval(() => {
+                    if (!client.connected || statusRef.current !== "idle") {
+                        log(
+                            `🟡 [Passive MQTT] Stopping heartbeat - connected: ${client.connected}, status: ${statusRef.current}`
+                        )
+                        clearInterval(passiveHeartbeat)
+                        return
+                    }
+                    broadcastPassive()
+                }, 1000)
             }
         })
 
@@ -13557,17 +13748,17 @@ Do not include markdown formatting or explanations.`
             try {
                 const data = JSON.parse(msg.toString())
 
-                // log(`[Passive] Received message: ${JSON.stringify(data)}`)
+                // if (debugMode) console.log(`[Passive] Received message: ${JSON.stringify(data)}`)
 
                 // Ignore self by Session ID (prevents echo from same tab)
                 if (data.sessionId && data.sessionId === sessionId.current) {
-                    // log(`[Passive] Ignoring own message (Session match)`)
+                    // if (debugMode) console.log(`[Passive] Ignoring own message (Session match)`)
                     return
                 }
 
                 // Check timestamp (allow 5 second window)
                 if (data.timestamp && Date.now() - data.timestamp > 5000) {
-                    // log(`[Passive] Message too old (${Date.now() - data.timestamp}ms)`)
+                        // if (debugMode) console.log(`[Passive] Message too old (${Date.now() - data.timestamp}ms)`)
                     return
                 }
 
@@ -13599,7 +13790,7 @@ Do not include markdown formatting or explanations.`
                         )
                     }
                 } else {
-                    // log(`[Passive] Not my room. Topic: ${topic}, My hash: ${currentHash}`)
+                    // if (debugMode) console.log(`[Passive] Not my room. Topic: ${topic}, My hash: ${currentHash}`)
                 }
             } catch (err) {
                 log(`[Passive] Error processing message: ${err}`)
@@ -13643,7 +13834,52 @@ Do not include markdown formatting or explanations.`
                 log(`Subscribed to find students`)
             }
 
-            // Periodic heartbeat to broadcast presence to other users
+            // Define broadcast function for reuse
+            const broadcastActive = () => {
+                const currentHash =
+                    typeof window !== "undefined" ? window.location.hash : ""
+                const isPrivateRoom = currentHash && currentHash.length > 1
+                const currentRole = roleRef.current
+
+                // 1. ALWAYS broadcast to private room (hash-based matching)
+                if (currentHash && currentHash.length > 1) {
+                    const privateTopic = `${TOPIC_LOBBY}/${currentHash.replace("#", "")}`
+                    const message = {
+                        id: myId.current,
+                        sessionId: sessionId.current,
+                        role: currentRole,
+                        hash: currentHash,
+                        timestamp: Date.now(),
+                    }
+                    client.publish(privateTopic, JSON.stringify(message), {
+                        retain: false,
+                    })
+                }
+
+                // 2. If Student role, ALSO broadcast to student matching database
+                if (
+                    statusRef.current !== "connected" &&
+                    currentRole === "student"
+                ) {
+                    const studentTopic = `${TOPIC_LOBBY}/students-waiting`
+                    client.publish(
+                        studentTopic,
+                        JSON.stringify({
+                            id: myId.current,
+                            sessionId: sessionId.current,
+                            role: "student",
+                            hash: currentHash,
+                            timestamp: Date.now(),
+                        }),
+                        { retain: false }
+                    )
+                }
+            }
+
+            // Broadcast IMMEDIATELY
+            broadcastActive()
+
+            // Periodic heartbeat to broadcast presence to other users (Reduced to 1000ms)
             const heartbeat = setInterval(() => {
                 const currentHash =
                     typeof window !== "undefined" ? window.location.hash : ""
@@ -13665,45 +13901,8 @@ Do not include markdown formatting or explanations.`
                     // If IN private room, CONTINUE broadcasting so new peers (3rd, 4th) can find us
                 }
 
-                const currentRole = roleRef.current
-
-                // 1. ALWAYS broadcast to private room (hash-based matching)
-                if (currentHash && currentHash.length > 1) {
-                    const privateTopic = `${TOPIC_LOBBY}/${currentHash.replace("#", "")}`
-                    const message = {
-                        id: myId.current,
-                        sessionId: sessionId.current,
-                        role: currentRole,
-                        hash: currentHash,
-                        timestamp: Date.now(),
-                    }
-                    // log(`📡 [Active MQTT] Broadcasting to ${privateTopic}: ${JSON.stringify(message)}`)
-                    client.publish(privateTopic, JSON.stringify(message), {
-                        retain: false,
-                    })
-                }
-
-                // 2. If Student role, ALSO broadcast to student matching database
-                // Only if NOT connected? Or keep broadcasting?
-                // For role-based 1-on-1, we usually stop.
-                if (
-                    statusRef.current !== "connected" &&
-                    currentRole === "student"
-                ) {
-                    const studentTopic = `${TOPIC_LOBBY}/students-waiting`
-                    client.publish(
-                        studentTopic,
-                        JSON.stringify({
-                            id: myId.current,
-                            sessionId: sessionId.current,
-                            role: "student",
-                            hash: currentHash,
-                            timestamp: Date.now(),
-                        }),
-                        { retain: false }
-                    )
-                }
-            }, 2000)
+                broadcastActive()
+            }, 1000)
         })
 
         client.on("message", (topic: string, msg: any) => {
@@ -13718,25 +13917,25 @@ Do not include markdown formatting or explanations.`
             const data = JSON.parse(msg.toString())
 
             if (data.id === myId.current) {
-                // log(`🔵 [Active MQTT] Ignoring own message (ID match)`)
+                // if (debugMode) console.log(`🔵 [Active MQTT] Ignoring own message (ID match)`)
                 return
             }
 
             // IGNORE SELF (Session Check)
             if (data.sessionId && data.sessionId === sessionId.current) {
-                // log(`🔵 [Active MQTT] Ignoring own message (Session match)`)
+                // if (debugMode) console.log(`🔵 [Active MQTT] Ignoring own message (Session match)`)
                 return
             }
 
             // Check timestamp to avoid stale peers (5 second window)
             // if (data.timestamp && Date.now() - data.timestamp > 5000) {
-            //    log(`🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`)
+            //    if (debugMode) console.log(`🔵 [Active MQTT] Message too old: ${Date.now() - data.timestamp}ms`)
             //    return
             // }
 
             // Check if we are already connected to this peer
             if (activeCalls.current.has(data.id)) {
-                // log(`🔵 [Active MQTT] Already connected to ${data.id}`)
+                // if (debugMode) console.log(`🔵 [Active MQTT] Already connected to ${data.id}`)
                 return
             }
 
@@ -14185,6 +14384,10 @@ Do not include markdown formatting or explanations.`
             } else if (data.type === "ai-suggestions") {
                 // Receive and display shared AI suggestions
                 setAiGeneratedSuggestions(data.payload)
+            } else if (data.type === "ai-loading-start") {
+                setIsLoading(true)
+            } else if (data.type === "ai-loading-stop") {
+                setIsLoading(false)
             } else if (data.type === "app-start") {
                 if (isWhiteboardOpenRef.current) setIsWhiteboardOpen(false)
                 setIsDocOpen(false)
@@ -14272,10 +14475,17 @@ Do not include markdown formatting or explanations.`
                     return newMap
                 })
             } else if (data.type === "app-interaction") {
-                setRemoteAppEvent(data.payload)
+                if (debugMode) console.log('[Peer] Received app-interaction from peer:', data.payload);
+                if (miniIDERef.current) {
+                    miniIDERef.current.replayInteraction(data.payload);
+                }
             } else if (data.type === "app-mutation") {
                 if (debugMode) console.log('[App] Received remote mutation:', data.payload);
-                setRemoteAppMutation(data.payload)
+                
+                // OPTIMIZATION: Bypass React state batching for high-frequency updates
+                if (miniIDERef.current) {
+                    miniIDERef.current.applyMutation(data.payload);
+                }
             } else if (data.type === "tldraw-update") {
                 if (editorRef.current) {
                     try {
@@ -14461,6 +14671,10 @@ Do not include markdown formatting or explanations.`
 
             setIsLoading(true)
 
+            if (dataConnectionsRef.current.size > 0) {
+                broadcastData({ type: "ai-loading-start" })
+            }
+
             try {
                 // Construct "You" context if available (Hidden from UI, visible to model)
                 let hiddenContext = ""
@@ -14635,6 +14849,7 @@ DO NOT:
 - no animations
 
 DO:
+- must add unique id="..." to EVERY interactive element (buttons, inputs, clickable divs, canvas)
 - must have desktop and mobile support
 - must have 48px top margin
 - must add a label in bottom right corner 12px font size, #0B87DA color saying Curastem.org 
@@ -14925,7 +15140,7 @@ PREFERENCES:
 
                                             // Force open IDE via ref to bypass closure staleness
                                             if (!isAppOpenRef.current) {
-                                                console.log("Opening App Editor (Streaming)...")
+                                                if (debugMode) console.log("Opening App Editor (Streaming)...")
                                                 setIsAppOpen(true)
                                                 setIsDocOpen(false)
                                                 setIsWhiteboardOpen(false)
@@ -15087,7 +15302,7 @@ PREFERENCES:
                         accumulatedFunctionCall.name === "update_whiteboard"
                     ) {
                         const args = accumulatedFunctionCall.args as any
-                        console.log("AI Whiteboard Update:", args) // Debug logging
+                        if (debugMode) console.log("AI Whiteboard Update:", args) // Debug logging
 
                         const added = args.added || []
                         const updated = args.updated || []
@@ -15499,6 +15714,9 @@ PREFERENCES:
                 })
             } finally {
                 setIsLoading(false)
+                if (dataConnectionsRef.current.size > 0) {
+                    broadcastData({ type: "ai-loading-stop" })
+                }
                 abortControllerRef.current = null
             }
         },
@@ -16578,18 +16796,30 @@ PREFERENCES:
                                         saveChatHistory()
                                         setCurrentChatId(chat.id)
                                         setMessages(chat.messages)
-                                        setDocContent(chat.notes || "")
+                                        setDocContent(chat.notes || DEFAULT_DOC_CONTENT)
                                         setAiGeneratedSuggestions(chat.suggestions || [])
-                                        if (
-                                            chat.whiteboard &&
-                                            editorRef.current
-                                        ) {
-                                            try {
-                                                editorRef.current.store.loadSnapshot(
-                                                    chat.whiteboard
-                                                )
-                                            } catch (e) {
-                                                console.error(e)
+                                        if (chat.whiteboard) {
+                                            pendingSnapshotRef.current = chat.whiteboard
+                                            if (editorRef.current) {
+                                                try {
+                                                    editorRef.current.store.loadSnapshot(
+                                                        chat.whiteboard
+                                                    )
+                                                } catch (e) {
+                                                    console.error(e)
+                                                }
+                                            }
+                                        } else {
+                                            pendingSnapshotRef.current = null
+                                            if (editorRef.current) {
+                                                try {
+                                                    editorRef.current.store.loadSnapshot({
+                                                        store: {},
+                                                        schema: editorRef.current.store.schema.serialize()
+                                                    })
+                                                } catch (e) {
+                                                    console.error(e)
+                                                }
                                             }
                                         }
                                         // Restore app state
@@ -16965,6 +17195,8 @@ PREFERENCES:
                                 <div
                                     data-layer="new chat"
                                     className="NewChat"
+                                    onMouseEnter={() => setIsNewChatHovered(true)}
+                                    onMouseLeave={() => setIsNewChatHovered(false)}
                                     style={{
                                         alignSelf: "stretch",
                                         height: 36,
@@ -16975,7 +17207,9 @@ PREFERENCES:
                                         alignItems: "center",
                                         gap: 8,
                                         display: "inline-flex",
-                                        background: "rgba(255,255,255,0.1)",
+                                        background: isNewChatHovered
+                                            ? "rgba(255, 255, 255, 0.06)"
+                                            : "transparent",
                                     }}
                                 >
                                     <div
@@ -17085,6 +17319,7 @@ PREFERENCES:
                             }}
                         >
                             <MiniIDE
+                                ref={miniIDERef}
                                 code={appCode}
                                 onChange={handleAppChange}
                                 mode={appMode}
