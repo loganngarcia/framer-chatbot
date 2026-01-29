@@ -1791,26 +1791,194 @@ const GEMINI_EYE_STATES = {
     },
 }
 
-const GeminiEye = ({ config, id }: { config: any; id: string }) => {
-    const transitionStyles: React.CSSProperties = {
-        transitionProperty: "all",
-        transitionDuration: "500ms",
-        transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-    }
+// Constants for eye animations
+const EYE_ANIMATION_CONFIG = {
+    BLINK_THRESHOLD_LARGE: 4,
+    BLINK_THRESHOLD_SMALL: 1.0,
+    TRANSITION_DURATION: 500,
+    TRANSITION_EASING: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    BLINK_DURATION: 150,
+    BLINK_INTERVAL_MIN: 2000,
+    BLINK_INTERVAL_MAX: 4000,
+} as const
 
-    const isBlinking = config.ry < 4
+const CHAT_INPUT_EYE_STATES = {
+    LOOKING: {
+        id: "looking",
+        eye1: {
+            left: 9.0, // Moved right 1px
+            top: 5.5, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 3.7, // Slightly bigger
+            rotate: 12, // Looking left
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 18.0, // Moved right 1px
+            top: 7.5, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 3.7, // Slightly bigger
+            rotate: 12, // Looking left
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    BLINKING_LOOKING: {
+        id: "blinking_looking",
+        eye1: {
+            left: 9.0, // Moved right 1px
+            top: 5.5, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 0.5,
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 18.0, // Moved right 1px
+            top: 7.5, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 0.5,
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    TALKING: {
+        id: "talking",
+        eye1: {
+            left: 9.0, // Moved right 1px
+            top: 6.0, // Moved up 0.5px
+            rx: 3.2, // Slightly bigger
+            ry: 3.9, // Slightly bigger
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 18.0, // Moved right 1px
+            top: 7.0, // Moved up 0.5px
+            rx: 3.2, // Slightly bigger
+            ry: 3.9, // Slightly bigger
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    BLINKING_TALKING: {
+        id: "blinking_talking",
+        eye1: {
+            left: 9.0, // Moved right 1px
+            top: 6.0, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 0.5,
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 18.0, // Moved right 1px
+            top: 7.0, // Moved up 0.5px
+            rx: 3.0, // Slightly bigger
+            ry: 0.5,
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    THINKING: {
+        id: "thinking",
+        eye1: {
+            left: 10.0, // Moved right 1px
+            top: 5.0, // Moved up 0.5px
+            rx: 2.8, // Slightly bigger
+            ry: 3.4, // Slightly bigger
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 19.0, // Moved right 1px
+            top: 6.5, // Moved up 0.5px
+            rx: 2.8, // Slightly bigger
+            ry: 3.4, // Slightly bigger
+            rotate: 12,
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    LOOKING_DOWN: {
+        id: "looking_down",
+        eye1: {
+            left: 7.0, // Moved right 1px
+            top: 10.9, // Moved up 2px
+            rx: 3.0,
+            ry: 3.7,
+            rotate: -6, // Based on matrix rotation (~-6 degrees from 0.993875, -0.110514)
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 16.7, // Moved right 1px
+            top: 9.8, // Moved up 2px
+            rx: 3.0,
+            ry: 3.7,
+            rotate: -6, // Based on matrix rotation (~-6 degrees)
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+    BLINKING_LOOKING_DOWN: {
+        id: "blinking_looking_down",
+        eye1: {
+            left: 7.0, // Moved right 1px
+            top: 10.9, // Moved up 2px
+            rx: 3.0,
+            ry: 0.5,
+            rotate: -6,
+            width: 6.76,
+            height: 8.45,
+        },
+        eye2: {
+            left: 16.7, // Moved right 1px
+            top: 9.8, // Moved up 2px
+            rx: 3.0,
+            ry: 0.5,
+            rotate: -6,
+            width: 6.76,
+            height: 8.45,
+        },
+    },
+}
 
-    // Apply faster transition for blink
-    const currentTransitionStyles = {
-        ...transitionStyles,
-        transitionDuration: isBlinking ? "100ms" : "500ms",
-        transitionTimingFunction: isBlinking
-            ? "ease-in-out"
-            : "cubic-bezier(0.34, 1.56, 0.64, 1)",
-    }
-
+// Shared eye rendering component
+const AnimatedEye = ({
+    config,
+    id,
+    blinkThreshold = EYE_ANIMATION_CONFIG.BLINK_THRESHOLD_LARGE,
+    filterPrefix = "eye",
+    flipHorizontal = false,
+    useBlinkSVG = false,
+}: {
+    config: any
+    id: string
+    blinkThreshold?: number
+    filterPrefix?: string
+    flipHorizontal?: boolean
+    useBlinkSVG?: boolean
+}) => {
+    const isBlinking = config.ry < blinkThreshold
     const cx = config.width / 2
     const cy = config.height / 2
+
+    const transitionStyles: React.CSSProperties = {
+        transitionProperty: "all",
+        transitionDuration: isBlinking ? "100ms" : `${EYE_ANIMATION_CONFIG.TRANSITION_DURATION}ms`,
+        transitionTimingFunction: isBlinking ? "ease-in-out" : EYE_ANIMATION_CONFIG.TRANSITION_EASING,
+    }
+
+    const blinkSVGTransform = useBlinkSVG ? (flipHorizontal ? "scaleX(-1)" : "none") : "none"
 
     return (
         <div
@@ -1820,86 +1988,73 @@ const GeminiEye = ({ config, id }: { config: any; id: string }) => {
                 top: `${config.top}px`,
                 width: `${config.width}px`,
                 height: `${config.height}px`,
-                ...currentTransitionStyles,
+                ...transitionStyles,
             }}
         >
-            {/* Closed Eye (Blink) */}
-            <div
-                style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
-                    opacity: isBlinking ? 1 : 0,
-                    transform: `scale(${isBlinking ? 1 : 0.8})`,
-                    transition:
-                        "opacity 100ms ease-in-out, transform 100ms ease-in-out",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    pointerEvents: "none",
-                }}
-            >
-                <svg
-                    width="100%"
-                    height="100%"
-                    viewBox="0 0 74 55"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+            {useBlinkSVG && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: isBlinking ? 1 : 0,
+                        transform: `scale(${isBlinking ? 1 : 0.8})`,
+                        transition: "opacity 100ms ease-in-out, transform 100ms ease-in-out",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                    }}
                 >
-                    <g filter={`url(#filter_blink_${id})`}>
-                        <path
-                            d="M50.5534 23.2448C50.6256 25.3123 44.399 22.2078 36.6459 22.4785C28.8928 22.7493 22.5492 26.2927 22.477 24.2252C22.4048 22.1577 28.6314 15.2622 36.3845 14.9915C44.1376 14.7207 50.4812 21.1773 50.5534 23.2448Z"
-                            fill="#FFFFFF" // Hardcoded white for animated character eye
-                            fillOpacity="0.85"
-                            shapeRendering="crispEdges"
-                        />
-                    </g>
-                    <defs>
-                        <filter
-                            id={`filter_blink_${id}`}
-                            x="0.00174713"
-                            y="-5.62668e-05"
-                            width="73.0278"
-                            height="54.8363"
-                            filterUnits="userSpaceOnUse"
-                            colorInterpolationFilters="sRGB"
-                        >
-                            <feFlood
-                                floodOpacity="0"
-                                result="BackgroundImageFix"
+                    <svg
+                        width="100%"
+                        height="100%"
+                        viewBox="0 0 74 55"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style={{ transform: blinkSVGTransform }}
+                    >
+                        <g filter={`url(#filter_${filterPrefix}_blink_${id})`}>
+                            <path
+                                d="M50.5534 23.2448C50.6256 25.3123 44.399 22.2078 36.6459 22.4785C28.8928 22.7493 22.5492 26.2927 22.477 24.2252C22.4048 22.1577 28.6314 15.2622 36.3845 14.9915C44.1376 14.7207 50.4812 21.1773 50.5534 23.2448Z"
+                                fill="white"
+                                fillOpacity="0.95"
+                                shapeRendering="crispEdges"
                             />
-                            <feColorMatrix
-                                in="SourceAlpha"
-                                type="matrix"
-                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                                result="hardAlpha"
-                            />
-                            <feOffset dy="7.4916" />
-                            <feGaussianBlur stdDeviation="11.2374" />
-                            <feComposite in2="hardAlpha" operator="out" />
-                            <feColorMatrix
-                                type="matrix"
-                                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
-                            />
-                            <feBlend
-                                mode="normal"
-                                in2="BackgroundImageFix"
-                                result="effect1_dropShadow_495_119"
-                            />
-                            <feBlend
-                                mode="normal"
-                                in="SourceGraphic"
-                                in2="effect1_dropShadow_495_119"
-                                result="shape"
-                            />
-                        </filter>
-                    </defs>
-                </svg>
-            </div>
-
-            {/* Open Eye */}
+                        </g>
+                        <defs>
+                            <filter
+                                id={`filter_${filterPrefix}_blink_${id}`}
+                                x="0.00174713"
+                                y="-5.62668e-05"
+                                width="73.0278"
+                                height="54.8363"
+                                filterUnits="userSpaceOnUse"
+                                colorInterpolationFilters="sRGB"
+                            >
+                                <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                                <feColorMatrix
+                                    in="SourceAlpha"
+                                    type="matrix"
+                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                                    result="hardAlpha"
+                                />
+                                <feOffset dy={filterPrefix === "chat" ? "1.68966" : "7.4916"} />
+                                <feGaussianBlur stdDeviation={filterPrefix === "chat" ? "2.53449" : "11.2374"} />
+                                <feComposite in2="hardAlpha" operator="out" />
+                                <feColorMatrix
+                                    type="matrix"
+                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
+                                />
+                                <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow" />
+                                <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape" />
+                            </filter>
+                        </defs>
+                    </svg>
+                </div>
+            )}
             <div
                 style={{
                     position: "absolute",
@@ -1919,61 +2074,251 @@ const GeminiEye = ({ config, id }: { config: any; id: string }) => {
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                 >
-                    <g filter={`url(#filter_eye_${id})`}>
+                    <g
+                        filter={`url(#filter_${filterPrefix}_open_${id})`}
+                        transform={flipHorizontal ? `translate(${cx}, ${cy}) scaleX(-1) translate(${-cx}, ${-cy})` : undefined}
+                    >
                         <ellipse
                             cx={cx}
                             cy={cy}
                             rx={config.rx}
                             ry={config.ry}
                             transform={`rotate(${config.rotate} ${cx} ${cy})`}
-                            fill="#FFFFFF" // Hardcoded white for animated character eye
-                            fillOpacity="0.85"
+                            fill="white"
+                            fillOpacity={filterPrefix === "chat" ? "0.95" : "0.85"}
                             shapeRendering="crispEdges"
-                            style={currentTransitionStyles}
+                            style={transitionStyles}
                         />
                     </g>
                     <defs>
                         <filter
-                            id={`filter_eye_${id}`}
-                            x="-10"
-                            y="-10"
-                            width={config.width + 20}
-                            height={config.height + 20}
+                            id={`filter_${filterPrefix}_open_${id}`}
+                            x={filterPrefix === "chat" ? "-2" : "-10"}
+                            y={filterPrefix === "chat" ? "-2" : "-10"}
+                            width={config.width + (filterPrefix === "chat" ? 4 : 20)}
+                            height={config.height + (filterPrefix === "chat" ? 4 : 20)}
                             filterUnits="userSpaceOnUse"
                             colorInterpolationFilters="sRGB"
                         >
-                            <feFlood
-                                floodOpacity="0"
-                                result="BackgroundImageFix"
-                            />
+                            <feFlood floodOpacity="0" result="BackgroundImageFix" />
                             <feColorMatrix
                                 in="SourceAlpha"
                                 type="matrix"
                                 values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
                                 result="hardAlpha"
                             />
-                            <feOffset dy="4" />
-                            <feGaussianBlur stdDeviation="6" />
+                            <feOffset dy={filterPrefix === "chat" ? "1.68966" : "4"} />
+                            <feGaussianBlur stdDeviation={filterPrefix === "chat" ? "2.53449" : "6"} />
                             <feComposite in2="hardAlpha" operator="out" />
                             <feColorMatrix
                                 type="matrix"
                                 values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.24 0"
                             />
-                            <feBlend
-                                mode="normal"
-                                in2="BackgroundImageFix"
-                                result="effect1_dropShadow"
-                            />
-                            <feBlend
-                                mode="normal"
-                                in="SourceGraphic"
-                                in2="effect1_dropShadow"
-                                result="shape"
-                            />
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow" />
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape" />
                         </filter>
                     </defs>
                 </svg>
             </div>
+        </div>
+    )
+}
+
+const GeminiEye = ({ config, id }: { config: any; id: string }) => (
+    <AnimatedEye config={config} id={id} blinkThreshold={4} filterPrefix="gemini" useBlinkSVG />
+)
+
+const ChatInputEye = ({ config, id }: { config: any; id: string }) => (
+    <AnimatedEye
+        config={config}
+        id={id}
+        blinkThreshold={EYE_ANIMATION_CONFIG.BLINK_THRESHOLD_SMALL}
+        filterPrefix="chat"
+        flipHorizontal
+        useBlinkSVG
+    />
+)
+
+// Custom hook for chat input icon eye animation with interaction detection
+const useChatIconAnimation = () => {
+    const [currentState, setCurrentState] = React.useState(CHAT_INPUT_EYE_STATES.LOOKING)
+    const [isMounted, setIsMounted] = React.useState(false)
+    const hasInteractedRef = React.useRef(false)
+    const isLookingDownRef = React.useRef(false)
+    const timeoutIdRef = React.useRef<any>(null)
+
+    React.useEffect(() => {
+        const delayTimer = setTimeout(() => setIsMounted(true), 200)
+        return () => clearTimeout(delayTimer)
+    }, [])
+
+    React.useEffect(() => {
+        const handleInteraction = () => {
+            if (hasInteractedRef.current) return
+            hasInteractedRef.current = true
+            if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+            setCurrentState((prev) =>
+                prev.id === "looking_down" || prev.id === "blinking_looking_down"
+                    ? CHAT_INPUT_EYE_STATES.LOOKING
+                    : prev
+            )
+        }
+
+        const events = ["mousedown", "touchstart", "keydown", "click"]
+        events.forEach((e) => document.addEventListener(e, handleInteraction, { once: true }))
+        return () => events.forEach((e) => document.removeEventListener(e, handleInteraction))
+    }, [])
+
+    React.useEffect(() => {
+        const scheduleAnimation = (
+            state: any,
+            blinkState: any,
+            nextState: any,
+            toggleDirection: boolean
+        ) => {
+            if (hasInteractedRef.current) return
+            setCurrentState(state)
+
+            const blinkDelay = EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN + Math.random() * (EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MAX - EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN)
+            timeoutIdRef.current = setTimeout(() => {
+                if (hasInteractedRef.current) return
+                setCurrentState(blinkState)
+                timeoutIdRef.current = setTimeout(() => {
+                    if (hasInteractedRef.current) return
+                    setCurrentState(state)
+
+                    const transitionDelay = EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN + Math.random() * (EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MAX - EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN)
+                    timeoutIdRef.current = setTimeout(() => {
+                        if (hasInteractedRef.current) return
+                        isLookingDownRef.current = toggleDirection
+                        animateLoop()
+                    }, transitionDelay)
+                }, EYE_ANIMATION_CONFIG.BLINK_DURATION)
+            }, blinkDelay)
+        }
+
+        const animateLoop = () => {
+            if (hasInteractedRef.current) return
+            if (isLookingDownRef.current) {
+                scheduleAnimation(
+                    CHAT_INPUT_EYE_STATES.LOOKING_DOWN,
+                    CHAT_INPUT_EYE_STATES.BLINKING_LOOKING_DOWN,
+                    CHAT_INPUT_EYE_STATES.LOOKING,
+                    false
+                )
+            } else {
+                scheduleAnimation(
+                    CHAT_INPUT_EYE_STATES.LOOKING,
+                    CHAT_INPUT_EYE_STATES.BLINKING_LOOKING,
+                    CHAT_INPUT_EYE_STATES.LOOKING_DOWN,
+                    true
+                )
+            }
+        }
+
+        if (!hasInteractedRef.current) animateLoop()
+        return () => {
+            if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+        }
+    }, [])
+
+    return { currentState, isMounted }
+}
+
+const ChatInputBarAiIcon = () => {
+    const { currentState, isMounted } = useChatIconAnimation()
+
+    return (
+        <div
+            data-svg-wrapper
+            data-layer="chat input bar ai icon"
+            className="ChatInputBarAiIcon"
+            style={{
+                position: "relative",
+                width: 36,
+                height: 36,
+                transform: isMounted ? "scale(1)" : "scale(0)",
+                transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+        >
+            <svg
+                width="36"
+                height="36"
+                viewBox="0 0 36 36"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ position: "absolute", top: 0, left: 0 }}
+            >
+                <g opacity="0.95">
+                    <g clipPath="url(#clip0_523_848)">
+                        <ellipse
+                            cx="17.6471"
+                            cy="18"
+                            rx="17.6471"
+                            ry="18"
+                            fill="white"
+                            fillOpacity="0.85"
+                        />
+                        <g filter="url(#filter0_f_523_848)">
+                            <ellipse
+                                cx="17.6406"
+                                cy="18"
+                                rx="19.6094"
+                                ry="20"
+                                fill="url(#paint0_linear_523_848)"
+                            />
+                        </g>
+                    </g>
+                </g>
+                <defs>
+                    <filter
+                        id="filter0_f_523_848"
+                        x="-9.96875"
+                        y="-10"
+                        width="55.2188"
+                        height="56"
+                        filterUnits="userSpaceOnUse"
+                        colorInterpolationFilters="sRGB"
+                    >
+                        <feFlood
+                            floodOpacity="0"
+                            result="BackgroundImageFix"
+                        />
+                        <feBlend
+                            mode="normal"
+                            in="SourceGraphic"
+                            in2="BackgroundImageFix"
+                            result="shape"
+                        />
+                        <feGaussianBlur
+                            stdDeviation="4"
+                            result="effect1_foregroundBlur_523_848"
+                        />
+                    </filter>
+                    <linearGradient
+                        id="paint0_linear_523_848"
+                        x1="17.6406"
+                        y1="-2"
+                        x2="17.6406"
+                        y2="38"
+                        gradientUnits="userSpaceOnUse"
+                    >
+                        <stop stopColor="#0099FF" />
+                        <stop offset="1" stopColor="white" stopOpacity="0.85" />
+                    </linearGradient>
+                    <clipPath id="clip0_523_848">
+                        <rect
+                            width="35.2941"
+                            height="36"
+                            rx="17.6471"
+                            fill="white"
+                        />
+                    </clipPath>
+                </defs>
+            </svg>
+            {/* Animated Eyes */}
+            <ChatInputEye config={currentState.eye1} id="chat_eye1" />
+            <ChatInputEye config={currentState.eye2} id="chat_eye2" />
         </div>
     )
 }
@@ -4438,6 +4783,8 @@ const ChatInput = React.memo(function ChatInput({
     const [isAiTooltipHovered, setIsAiTooltipHovered] = React.useState(false)
     const [isAddFilesTooltipHovered, setIsAddFilesTooltipHovered] =
         React.useState(false)
+    const [isUploadButtonHovered, setIsUploadButtonHovered] =
+        React.useState(false)
     const [isEndCallTooltipHovered, setIsEndCallTooltipHovered] =
         React.useState(false)
     const [showGradient, setShowGradient] = React.useState(true)
@@ -4474,6 +4821,13 @@ const ChatInput = React.memo(function ChatInput({
     // Reset selection when menu opens/closes
     React.useEffect(() => {
         if (!showMenu) setSelectedMenuIndex(-1)
+    }, [showMenu])
+
+    // Clear hover state when menu closes (unless mouse is actually over button)
+    React.useEffect(() => {
+        if (!showMenu) {
+            setIsUploadButtonHovered(false)
+        }
     }, [showMenu])
 
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -5304,14 +5658,21 @@ const ChatInput = React.memo(function ChatInput({
                                     }
                                 }
                             }}
-                            onMouseEnter={() =>
-                                !showMenu &&
-                                isHoverCapable() &&
-                                setIsAddFilesTooltipHovered(true)
-                            }
-                            onMouseLeave={() =>
+                            onMouseEnter={() => {
+                                if (
+                                    attachments.length < 10 &&
+                                    isHoverCapable()
+                                ) {
+                                    setIsUploadButtonHovered(true)
+                                    if (!showMenu) {
+                                        setIsAddFilesTooltipHovered(true)
+                                    }
+                                }
+                            }}
+                            onMouseLeave={() => {
+                                setIsUploadButtonHovered(false)
                                 setIsAddFilesTooltipHovered(false)
-                            }
+                            }}
                             style={{
                                 cursor:
                                     attachments.length >= 10
@@ -5327,6 +5688,12 @@ const ChatInput = React.memo(function ChatInput({
                                 marginBottom: 0, // Aligned with send button
                                 position: "relative",
                                 zIndex: 1,
+                                borderRadius: "50%",
+                                background:
+                                    (showMenu || isUploadButtonHovered) &&
+                                    attachments.length < 10
+                                        ? themeColors.hover.subtle
+                                        : "transparent",
                             }}
                         >
                             {showMenu && (
@@ -5746,19 +6113,7 @@ const ChatInput = React.memo(function ChatInput({
                                             Connect with AI
                                         </Tooltip>
                                     )}
-                                    <svg
-                                        width="36"
-                                        height="36"
-                                        viewBox="0 0 36 36"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                    >
-                                        <path
-                                            d="M17.3619 10.1964C17.6342 9.68595 18.3658 9.68595 18.6381 10.1964L21.0786 14.7725C21.1124 14.8358 21.1642 14.8876 21.2275 14.9213L25.8036 17.3619C26.314 17.6341 26.314 18.3658 25.8036 18.6381L21.2275 21.0787C21.1642 21.1124 21.1124 21.1642 21.0786 21.2275L18.6381 25.8036C18.3658 26.3141 17.6342 26.3141 17.3619 25.8036L14.9213 21.2275C14.8876 21.1642 14.8358 21.1124 14.7725 21.0787L10.1964 18.6381C9.68594 18.3658 9.68594 17.6341 10.1964 17.3619L14.7725 14.9213C14.8358 14.8876 14.8876 14.8358 14.9213 14.7725L17.3619 10.1964Z"
-                                            fill={themeColors.text.primary}
-                                            fillOpacity="0.95"
-                                        />
-                                    </svg>
+                                    <ChatInputBarAiIcon />
                                 </div>
                             )}
                     </div>
@@ -11539,7 +11894,7 @@ Do not include markdown formatting or explanations.`
         }
     }, [currentChatId])
 
-    // Automatically save chat history when code changes (debounced)
+    // Automatically save chat history when content changes (debounced)
     React.useEffect(() => {
         const timer = setTimeout(() => {
             if (currentChatId && saveChatHistoryRef.current) {
@@ -11548,7 +11903,7 @@ Do not include markdown formatting or explanations.`
         }, 1000)
 
         return () => clearTimeout(timer)
-    }, [appCode, appMode, docContent, currentChatId])
+    }, [appCode, appMode, docContent, messages, currentChatId])
 
     const [aiGeneratedSuggestions, setAiGeneratedSuggestions] = React.useState<
         string[]
@@ -11803,14 +12158,75 @@ Do not include markdown formatting or explanations.`
                 const titleToUse =
                     overrideTitle || (existing ? existing.title : "New chat")
 
+                // Only update timestamp if content has changed (messages, notes, whiteboard, or app code)
+                // Compare current content with existing content to detect changes
+                const currentMessages = msgs.map((m) => ({
+                    ...m,
+                    attachments: undefined,
+                }))
+                
+                let hasContentChanges = false
+                
+                if (!existing) {
+                    // New chat, check if it has any content
+                    hasContentChanges = currentMessages.length > 0 || 
+                                       docContentRef.current || 
+                                       whiteboardData || 
+                                       appCodeRef.current
+                } else {
+                    // Check for message changes
+                    if (existing.messages.length !== currentMessages.length) {
+                        hasContentChanges = true
+                    } else if (currentMessages.length > 0) {
+                        // Same count, compare the last message to see if it's different
+                        const lastCurrent = currentMessages[currentMessages.length - 1]
+                        const lastExisting = existing.messages[existing.messages.length - 1]
+                        if (lastCurrent.role !== lastExisting.role || 
+                            lastCurrent.text !== lastExisting.text ||
+                            (lastCurrent.attachments?.length || 0) !== (lastExisting.attachments?.length || 0)) {
+                            hasContentChanges = true
+                        }
+                    }
+                    
+                    // Check for notes/docContent changes
+                    if (!hasContentChanges && existing.notes !== docContentRef.current) {
+                        hasContentChanges = true
+                    }
+                    
+                    // Check for whiteboard changes
+                    if (!hasContentChanges) {
+                        const existingWhiteboard = existing.whiteboard
+                        if (whiteboardData !== existingWhiteboard) {
+                            // Compare stringified versions to detect actual changes
+                            const existingStr = existingWhiteboard ? JSON.stringify(existingWhiteboard) : null
+                            const currentStr = whiteboardData ? JSON.stringify(whiteboardData) : null
+                            if (existingStr !== currentStr) {
+                                hasContentChanges = true
+                            }
+                        }
+                    }
+                    
+                    // Check for app code changes
+                    if (!hasContentChanges) {
+                        const existingAppCode = existing.app?.code || ""
+                        const existingAppMode = existing.app?.mode || "editor"
+                        const currentAppCode = appCodeRef.current || ""
+                        const currentAppMode = appModeRef.current || "editor"
+                        
+                        if (existingAppCode !== currentAppCode || existingAppMode !== currentAppMode) {
+                            hasContentChanges = true
+                        }
+                    }
+                }
+                
+                // Preserve original timestamp if no content changes, otherwise update it
+                const timestampToUse = hasContentChanges ? Date.now() : (existing?.timestamp || Date.now())
+
                 const sessionToSave: ChatSession = {
                     id: currentChatId,
                     title: titleToUse,
-                    timestamp: Date.now(),
-                    messages: msgs.map((m) => ({
-                        ...m,
-                        attachments: undefined,
-                    })),
+                    timestamp: timestampToUse,
+                    messages: currentMessages,
                     notes: docContentRef.current,
                     whiteboard: whiteboardData,
                     app: appCodeRef.current
@@ -17652,7 +18068,7 @@ PREFERENCES:
                                 0) && (
                             <div
                                 style={{
-                                    paddingLeft: 8,
+                                    marginLeft: 0,
                                     paddingBottom: 8,
                                     minHeight: "auto",
                                 }}
