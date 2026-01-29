@@ -271,7 +271,7 @@ const Tooltip = ({ children, style }: TooltipProps) => {
             style={{
                 position: "absolute",
                 background: darkColors.backgroundDark,
-                color: colors.ui.white,
+                color: colors.text.primary,
                 padding: "4px 12px",
                 borderRadius: "28px",
                 fontSize: "12px",
@@ -344,9 +344,8 @@ const darkColors = {
     background: "hsl(0, 0%, 13%)", // #212121
     backgroundDark: "hsl(0, 0%, 8%)", // #141414 - Dark background
     surface: "hsl(0, 0%, 19%)", // #303030
-    surfaceHighlight: "hsl(0, 0%, 24%)", // #3D3D3D
     surfaceMenu: "hsl(0, 0%, 21%)", // #353535
-    surfaceModal: "hsl(0, 0%, 12%)", // #1E1E1E
+    surfaceHighlight: "hsl(0, 0%, 24%)", // #3D3D3D
     surfaceBlack: "hsl(0, 0%, 0%)", // #000000 - Pure black surface
 
     text: {
@@ -356,10 +355,8 @@ const darkColors = {
         link: "hsl(210, 100%, 68%)", // #4DA6FF
     },
 
-        border: {
+    border: {
         subtle: "hsla(0, 0%, 100%, 0.1)", // rgba(255, 255, 255, 0.1)
-        subtleDark: "hsla(0, 0%, 0%, 0.1)", // rgba(0, 0, 0, 0.1) - Dark border for light backgrounds
-        outline: "hsla(0, 0%, 100%, 0.2)", // rgba(255, 255, 255, 0.20) - Outline border
     },
 
     hover: {
@@ -373,54 +370,25 @@ const darkColors = {
 
     destructive: {
         // Colors used for delete/destructive actions and error states
-        default: "hsl(0, 84%, 50%)", // #EC1313 - Red for destructive actions
-        light: "hsl(0, 92%, 70%)", // #FB6A6A - Lighter red/pink for strokes and highlights
+        bright: "hsl(0, 84%, 50%)", // #EC1313 - Bright red for destructive actions
         tint: "hsla(0, 92%, 70%, 0.12)", // rgba(251, 106, 106, 0.12) - Red tint for destructive hovers
-        tintAlt: "hsla(0, 84%, 60%, 0.15)", // rgba(239, 68, 68, 0.15) - Alternative destructive tint
+        light: "hsla(0, 92%, 70%, 0.95)", // rgba(251, 106, 106, 0.95) - #FB6A6A at 95% for report text/icon in menus
     },
 
     semantic: {
         // Colors used for status indicators and UI feedback
         accent: "hsl(202, 90%, 45%)", // #0B87DA - Blue, default student card color
-        success: "hsl(142, 71%, 45%)", // #22c55e - Green success state
-        warning: "hsl(38, 92%, 50%)", // #f59e0b - Orange/amber warning state
-        inactive: "hsl(215, 16%, 65%)", // #94a3b8 - Gray for inactive/disabled states
     },
 
     overlay: {
         // Colors used for UI overlays, modals, backdrops, and shadows
-        default: "hsla(0, 0%, 0%, 0.7)", // rgba(0, 0, 0, 0.7) - Default overlay
-        dark: "hsla(0, 0%, 0%, 0.2)", // rgba(0, 0, 0, 0.2) - Dark overlay (shadows)
-        modal: "hsla(0, 0%, 0%, 0.8)", // rgba(0, 0, 0, 0.8) - Modal backdrop overlay
-        veryLight: "hsla(0, 0%, 0%, 0.04)", // rgba(0, 0, 0, 0.04) - Very light overlay
+        black: "hsla(0, 0%, 0%, 0.7)", // rgba(0, 0, 0, 0.7) - Default overlay
+        gradient: "hsla(0, 0%, 13%, 0)", // rgba(33, 33, 33, 0) - Transparent black (for gradients)
     },
 
     misc: {
         // Miscellaneous UI colors
-        outlineSubtle: "hsla(0, 0%, 100%, 0.24)", // rgba(255, 255, 255, 0.24) - Subtle outline
-        textMuted: "hsla(0, 0%, 100%, 0.7)", // rgba(255,255,255,0.7) - Muted text (consolidated: same as text.secondary)
-        shadowAccent: "hsla(200, 100%, 50%, 0.25)", // rgba(0, 153, 255, 0.25) - Accent shadow
-        graySolid: "hsl(0, 0%, 52%)", // rgba(133,133,133) - Solid gray
-    },
-
-    canvas: {
-        // Colors used for rendering markdown content to HTML5 Canvas (shared/downloaded images)
-        stroke: "hsla(0, 0%, 0%, 0.15)", // rgba(0, 0, 0, 0.15) - Canvas stroke (horizontal rules)
-        darkFill: "hsla(0, 0%, 0%, 0.65)", // rgba(0, 0, 0, 0.65) - Canvas dark fill (blockquote text)
-        subtleFill: "hsla(0, 0%, 0%, 0.02)", // rgba(0, 0, 0, 0.02) - Canvas subtle fill (alternating table rows)
-        // Overlay colors also used in canvas rendering (shared with UI overlays)
-        light: "hsla(0, 0%, 0%, 0.05)", // rgba(0, 0, 0, 0.05) - Light overlay (code blocks, blockquote backgrounds)
-        medium: "hsla(0, 0%, 0%, 0.08)", // rgba(0, 0, 0, 0.08) - Medium overlay (user bubble background)
-        strong: "hsla(0, 0%, 0%, 0.95)", // rgba(0, 0, 0, 0.95) - Strong overlay (text color)
-        codeText: "hsla(0, 0%, 0%, 0.7)", // rgba(0, 0, 0, 0.7) - Code text color
-    },
-
-    ui: {
-        white: "hsl(0, 0%, 100%)", // #FFFFFF - Pure white
-        mediumGray: "hsl(0, 0%, 63%)", // rgba(160, 160, 160, 1) - Medium gray text
-        offWhite: "hsl(220, 14%, 96%)", // #F9FAFC - Very light gray/off-white
-        transparent: "hsla(0, 0%, 100%, 0)", // rgba(255, 255, 255, 0) - Transparent white
-        transparentBlack: "hsla(0, 0%, 13%, 0)", // rgba(33, 33, 33, 0) - Transparent black (for gradients)
+        graySolid: "hsl(0, 0%, 52%)", // rgba(133,133,133) - Solid gray drag bar
     },
 
     code: {
@@ -541,7 +509,7 @@ const getStyles = (theme: typeof darkColors) => ({
         overflow: "hidden",
         background: theme.surface,
         position: "relative",
-        boxShadow: "0 4px 12px ${themeColors.overlay.dark}",
+        boxShadow: "0 4px 12px hsla(0, 0%, 0%, 0.2)",
     } as React.CSSProperties,
     textEllipsis: {
         whiteSpace: "nowrap",
@@ -1270,7 +1238,7 @@ function AdCard({
                 paddingBottom: 14,
                 paddingLeft: 20,
                 paddingRight: 16,
-                background: themeColors.surface,
+                background: colors.surface,
                 overflow: "hidden",
                 borderRadius: 28,
                 justifyContent: "flex-start",
@@ -1516,12 +1484,12 @@ const FileAttachment = React.memo(function FileAttachment({
                         />
                         <path
                             d="M15 17C15 16.4477 15.4477 16 16 16H32C32.5523 16 33 16.4477 33 17C33 17.5523 32.5523 18 32 18H16C15.4477 18 15 17.5523 15 17ZM15 24C15 23.4477 15.4477 23 16 23H32C32.5523 23 33 23.4477 33 24C33 24.5523 32.5523 25 32 25H16C15.4477 25 15 24.5523 15 24ZM15 31C15 30.4477 15.4477 30 16 30H23C23.5523 30 24 30.4477 24 31C24 31.5523 23.5523 32 23 32H16C15.4477 32 15 31.5523 15 31Z"
-                            fill={colors.ui.white}
+                            fill={colors.text.primary}
                             fillOpacity="0.95"
                         />
                         <path
                             d="M23 29.835C23.6434 29.835 24.165 30.3566 24.165 31C24.165 31.6434 23.6434 32.165 23 32.165H16C15.3566 32.165 14.835 31.6434 14.835 31C14.835 30.3566 15.3566 29.835 16 29.835H23ZM32 22.835C32.6434 22.835 33.165 23.3566 33.165 24C33.165 24.6434 32.6434 25.165 32 25.165H16C15.3566 25.165 14.835 24.6434 14.835 24C14.835 23.3566 15.3566 22.835 16 22.835H32ZM32 15.835C32.6434 15.835 33.165 16.3566 33.165 17C33.165 17.6434 32.6434 18.165 32 18.165H16C15.3566 18.165 14.835 17.6434 14.835 17C14.835 16.3566 15.3566 15.835 16 15.835H32Z"
-                            stroke={colors.ui.white}
+                            stroke={colors.text.primary}
                             strokeOpacity="0.95"
                             strokeWidth="0.33"
                         />
@@ -2486,8 +2454,6 @@ const DocEditor = React.memo(function DocEditor({
                 "--doc-font-serif": '"Times New Roman", serif',
                 "--doc-font-sans": "Inter, sans-serif",
                 "--doc-accent": themeColors.semantic.accent,
-                "--doc-border-color":
-                    themeColors.border?.subtle || "${themeColors.border.subtleDark}",
                 "--doc-current-font":
                     settings.fontStyle === "serif"
                         ? "var(--doc-font-serif)"
@@ -3961,10 +3927,9 @@ const DocEditor = React.memo(function DocEditor({
                                     ref={linkDropdownContentRef}
                                     style={{
                                         ...linkDropdownPosition,
-                                        background: themeColors.surfaceModal,
-                                        border: `1px solid ${themeColors.border.subtle}`,
+                                        background: darkColors.background,
                                         borderRadius: 20, // Link overlay dropdown border radius
-                                        boxShadow: `0 4px 12px ${themeColors.border.subtleDark}`,
+                                        boxShadow: "0 4px 12px hsla(0, 0%, 0%, 0.1)",
                                         padding: 8,
                                         minWidth: 220,
                                         pointerEvents: "auto", // Re-enable clicks for the dropdown itself
@@ -4029,7 +3994,7 @@ const DocEditor = React.memo(function DocEditor({
                                                     ? themeColors.semantic.accent
                                                     : themeColors.hover.subtle,
                                                 color: linkUrl.trim()
-                                                    ? colors.ui.white
+                                                    ? colors.text.primary
                                                     : themeColors.text.tertiary,
                                                 border: "none",
                                                 borderRadius: 28,
@@ -4053,8 +4018,8 @@ const DocEditor = React.memo(function DocEditor({
                                                     flex: 1,
                                                     padding: "6px 10px",
                                                     background:
-                                                        themeColors.destructive.tintAlt, // Red tint for delete
-                                                    color: themeColors.destructive.default,
+                                                        themeColors.destructive.tint, // Red tint for delete
+                                                    color: themeColors.destructive.bright,
                                                     border: "none",
                                                     borderRadius: 28,
                                                     cursor: "pointer",
@@ -4121,8 +4086,7 @@ const DocEditor = React.memo(function DocEditor({
                                         width: 128,
                                         padding: 10,
                                         background: themeColors.surfaceMenu,
-                                        boxShadow:
-                                            "0px 4px 24px ${themeColors.canvas.medium}",
+                                        boxShadow: "0px 4px 24px hsla(0, 0%, 0%, 0.08)",
                                         borderRadius: 28,
                                         outline: `0.33px ${themeColors.border.subtle} solid`,
                                         outlineOffset: "-0.33px",
@@ -4167,7 +4131,7 @@ const DocEditor = React.memo(function DocEditor({
                                                     selectedDownloadMenuIndex
                                                         ? themeColors.state
                                                               ?.hover ||
-                                                          themeColors.canvas.light
+                                                          themeColors.surfaceHighlight
                                                         : "transparent",
                                                 cursor: "pointer",
                                                 display: "flex",
@@ -4952,7 +4916,7 @@ const ChatInput = React.memo(function ChatInput({
                             paddingLeft: 20,
                             paddingRight: 20,
                             borderRadius: 28,
-                            outline: `1px ${themeColors.border.outline} solid`,
+                            outline: `1px ${themeColors.border.subtle} solid`,
                             outlineOffset: "-1px",
                             justifyContent: "flex-start",
                             alignItems: "center",
@@ -5078,7 +5042,7 @@ const ChatInput = React.memo(function ChatInput({
                     padding: "10px 0 16px 0",
                     background:
                         !hideGradient && showGradient
-                            ? `linear-gradient(180deg, ${themeColors.ui.transparentBlack} 0%, ${themeColors.background} 35%)`
+                            ? `linear-gradient(180deg, ${themeColors.overlay.gradient} 0%, ${themeColors.background} 35%)`
                             : "transparent",
                     justifyContent: "center",
                     alignItems: "flex-end",
@@ -5282,7 +5246,7 @@ const ChatInput = React.memo(function ChatInput({
                                                 right: 0,
                                                 bottom: 0,
                                                 background:
-                                                    "${themeColors.canvas.codeText}",
+                                                    themeColors.text.primary,
                                                 zIndex: 1004,
                                                 pointerEvents: "auto",
                                             }}
@@ -5322,8 +5286,7 @@ const ChatInput = React.memo(function ChatInput({
                                                 padding: 10,
                                                 background:
                                                     themeColors.surfaceMenu,
-                                                boxShadow:
-                                                    "0px 4px 24px ${themeColors.canvas.medium}",
+                                                boxShadow: "0px 4px 24px hsla(0, 0%, 0%, 0.08)",
                                                 borderRadius: isMobileLayout
                                                     ? "36px 36px 0px 0px"
                                                     : 28,
@@ -5752,14 +5715,14 @@ const ChatInput = React.memo(function ChatInput({
                                 width="56"
                                 height="56"
                                 rx="28"
-                                fill={themeColors.destructive.default}
+                                fill={themeColors.destructive.bright}
                             />
                             <g transform="translate(17.5, 23)">
                                 <path
                                     fillRule="evenodd"
                                     clipRule="evenodd"
                                     d="M10.0238 6.15427e-07C13.4809 0.00106797 17.0396 1.07344 19.4144 3.07617L19.641 3.27246L19.8129 3.44531C20.193 3.86925 20.4321 4.44154 20.5619 5.01758C20.7128 5.68736 20.7333 6.43445 20.6117 7.12598C20.4913 7.81029 20.2208 8.49784 19.7377 8.99121C19.23 9.50959 18.5253 9.77083 17.6781 9.62598L17.6771 9.625C17.0576 9.51856 16.052 9.42599 15.2572 9.11231C14.8416 8.94822 14.4265 8.70597 14.1107 8.32715C13.7865 7.93804 13.6006 7.44499 13.5853 6.84863C13.5729 6.36452 13.2765 5.94847 12.6654 5.625C12.0488 5.29868 11.1923 5.11979 10.306 5.12305C9.41899 5.12637 8.57444 5.31144 7.97987 5.63867C7.39421 5.96113 7.12804 6.36719 7.14002 6.84082C7.15406 7.39768 6.99962 7.86763 6.71131 8.24805C6.43154 8.61707 6.05354 8.86532 5.67616 9.04199C5.29889 9.21854 4.88865 9.33849 4.51405 9.43359C4.30609 9.48639 4.1304 9.52723 3.9662 9.56543L3.48475 9.68359C2.6791 9.90064 1.96126 9.73436 1.39491 9.31055C0.850256 8.90287 0.482228 8.28739 0.264048 7.64648C0.0442707 7.00068 -0.0404776 6.28152 0.0179545 5.61035C0.0757894 4.94623 0.27954 4.27344 0.693736 3.76856L0.89979 3.52637C3.0747 1.06993 6.56949 -0.000937214 10.0238 6.15427e-07Z"
-                                    fill={colors.ui.white}
+                                    fill={colors.text.primary}
                                     fillOpacity="0.95"
                                 />
                             </g>
@@ -5814,8 +5777,8 @@ function DebugConsole({
                 right: 20,
                 width: 300,
                 height: 400,
-                background: themeColors.canvas.light,
-                color: themeColors.text.secondary,
+                background: colors.surfaceHighlight,
+                color: colors.text.secondary,
                 fontFamily: "monospace",
                 fontSize: 12,
                 padding: 12,
@@ -5849,7 +5812,7 @@ function DebugConsole({
                     }}
                 >
                     <span style={{ opacity: 0.7 }}>🔗 Room:</span>
-                    <span style={{ color: themeColors.semantic.accent, fontWeight: "bold" }}>
+                    <span style={{ color: colors.semantic.accent, fontWeight: "bold" }}>
                         {typeof window !== "undefined"
                             ? window.location.hash || "(no hash)"
                             : "(no hash)"}
@@ -5866,7 +5829,7 @@ function DebugConsole({
                     <span style={{ opacity: 0.7 }}>👤 Role:</span>
                     <span
                         style={{
-                            color: role ? themeColors.semantic.success : themeColors.semantic.warning,
+                            color: role ? colors.coloredAccents.rainbow[3] : colors.coloredAccents.rainbow[1],
                             fontWeight: "bold",
                         }}
                     >
@@ -5886,10 +5849,10 @@ function DebugConsole({
                         style={{
                             color:
                                 status === "connected"
-                                    ? themeColors.semantic.success
+                                    ? colors.coloredAccents.rainbow[3]
                                     : status === "searching"
-                                      ? themeColors.semantic.warning
-                                      : themeColors.semantic.inactive,
+                                      ? colors.coloredAccents.rainbow[1]
+                                      : colors.text.tertiary,
                             fontWeight: "bold",
                         }}
                     >
@@ -5909,15 +5872,15 @@ function DebugConsole({
                 }}
             >
                 <div
-                    style={{ color: themeColors.text.primary, fontWeight: "bold", fontSize: 13 }}
+                    style={{ color: colors.text.primary, fontWeight: "bold", fontSize: 13 }}
                 >
                     🔍 Debug Logs
                 </div>
                 <button
                     onClick={handleCopy}
                     style={{
-                        background: copied ? themeColors.semantic.success : themeColors.semantic.accent,
-                        color: themeColors.text.primary,
+                        background: copied ? colors.coloredAccents.rainbow[3] : colors.semantic.accent,
+                        color: colors.text.primary,
                         border: "none",
                         borderRadius: 6,
                         padding: "4px 8px",
@@ -6004,7 +5967,7 @@ function ReportModal({
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: themeColors.overlay.modal,
+                background: colors.overlay.black,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -6017,14 +5980,14 @@ function ReportModal({
                 style={{
                     width: "100%",
                     maxWidth: 400,
-                    background: themeColors.surfaceModal,
+                    background: colors.background,
                     borderRadius: 28,
                     padding: 16,
                     display: "flex",
                     flexDirection: "column",
                     gap: 16,
-                    boxShadow: `0 8px 32px ${themeColors.overlay.dark}`,
-                    border: "1px solid ${themeColors.hover.strong}",
+                    boxShadow: "0 8px 32px hsla(0, 0%, 0%, 0.2)",
+                    border: `1px solid ${colors.hover.strong}`,
                 }}
             >
                 {/* Header */}
@@ -6037,7 +6000,7 @@ function ReportModal({
                 >
                     <div
                         style={{
-                            color: colors.ui.white,
+                            color: colors.text.primary,
                             fontSize: 18,
                             fontWeight: "600",
                         }}
@@ -6049,7 +6012,7 @@ function ReportModal({
                         style={{
                             background: "transparent",
                             border: "none",
-                            color: colors.ui.white,
+                            color: colors.text.primary,
                             cursor: "pointer",
                             padding: 0,
                             opacity: 0.8,
@@ -6076,7 +6039,7 @@ function ReportModal({
 
                 <div
                     style={{
-                        color: colors.ui.white,
+                        color: colors.text.primary,
                         fontSize: 16,
                         fontWeight: "500",
                         marginTop: 4,
@@ -6112,10 +6075,10 @@ function ReportModal({
                                     width: 16,
                                     height: 16,
                                     borderRadius: "50%",
-                                    border: `0.33px solid ${selected === reason ? colors.ui.white : themeColors.text.secondary}`,
+                                    border: `0.33px solid ${selected === reason ? colors.text.primary : colors.text.secondary}`,
                                     background:
                                         hoveredRow === reason
-                                            ? themeColors.misc.outlineSubtle
+                                            ? colors.border.subtle
                                             : "transparent",
                                     display: "flex",
                                     alignItems: "center",
@@ -6129,14 +6092,14 @@ function ReportModal({
                                             width: 7,
                                             height: 7,
                                             borderRadius: "50%",
-                                            background: colors.ui.white,
+                                            background: colors.text.primary,
                                         }}
                                     />
                                 )}
                             </div>
                             <div
                                 style={{
-                                    color: colors.ui.white,
+                                    color: colors.text.primary,
                                     fontSize: 16,
                                     fontWeight: "400",
                                     opacity: 0.95,
@@ -6163,9 +6126,9 @@ function ReportModal({
                             padding: "10px 12px",
                             borderRadius: 28,
                             background: selected
-                                ? colors.ui.white
-                                : themeColors.text.secondary,
-                            color: selected ? "black" : themeColors.text.secondary,
+                                ? colors.text.primary
+                                : colors.text.secondary,
+                            color: selected ? "black" : colors.text.secondary,
                             border: "none",
                             fontSize: 14,
                             fontWeight: "500",
@@ -6733,8 +6696,6 @@ function sanitizeMessage(text: string): string {
 }
 
 // --- HELPER: LIVE CURSOR ---
-// Colored accents moved to shared styles (colors.coloredAccents)
-// getRandomRainbowColor() helper moved to shared styles section
 
 function LiveCursor({
     x,
@@ -6852,7 +6813,7 @@ function LiveCursor({
                     <path
                         d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
                         fill={color}
-                        stroke={colors.ui.white}
+                        stroke={colors.text.primary}
                         strokeWidth="1.5"
                     />
                 </svg>
@@ -6883,7 +6844,7 @@ function LiveCursor({
                 <path
                     d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
                     fill={color}
-                    stroke={colors.ui.white}
+                    stroke={colors.text.primary}
                     strokeWidth="1.5"
                 />
             </svg>
@@ -6999,7 +6960,7 @@ const MessageBubble = React.memo(
             padding: 4,
         }
 
-        const hoverBackground = "${themeColors.hover.subtle}"
+        const hoverBackground = themeColors.hover.subtle
 
         const handleShare = React.useCallback(async () => {
             if (
@@ -7032,7 +6993,7 @@ const MessageBubble = React.memo(
             const MAX_BUBBLE_WIDTH = 224
 
             // Draw Background
-            ctx.fillStyle = colors.ui.white
+            ctx.fillStyle = themeColors.background
             ctx.fillRect(0, 0, 320, 400) // Logical coords
 
             // Helper: Rounded Rect
@@ -7052,7 +7013,7 @@ const MessageBubble = React.memo(
                 ctx.arcTo(x, y + h, x, y, r)
                 ctx.arcTo(x, y, x + w, y, r)
                 ctx.closePath()
-                ctx.fillStyle = "${themeColors.canvas.medium}"
+                ctx.fillStyle = themeColors.hover.message
                 ctx.fill()
             }
 
@@ -7127,7 +7088,7 @@ const MessageBubble = React.memo(
             roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 24)
 
             // Draw text with proper top-left alignment
-            ctx.fillStyle = "${themeColors.canvas.strong}"
+            ctx.fillStyle = themeColors.text.primary
             ctx.textAlign = "left"
             ctx.textBaseline = "top"
 
@@ -7150,7 +7111,7 @@ const MessageBubble = React.memo(
             ) => {
                 let currentY = startY
                 const baseFont = "400 16px Inter, sans-serif"
-                const baseColor = "${themeColors.canvas.strong}"
+                const baseColor = themeColors.text.primary
                 const lineHeight = 24
                 ctx.textAlign = "left"
                 ctx.textBaseline = "top"
@@ -7241,7 +7202,7 @@ const MessageBubble = React.memo(
                         } else if (codeInner !== undefined) {
                             content = codeInner
                             font = "400 14px 'Courier New', monospace"
-                            color = "${themeColors.canvas.codeText}"
+                            color = themeColors.text.primary
                         } else if (strikeInner !== undefined) {
                             content = strikeInner
                             // Strikethrough not easily rendered on canvas, render as normal
@@ -7292,7 +7253,7 @@ const MessageBubble = React.memo(
                             .replace(/```$/, "")
                         const lines = content.split("\n")
                         const blockHeight = lines.length * 20 + 8
-                        ctx.fillStyle = "${themeColors.canvas.light}"
+                        ctx.fillStyle = themeColors.surfaceHighlight
                         ctx.fillRect(startX, currentY, maxWidth, blockHeight)
                         ctx.font = "400 14px 'Courier New', monospace"
                         ctx.fillStyle = baseColor
@@ -7335,7 +7296,7 @@ const MessageBubble = React.memo(
 
                             // Horizontal rule
                             if (/^---+$|^\*\*\*+$/.test(trimmed)) {
-                                ctx.strokeStyle = themeColors.canvas.stroke
+                                ctx.strokeStyle = themeColors.border.subtle
                                 ctx.lineWidth = 1
                                 ctx.beginPath()
                                 ctx.moveTo(startX, currentY + 8)
@@ -7350,10 +7311,10 @@ const MessageBubble = React.memo(
                                 const content = trimmed
                                     .replace(/^>\s?/gm, "")
                                     .trim()
-                                ctx.fillStyle = "${themeColors.canvas.light}"
+                                ctx.fillStyle = themeColors.surfaceHighlight
                                 ctx.fillRect(startX, currentY, 4, 24)
                                 ctx.font = baseFont
-                                ctx.fillStyle = themeColors.canvas.darkFill
+                                ctx.fillStyle = themeColors.text.secondary
                                 processInlineFormatting(
                                     content,
                                     startX + 12,
@@ -7467,7 +7428,7 @@ const MessageBubble = React.memo(
 
                                             // Draw header background
                                             ctx.fillStyle =
-                                                "${themeColors.canvas.light}"
+                                                themeColors.surfaceHighlight
                                             ctx.fillRect(
                                                 startX,
                                                 currentY,
@@ -7499,7 +7460,7 @@ const MessageBubble = React.memo(
                                                 // Alternating row background
                                                 if (i % 2 === 1) {
                                                     ctx.fillStyle =
-                                                        themeColors.canvas.subtleFill
+                                                        themeColors.hover.subtle
                                                     ctx.fillRect(
                                                         startX,
                                                         currentY,
@@ -7551,9 +7512,9 @@ const MessageBubble = React.memo(
                                                 currentY += 24
                                             })
 
-                                            // Draw borders
+                                            // Draw table border
                                             ctx.strokeStyle =
-                                                themeColors.border.subtleDark
+                                                themeColors.border.subtle
                                             ctx.lineWidth = 1
                                             ctx.strokeRect(
                                                 startX,
@@ -7590,9 +7551,9 @@ const MessageBubble = React.memo(
 
             // 6. Draw Gradient
             const grad = ctx.createLinearGradient(0, 400, 0, 250) // Bottom up to 250
-            grad.addColorStop(0, colors.ui.white)
-            grad.addColorStop(0.5, colors.ui.white)
-            grad.addColorStop(1, themeColors.ui.transparent)
+            grad.addColorStop(0, themeColors.background)
+            grad.addColorStop(0.35, themeColors.background)
+            grad.addColorStop(1, themeColors.overlay.gradient)
             ctx.fillStyle = grad
             ctx.fillRect(0, 250, 320, 150)
 
@@ -8401,7 +8362,7 @@ const RoleSelectionButton = React.memo(
         const desc = isStudent
             ? "Join a call with a mentor"
             : "Support students with free advice"
-        const textColor = isStudent ? colors.ui.white : colors.text.primary
+        const textColor = colors.text.primary
 
         if (isCompact) {
             return (
@@ -8884,7 +8845,7 @@ const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(functio
                                 top: 0,
                                 left: 0,
                                 color: "transparent",
-                                caretColor: colors.ui.white,
+                                caretColor: colors.text.primary,
                                 background: "transparent",
                                 resize: "none",
                                 zIndex: 2,
@@ -8945,7 +8906,7 @@ const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(functio
                             style={{ cursor: "pointer" }}
                         >
                             <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M25.093 15.974L25.323 16.204C27.112 17.994 28.007 18.888 28.007 20C28.007 21.112 27.112 22.007 25.323 23.796L25.093 24.026M21.879 13L18.128 27M14.913 15.974L14.683 16.204C12.895 17.994 12 18.888 12 20C12 21.112 12.895 22.007 14.685 23.796L14.915 24.026" stroke={colors.ui.white} stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M25.093 15.974L25.323 16.204C27.112 17.994 28.007 18.888 28.007 20C28.007 21.112 27.112 22.007 25.323 23.796L25.093 24.026M21.879 13L18.128 27M14.913 15.974L14.683 16.204C12.895 17.994 12 18.888 12 20C12 21.112 12.895 22.007 14.685 23.796L14.915 24.026" stroke={colors.text.primary} stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
                     ) : (
@@ -8962,7 +8923,7 @@ const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(functio
                             }}
                         >
                             <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M25.1692 20C25.1692 20.7614 18.9674 24.5629 16.2377 25.9728C15.4682 26.3702 14.9347 26.0432 14.903 25.1777C14.8118 22.6836 14.8146 17.3166 14.9054 14.8224C14.9369 13.957 15.4717 13.6195 16.2432 14.013C18.9845 15.4113 25.1692 19.236 25.1692 20Z" stroke={colors.ui.white} stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M25.1692 20C25.1692 20.7614 18.9674 24.5629 16.2377 25.9728C15.4682 26.3702 14.9347 26.0432 14.903 25.1777C14.8118 22.6836 14.8146 17.3166 14.9054 14.8224C14.9369 13.957 15.4717 13.6195 16.2432 14.013C18.9845 15.4113 25.1692 19.236 25.1692 20Z" stroke={colors.text.primary} stroke-opacity="0.95" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </div>
                     )}
@@ -16660,7 +16621,7 @@ PREFERENCES:
             font-weight: 600;
         }
         .chat-markdown-code-block {
-            background: ${themeColors.overlay.dark};
+            background: ${themeColors.backgroundDark};
             border: 1px solid ${chatThemeColors.border.subtle};
             color: ${chatThemeColors.text.primary};
             padding: 12px;
@@ -16745,7 +16706,7 @@ PREFERENCES:
                     position: "relative",
                     background:
                         isWhiteboardOpen && isMobileLayout
-                            ? darkColors.ui.offWhite
+                            ? darkColors.text.primary
                             : chatThemeColors.background,
                     display: "flex",
                     flexDirection: "column",
@@ -16785,7 +16746,7 @@ PREFERENCES:
                         <button
                             onClick={isDocOpen ? toggleDoc : isWhiteboardOpen ? toggleWhiteboard : isAppOpen ? toggleApp : undefined}
                             style={{
-                                background: themeColors.canvas.light,
+                                background: themeColors.surfaceHighlight,
                                 border: "none",
                                 borderRadius: "50%",
                                 width: 32,
@@ -16897,7 +16858,7 @@ PREFERENCES:
                                     zIndex: 0,
                                     visibility: "visible",
                                     pointerEvents: "auto",
-                                    background: darkColors.ui.offWhite,
+                                    background: darkColors.text.primary,
                                 }}
                                 onPointerDown={(e) => e.stopPropagation()}
                             >
@@ -17474,7 +17435,7 @@ PREFERENCES:
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                background: `linear-gradient(180deg, ${themeColors.ui.transparentBlack} 0%, ${themeColors.background} 36px)`,
+                                background: `linear-gradient(180deg, ${themeColors.overlay.gradient} 0%, ${themeColors.background} 36px)`,
                                 pointerEvents: "none",
                                 zIndex: -1,
                             }}
@@ -17542,7 +17503,7 @@ PREFERENCES:
                                             cursor: "pointer",
                                             flexShrink: 0,
                                             background: themeColors.surface,
-                                            color: "${themeColors.text.secondary}",
+                                            color: themeColors.text.secondary,
                                             transition:
                                                 "background-color 0.2s ease",
                                             pointerEvents: "auto",
@@ -17561,7 +17522,7 @@ PREFERENCES:
                                                 justifyContent: "center",
                                                 display: "flex",
                                                 flexDirection: "column",
-                                                color: "${themeColors.text.secondary}",
+                                                color: themeColors.text.secondary,
                                                 fontSize: 15,
                                                 fontFamily: "Inter",
                                                 fontWeight: "400",
@@ -18392,7 +18353,7 @@ PREFERENCES:
                 >
                     <path
                         d="M10 14H26M10 22H20"
-                        stroke={colors.ui.white}
+                        stroke={colors.text.primary}
                         strokeOpacity="0.95"
                         strokeWidth="1.2"
                         strokeLinecap="round"
@@ -18561,7 +18522,7 @@ PREFERENCES:
                                                 justifyContent: "center",
                                                 display: "flex",
                                                 flexDirection: "column",
-                                                color: "${themeColors.text.secondary}",
+                                                color: themeColors.text.secondary,
                                                 fontSize: 14,
                                                 fontFamily: "Inter",
                                                 fontWeight: "400",
@@ -18756,7 +18717,7 @@ PREFERENCES:
                                                         alignItems: "center",
                                                         justifyContent:
                                                             "center",
-                                                        color: themeColors.misc.textMuted,
+                                                        color: themeColors.text.secondary,
                                                     }}
                                                 >
                                                     <div
@@ -18777,17 +18738,17 @@ PREFERENCES:
                                                         >
                                                             <path
                                                                 d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z"
-                                                                fill={colors.ui.white}
+                                                                fill={colors.text.primary}
                                                                 fillOpacity="0.95"
                                                             />
                                                             <path
                                                                 d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z"
-                                                                fill={colors.ui.white}
+                                                                fill={colors.text.primary}
                                                                 fillOpacity="0.95"
                                                             />
                                                             <path
                                                                 d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z"
-                                                                fill={colors.ui.white}
+                                                                fill={colors.text.primary}
                                                                 fillOpacity="0.95"
                                                             />
                                                         </svg>
@@ -18819,7 +18780,7 @@ PREFERENCES:
                                                         >
                                                             <path
                                                                 d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z"
-                                                                fill={colors.ui.white}
+                                                                fill={colors.text.primary}
                                                                 fillOpacity="0.45"
                                                             />
                                                         </svg>
@@ -18895,7 +18856,7 @@ PREFERENCES:
                                         >
                                             <path
                                                 d="M10 14H26M10 22H20"
-                                                stroke={colors.ui.white}
+                                                stroke={colors.text.primary}
                                                 strokeOpacity="0.95"
                                                 strokeWidth="1.2"
                                                 strokeLinecap="round"
@@ -18943,7 +18904,7 @@ PREFERENCES:
                                         >
                                             <path
                                                 d="M12.5625 23.4359L23.1691 12.8293M23.1691 12.8293L14.949 12.5641M23.1691 12.8293L23.4343 21.0494"
-                                                stroke={colors.ui.white}
+                                                stroke={colors.text.primary}
                                                 strokeOpacity="0.95"
                                                 strokeWidth="1.2"
                                                 strokeLinecap="round"
@@ -18982,7 +18943,7 @@ PREFERENCES:
                                         >
                                             <path
                                                 d="M10.9289 10.8023L14.7616 14.6M12.6167 6.5224C12.6167 8.09311 11.9837 9.5995 10.8571 10.7102C9.73045 11.8208 8.20241 12.4448 6.60911 12.4448C5.01581 12.4448 3.48777 11.8208 2.36113 10.7102C1.2345 9.5995 0.601563 8.09311 0.601562 6.5224C0.601563 4.95168 1.2345 3.44529 2.36113 2.33463C3.48777 1.22396 5.01581 0.599998 6.60911 0.599998C8.20241 0.599998 9.73045 1.22396 10.8571 2.33463C11.9837 3.44529 12.6167 4.95168 12.6167 6.5224Z"
-                                                stroke={colors.ui.white}
+                                                stroke={colors.text.primary}
                                                 strokeOpacity="0.65"
                                                 strokeWidth="1.2"
                                                 strokeLinecap="round"
@@ -18990,6 +18951,12 @@ PREFERENCES:
                                             />
                                         </svg>
                                     </div>
+                                    <style>{`
+                                        .Search::placeholder {
+                                            color: ${themeColors.text.secondary};
+                                            opacity: 1;
+                                        }
+                                    `}</style>
                                     <input
                                         value={searchQuery}
                                         onChange={(e) =>
@@ -18999,7 +18966,7 @@ PREFERENCES:
                                         className="Search"
                                         style={{
                                             flex: "1 1 0",
-                                            color: "${themeColors.text.primary}",
+                                            color: themeColors.text.primary,
                                             fontSize: 14,
                                             fontFamily: "Inter",
                                             fontWeight: "400",
@@ -19069,7 +19036,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M14.9998 8.00011C14.9998 11.1823 14.9998 12.773 13.9747 13.7615C12.9496 14.75 11.2992 14.75 7.99988 14.75C4.69983 14.75 3.05019 14.75 2.02509 13.7615C1 12.773 1 11.1816 1 8.00011C1 4.81792 1 3.22719 2.02509 2.23871C3.05019 1.25023 4.7006 1.25023 7.99988 1.25023M6.08114 7.36262C5.81571 7.61895 5.66661 7.96637 5.66659 8.32861V10.2501H7.67167C8.04733 10.2501 8.40821 10.1061 8.6742 9.84958L14.5852 4.14668C14.7168 4.01979 14.8213 3.86913 14.8925 3.70332C14.9637 3.53751 15.0004 3.3598 15.0004 3.18032C15.0004 3.00084 14.9637 2.82313 14.8925 2.65732C14.8213 2.49151 14.7168 2.34085 14.5852 2.21396L14.0011 1.65072C13.8695 1.52369 13.7132 1.42291 13.5412 1.35415C13.3692 1.28539 13.1848 1.25 12.9986 1.25C12.8124 1.25 12.628 1.28539 12.4559 1.35415C12.2839 1.42291 12.1276 1.52369 11.996 1.65072L6.08114 7.36262Z"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -19182,7 +19149,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M0.90625 16.6C1.15799 11.6536 5.40086 9.45122 9.20677 9.99276M9.36 13.7048H15.0923M12.3708 10.8677V16.6M11.5346 4.0622C11.5346 2.17646 9.95814 0.600006 8.0724 0.600006C6.18665 0.600006 4.6102 2.17646 4.6102 4.0622C4.6102 5.94794 6.18665 7.52439 8.0724 7.52439C9.95814 7.52439 11.5346 5.94794 11.5346 4.0622Z"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -19249,7 +19216,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M8.05538 16.1C9.6313 10.5447 10.2524 11.0933 15.5064 8.3493C9.98573 5.51695 9.55693 5.83813 8.05538 0.600006C6.47805 6.15528 5.85559 5.60536 0.601562 8.3493C6.1166 11.1803 6.55663 10.8745 8.05538 16.1Z"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -19289,7 +19256,7 @@ PREFERENCES:
                     style={{
                         width: "100%",
                         background: "transparent",
-                        color: "${themeColors.ui.mediumGray}",
+                        color: "${themeColors.text.secondary}",
                         padding: "12px 16px",
                         textAlign: "center",
                         fontSize: 14,
@@ -19304,7 +19271,7 @@ PREFERENCES:
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                            color: "${themeColors.ui.mediumGray}",
+                            color: "${themeColors.text.secondary}",
                             textDecoration: "underline",
                             fontWeight: 700,
                         }}
@@ -19337,8 +19304,7 @@ PREFERENCES:
                             style={{
                                 position: "absolute",
                                 inset: 0,
-                                background: themeColors.overlay.default,
-                                backdropFilter: isMobileLayout ? "blur(1px)" : "blur(1px)",
+                                background: themeColors.overlay.black,
                             }}
                             onClick={() => setShowYouSettings(false)}
                         />
@@ -19373,7 +19339,7 @@ PREFERENCES:
                                 paddingLeft: isMobileLayout ? 16 : 28,
                                 paddingRight: isMobileLayout ? 16 : 28,
                                 background: themeColors.background,
-                                boxShadow: `0px 4px 24px ${themeColors.overlay.veryLight}`,
+                                boxShadow: "0px 4px 24px hsla(0, 0%, 0%, 0.04)",
                                 overflow: "hidden",
                                 borderRadius: isMobileLayout ? "24px 24px 0 0" : 48,
                                 outline: "0.33px ${themeColors.hover.strong} solid",
@@ -19410,7 +19376,7 @@ PREFERENCES:
                                     className="You"
                                     style={{
                                         alignSelf: "stretch",
-                                        color: colors.ui.white,
+                                        color: colors.text.primary,
                                         fontSize: 16,
                                         fontFamily: "Inter",
                                         fontWeight: "400",
@@ -19428,7 +19394,7 @@ PREFERENCES:
                                         justifyContent: "center",
                                         display: "flex",
                                         flexDirection: "column",
-                                        color: "${themeColors.text.secondary}",
+                                        color: themeColors.text.secondary,
                                         fontSize: 12,
                                         fontFamily: "Inter",
                                         fontWeight: "400",
@@ -19469,7 +19435,7 @@ PREFERENCES:
                                     >
                                         <path
                                             d="M23.25 12.75L12.75 23.25M12.75 12.75L23.25 23.25"
-                                            stroke={colors.ui.white}
+                                            stroke={colors.text.primary}
                                             strokeOpacity="0.95"
                                             strokeWidth="1.2"
                                             strokeLinecap="round"
@@ -19683,7 +19649,7 @@ PREFERENCES:
                             >
                                 <path
                                     d="M24.9998 18.0001C24.9998 21.1823 24.9998 22.773 23.9747 23.7615C22.9496 24.75 21.2992 24.75 17.9999 24.75C14.6998 24.75 13.0502 24.75 12.0251 23.7615C11 22.773 11 21.1816 11 18.0001C11 14.8179 11 13.2272 12.0251 12.2387C13.0502 11.2502 14.7006 11.2502 17.9999 11.2502M16.0811 17.3626C15.8157 17.619 15.6666 17.9664 15.6666 18.3286V20.2501H17.6717C18.0473 20.2501 18.4082 20.1061 18.6742 19.8496L24.5852 14.1467C24.7168 14.0198 24.8213 13.8691 24.8925 13.7033C24.9637 13.5375 25.0004 13.3598 25.0004 13.1803C25.0004 13.0008 24.9637 12.8231 24.8925 12.6573C24.8213 12.4915 24.7168 12.3409 24.5852 12.214L24.0011 11.6507C23.8695 11.5237 23.7132 11.4229 23.5412 11.3541C23.3692 11.2854 23.1848 11.25 22.9986 11.25C22.8124 11.25 22.628 11.2854 22.4559 11.3541C22.2839 11.4229 22.1276 11.5237 21.996 11.6507L16.0811 17.3626Z"
-                                    stroke={colors.ui.white}
+                                    stroke={colors.text.primary}
                                     strokeOpacity="0.95"
                                     strokeWidth="1.2"
                                     strokeLinecap="round"
@@ -19776,7 +19742,7 @@ PREFERENCES:
                     width: "100%",
                     height: "100%",
                     zIndex: 99999,
-                    background: themeColors.overlay.default,
+                    background: themeColors.overlay.black,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -19856,7 +19822,7 @@ PREFERENCES:
                                 zIndex: 9998,
                                 cursor: "default",
                                 background: isMobileLayout
-                                    ? themeColors.overlay.default
+                                    ? themeColors.overlay.black
                                     : "transparent",
                             }}
                             onClick={(e) => {
@@ -19901,8 +19867,7 @@ PREFERENCES:
                                           width: 196,
                                           padding: 10,
                                           background: themeColors.surfaceMenu,
-                                          boxShadow:
-                                              "0px 4px 24px ${themeColors.canvas.medium}",
+                                          boxShadow: "0px 4px 24px hsla(0, 0%, 0%, 0.08)",
                                           borderRadius: 28,
                                           outline:
                                               "0.33px ${themeColors.hover.strong} solid",
@@ -19929,7 +19894,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M0.796875 11.3786V12.275C0.796875 12.9911 1.08134 13.6778 1.58769 14.1842C2.09403 14.6905 2.78079 14.975 3.49687 14.975H12.4969C13.213 14.975 13.8997 14.6905 14.4061 14.1842C14.9124 13.6778 15.1969 12.9911 15.1969 12.275V11.375M7.99687 10.925V1.025M7.99687 1.025L11.1469 4.175M7.99687 1.025L4.84687 4.175"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -19952,7 +19917,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M13.7466 6.61748L5.43491 14.9325C5.00818 15.3595 4.42939 15.5995 3.82574 15.6H0.601562V12.3967C0.601562 11.7933 0.841563 11.2142 1.26823 10.7875L10.7766 1.2683C10.988 1.05651 11.2392 0.888481 11.5156 0.77381C11.7921 0.659139 12.0884 0.600076 12.3877 0.599999C12.687 0.599921 12.9833 0.65883 13.2598 0.773358C13.5363 0.887886 13.7875 1.05579 13.9991 1.26746L14.9374 2.20663C15.3645 2.63375 15.6045 3.21303 15.6045 3.81705C15.6045 4.42108 15.3645 5.00036 14.9374 5.42747L13.7466 6.61748ZM13.7466 6.61748L9.58742 2.4583"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -19975,17 +19940,17 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M3.61219 6.66505C3.84674 6.66157 4.11171 6.66951 4.37683 6.67872L5.57408 7.90234C5.16225 7.90665 4.74889 7.89255 4.38855 7.87988C3.99177 7.86593 3.67685 7.85673 3.45106 7.87109C3.17446 7.88872 2.82596 8.14464 2.62684 8.59374C2.42793 9.04267 2.49466 9.40603 2.67274 9.58396L7.6141 14.5263C7.79323 14.7053 8.15755 14.7719 8.60628 14.5732C9.05537 14.3741 9.31132 14.0261 9.32893 13.749C9.34312 13.5229 9.33317 13.2073 9.31916 12.8105C9.30726 12.4734 9.29485 12.0901 9.2967 11.705L10.5233 12.957C10.5336 13.2703 10.5417 13.5762 10.5262 13.8242C10.4706 14.7067 9.78154 15.3655 9.0926 15.6708C8.44618 15.9572 7.55502 16.0351 6.89438 15.4921L6.76548 15.3749L4.71862 13.3281L1.02334 17.0243C0.789076 17.2586 0.410024 17.2585 0.175696 17.0243C-0.058565 16.79 -0.0585655 16.411 0.175696 16.1767L3.87 12.4794L1.82412 10.4326C1.15477 9.76359 1.22403 8.7962 1.5292 8.10742C1.83442 7.41895 2.49268 6.72947 3.37488 6.67384L3.61219 6.66505Z"
-                                                    fill={colors.ui.white}
+                                                    fill={colors.text.primary}
                                                     fillOpacity="0.95"
                                                 />
                                                 <path
                                                     d="M0.314366 0.397528C0.511812 0.204725 0.828424 0.208084 1.02139 0.405341L6.98911 6.5127H6.99204L7.86703 7.40527L7.86312 7.40723L9.77228 9.36131C9.77342 9.35957 9.77505 9.35816 9.77619 9.35643L10.6639 10.2627C10.6629 10.2656 10.6619 10.2685 10.6609 10.2715L16.0369 15.7734C16.2298 15.9708 16.2263 16.2874 16.0291 16.4804C15.8316 16.6733 15.515 16.6699 15.322 16.4726L0.306554 1.10455C0.113661 0.907105 0.117057 0.59052 0.314366 0.397528Z"
-                                                    fill={colors.ui.white}
+                                                    fill={colors.text.primary}
                                                     fillOpacity="0.95"
                                                 />
                                                 <path
                                                     d="M10.5047 0.35749C11.0516 -0.00459142 11.9578 -0.250724 12.6385 0.429755L16.7683 4.56057C17.451 5.24176 17.2044 6.14765 16.8416 6.69434C16.6484 6.98522 16.3879 7.24439 16.0945 7.43066C15.8414 7.59129 15.5327 7.71638 15.2009 7.73144H15.0574C14.8582 7.72095 14.6246 7.68762 14.4177 7.66015C14.1981 7.63099 13.9857 7.60485 13.783 7.59473C13.3896 7.57513 13.187 7.62869 13.0916 7.69336L13.0574 7.7207L11.2977 9.48045L10.4578 8.62304L12.2088 6.87208C12.6819 6.39988 13.3717 6.37294 13.8435 6.39649C14.1011 6.40938 14.3577 6.44173 14.5759 6.47071C14.807 6.50141 14.9816 6.5259 15.1209 6.53321L15.1785 6.52931C15.2452 6.51967 15.3393 6.48943 15.4519 6.41798C15.5975 6.32551 15.7378 6.18738 15.8416 6.03126C16.0724 5.68355 16.0031 5.49159 15.9216 5.41018L11.7908 1.27838C11.7098 1.19735 11.5164 1.12768 11.1678 1.35846C11.0113 1.46205 10.8732 1.60193 10.7811 1.74712C10.6865 1.89621 10.6633 2.01205 10.6668 2.07622V2.07915C10.6741 2.21844 10.6986 2.39309 10.7293 2.62407C10.7583 2.84224 10.7907 3.09894 10.8035 3.35648C10.8271 3.82819 10.8 4.51623 10.3279 4.98928L8.59554 6.72071L7.7557 5.8633L9.47932 4.14163L9.50666 4.10745C9.57136 4.012 9.62493 3.80929 9.60529 3.41605C9.59516 3.21358 9.56902 3.00171 9.53986 2.78227C9.51249 2.57622 9.47918 2.34335 9.46858 2.14458C9.44659 1.75729 9.58359 1.39439 9.7674 1.10455C9.95384 0.810629 10.2135 0.55033 10.5047 0.35749Z"
-                                                    fill={colors.ui.white}
+                                                    fill={colors.text.primary}
                                                     fillOpacity="0.95"
                                                 />
                                             </svg>
@@ -19999,7 +19964,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M0.601562 16.6008L4.71716 12.4843M2.25047 10.0088C1.40246 9.16164 2.2558 7.34562 3.41493 7.27273C4.46205 7.20606 6.88607 7.58562 7.69231 6.77939L9.90566 4.56603C10.4541 4.01669 10.1057 2.78824 10.0701 2.1109C10.0186 1.20778 11.455 0.0922083 12.2168 0.853994L16.3475 4.98559C17.112 5.74827 15.9919 7.18028 15.0915 7.13228C14.4142 7.09673 13.1848 6.74828 12.6355 7.29673L10.4221 9.51009C9.61677 10.3163 9.99544 12.7395 9.92966 13.7866C9.85677 14.9466 8.04075 15.7999 7.19185 14.951L2.25047 10.0088Z"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -20023,7 +19988,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M1.33594 15.6V11.1726M1.33594 11.1726C6.18414 7.38101 9.82072 14.9641 14.6689 11.1726V1.69449C9.82072 5.48606 6.18414 -2.09708 1.33594 1.69449V11.1726Z"
-                                                    stroke={colors.ui.white}
+                                                    stroke={colors.text.primary}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -20051,7 +20016,7 @@ PREFERENCES:
                                             >
                                                 <path
                                                     d="M13.3359 4.33333L12.5893 11.7982C12.4764 12.9298 12.4204 13.4951 12.1626 13.9227C11.9365 14.299 11.604 14.6 11.207 14.7876C10.7564 15 10.1893 15 9.05149 15H6.95371C5.81683 15 5.24883 15 4.79816 14.7867C4.40087 14.5992 4.06804 14.2983 3.84172 13.9218C3.58572 13.4951 3.52883 12.9298 3.41505 11.7982L2.66927 4.33333M9.33594 11.3111V6.86667M6.66927 11.3111V6.86667M1.33594 4.11111H5.43816M5.43816 4.11111L5.78127 1.736C5.88083 1.304 6.23994 1 6.65238 1H9.35283C9.76527 1 10.1235 1.304 10.2239 1.736L10.567 4.11111M5.43816 4.11111H10.567M10.567 4.11111H14.6693"
-                                                    stroke={themeColors.destructive.light}
+                                                    stroke={colors.destructive.light}
                                                     strokeOpacity="0.95"
                                                     strokeWidth="1.2"
                                                     strokeLinecap="round"
@@ -20092,7 +20057,7 @@ PREFERENCES:
                                                         height: 1,
                                                         position: "relative",
                                                         background:
-                                                            "${themeColors.hover.strong}",
+                                                            themeColors.hover.strong,
                                                         borderRadius: 4,
                                                     }}
                                                 />
