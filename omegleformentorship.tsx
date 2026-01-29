@@ -7125,6 +7125,9 @@ const MessageBubble = React.memo(
         const [isWhiteboardHovered, setIsWhiteboardHovered] =
             React.useState(false)
         const [isAppHovered, setIsAppHovered] = React.useState(false)
+        const [isUserMessageHovered, setIsUserMessageHovered] = React.useState(false)
+        const [isUserCopyHovered, setIsUserCopyHovered] = React.useState(false)
+        const userMessageHoverTimeoutRef = React.useRef<number | null>(null)
 
         const actionButtonBaseStyle: React.CSSProperties = {
             width: 28,
@@ -7821,6 +7824,15 @@ const MessageBubble = React.memo(
             img.src = logoUrl
         }, [msg, previousMsg])
 
+        // Cleanup timeout on unmount
+        React.useEffect(() => {
+            return () => {
+                if (userMessageHoverTimeoutRef.current !== null) {
+                    clearTimeout(userMessageHoverTimeoutRef.current)
+                }
+            }
+        }, [])
+
         return (
             <div
                 id={id}
@@ -7832,6 +7844,8 @@ const MessageBubble = React.memo(
                     scrollMarginTop: 24,
                     // FIX: Removed "Snap to Top" min-height logic as it caused excessive scrolling space.
                     minHeight: "auto",
+                    marginTop: (msg.role === "user" || msg.role === "peer") ? 24 : 0, // Add margin to the top of the user message
+                    marginBottom: (msg.role === "user" || msg.role === "peer") ? 8 : 0, // Add margin to the bottom of the user message
                 }}
             >
                 <div
@@ -7849,6 +7863,32 @@ const MessageBubble = React.memo(
                         gap: 8,
                         alignItems:
                             msg.role === "user" ? "flex-end" : "flex-start",
+                    }}
+                    onMouseEnter={() => {
+                        if (
+                            (msg.role === "user" || msg.role === "peer") &&
+                            isHoverCapable()
+                        ) {
+                            // Clear any existing timeout
+                            if (userMessageHoverTimeoutRef.current !== null) {
+                                clearTimeout(userMessageHoverTimeoutRef.current)
+                            }
+                            // Set hover state after 0.1 seconds
+                            userMessageHoverTimeoutRef.current = window.setTimeout(() => {
+                                setIsUserMessageHovered(true)
+                                userMessageHoverTimeoutRef.current = null
+                            }, 100) // 100ms delay to prevent hover state from being set too early
+                        }
+                    }}
+                    onMouseLeave={() => {
+                        if (msg.role === "user" || msg.role === "peer") {
+                            // Clear timeout if mouse leaves before delay completes
+                            if (userMessageHoverTimeoutRef.current !== null) {
+                                clearTimeout(userMessageHoverTimeoutRef.current)
+                                userMessageHoverTimeoutRef.current = null
+                            }
+                            setIsUserMessageHovered(false)
+                        }
                     }}
                 >
                     {/* Attachments rendering */}
@@ -8022,6 +8062,116 @@ const MessageBubble = React.memo(
                                   )}
                         </div>
                     )}
+
+                    {/* User Message Copy Button */}
+                    {(msg.role === "user" || msg.role === "peer") &&
+                        msg.text && (
+                            <div
+                                data-layer="user message copy button"
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "flex-end",
+                                    alignItems: "center",
+                                    marginTop: -4,
+                                    opacity: isUserMessageHovered ? 1 : 0,
+                                    transition: "opacity 0.1s ease",
+                                    pointerEvents: isUserMessageHovered ? "auto" : "none",
+                                }}
+                            >
+                                <div
+                                    data-svg-wrapper
+                                    data-layer="copy button (user message)"
+                                    style={{
+                                        ...actionButtonBaseStyle,
+                                        background: isUserCopyHovered
+                                            ? hoverBackground
+                                            : "transparent",
+                                    }}
+                                    onMouseEnter={() =>
+                                        isHoverCapable() &&
+                                        setIsUserCopyHovered(true)
+                                    }
+                                    onMouseLeave={() =>
+                                        setIsUserCopyHovered(false)
+                                    }
+                                    onClick={() => {
+                                        if (
+                                            typeof navigator !== "undefined" &&
+                                            navigator.clipboard
+                                        ) {
+                                            navigator.clipboard.writeText(
+                                                msg.text
+                                            )
+                                            if (onCopy && id) {
+                                                onCopy(id)
+                                            }
+                                        }
+                                    }}
+                                >
+                                    {copiedMessageId === id ? (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="copy checkmark icon (show on successful copy to clipboard for 2 seconds)"
+                                            className="CopyCheckmarkIconShowOnSuccessfulCopyToClipboardFor2Seconds"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="12"
+                                                height="12"
+                                                viewBox="0 0 12 12"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    clipRule="evenodd"
+                                                    d="M11.6256 0.149029C12.0167 0.415701 12.1177 0.948951 11.8509 1.34007L5.42242 10.7686C5.27868 10.9795 5.04836 11.1153 4.79431 11.1391C4.54015 11.1629 4.28864 11.0723 4.10816 10.8918L0.251047 7.03469C-0.0836823 6.69998 -0.0836823 6.15724 0.251047 5.82253C0.585785 5.48782 1.12849 5.48782 1.46323 5.82253L4.58884 8.94816L10.4346 0.374361C10.7013 -0.016759 11.2345 -0.117644 11.6256 0.149029Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                            </svg>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            data-svg-wrapper
+                                            data-layer="copy icon"
+                                            className="CopyIcon"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 14 14"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M9.28734 7.57185C9.28734 6.96242 9.28733 6.53928 9.2605 6.21051C9.24078 5.96894 9.20829 5.8063 9.16422 5.68307L9.11656 5.57172C8.98453 5.31276 8.78349 5.09579 8.53718 4.94464L8.4283 4.88352C8.29285 4.81461 8.11136 4.76581 7.78952 4.73952C7.46074 4.71267 7.03765 4.71272 6.4282 4.71272H3.99941C3.38983 4.71272 2.96689 4.71266 2.63809 4.73952C2.39637 4.75927 2.2339 4.79168 2.11064 4.8358L1.99929 4.88352C1.74028 5.01549 1.52336 5.21646 1.37221 5.46288L1.31193 5.57172C1.24295 5.70717 1.19423 5.88852 1.16793 6.21051C1.14108 6.53929 1.1403 6.96239 1.1403 7.57185V10.0006C1.1403 10.6102 1.14106 11.0332 1.16793 11.362C1.19425 11.684 1.24291 11.8653 1.31193 12.0007L1.37221 12.1088C1.52336 12.3553 1.74016 12.556 1.99929 12.6881L2.11064 12.7367C2.23388 12.7807 2.39645 12.8124 2.63809 12.8321C2.96689 12.859 3.38983 12.8598 3.99941 12.8598H6.4282C7.03765 12.8598 7.46074 12.859 7.78952 12.8321C8.11153 12.8058 8.29285 12.7571 8.4283 12.6881L8.53718 12.6279C8.78358 12.4766 8.98453 12.2597 9.11656 12.0007L9.16422 11.8894C9.20838 11.7662 9.24078 11.6036 9.2605 11.362C9.28742 11.0332 9.28734 10.6102 9.28734 10.0006V7.57185ZM10.4276 9.28476C10.8175 9.28339 11.1161 9.28065 11.362 9.2605C11.684 9.23418 11.8653 9.18549 12.0007 9.11656L12.1088 9.05543C12.3553 8.9042 12.5561 8.68739 12.6881 8.4283L12.7367 8.31694C12.7807 8.19374 12.8124 8.03103 12.8321 7.78952C12.859 7.46074 12.8598 7.03765 12.8598 6.4282V3.99941C12.8598 3.38983 12.859 2.96689 12.8321 2.63809C12.8124 2.39645 12.7807 2.23388 12.7367 2.11064L12.6881 1.99929C12.556 1.74016 12.3553 1.52336 12.1088 1.37221L12.0007 1.31193C11.8653 1.24291 11.684 1.19425 11.362 1.16793C11.0332 1.14106 10.6102 1.1403 10.0006 1.1403H7.57185C6.96238 1.1403 6.53929 1.14108 6.21051 1.16793C5.969 1.18766 5.80629 1.21931 5.68307 1.26337L5.57172 1.31193C5.31261 1.44395 5.0958 1.64473 4.94464 1.89129L4.88352 1.99929C4.81455 2.13473 4.76583 2.31612 4.73952 2.63809C4.71943 2.88398 4.7158 3.18255 4.71441 3.57243H6.4282C7.01888 3.57243 7.49649 3.57188 7.88245 3.60341C8.2751 3.63549 8.62352 3.70339 8.94655 3.86797L9.13328 3.97262C9.55825 4.23329 9.90443 4.60685 10.132 5.05347L10.189 5.17571C10.3129 5.46421 10.3686 5.77383 10.3966 6.11758C10.4282 6.50356 10.4276 6.98115 10.4276 7.57185V9.28476ZM14 6.4282C14 7.01888 14.0006 7.49649 13.9691 7.88245C13.9409 8.22615 13.8852 8.53581 13.7614 8.8243L13.7045 8.94655C13.4769 9.39313 13.1306 9.76675 12.7057 10.0275L12.5181 10.132C12.1953 10.2966 11.8474 10.3646 11.4549 10.3966C11.166 10.4203 10.8257 10.4237 10.4251 10.4251C10.4237 10.8257 10.4203 11.166 10.3966 11.4549C10.3686 11.7984 10.3127 12.1076 10.189 12.3959L10.132 12.5181C9.90443 12.9649 9.55833 13.3391 9.13328 13.5998L8.94655 13.7045C8.62352 13.8691 8.2751 13.937 7.88245 13.9691C7.49649 14.0006 7.01888 14 6.4282 14H3.99941C3.40864 14 2.93115 14.0006 2.54516 13.9691C2.20167 13.941 1.89243 13.8851 1.60412 13.7614L1.48189 13.7045C1.03519 13.4769 0.660897 13.1307 0.400196 12.7057L0.295543 12.5181C0.131101 12.1953 0.0630563 11.8474 0.0309755 11.4549C-0.000556545 11.0688 6.49256e-07 10.5914 6.49256e-07 10.0006V7.57185C6.49256e-07 6.98116 -0.000547973 6.50355 0.0309755 6.11758C0.0630563 5.72493 0.130964 5.37648 0.295543 5.05347L0.400196 4.86678C0.660905 4.4417 1.03512 4.0956 1.48189 3.86797L1.60412 3.81103C1.89245 3.68735 2.20165 3.63148 2.54516 3.60341C2.8339 3.57982 3.17389 3.57548 3.57411 3.57411C3.57548 3.17389 3.57982 2.8339 3.60341 2.54516C3.63548 2.15265 3.70349 1.80479 3.86797 1.48189L3.97262 1.29435C4.23331 0.869456 4.60687 0.523117 5.05347 0.295543L5.17571 0.238609C5.46418 0.114795 5.77388 0.0590612 6.11758 0.0309755C6.50355 -0.000547973 6.98116 6.49247e-07 7.57185 6.49247e-07H10.0006C10.5914 6.49247e-07 11.0688 -0.000556545 11.4549 0.0309755C11.8474 0.0630563 12.1953 0.131101 12.5181 0.295543L12.7057 0.400196C13.1307 0.660897 13.4769 1.03519 13.7045 1.48189L13.7614 1.60412C13.8851 1.89243 13.941 2.20167 13.9691 2.54516C14.0006 2.93115 14 3.40864 14 3.99941V6.4282Z"
+                                                    fill={
+                                                        themeColors.text
+                                                            .tertiary
+                                                    }
+                                                />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                     {/* Tool Buttons */}
                     {(showDocButton || showWhiteboardButton || showAppButton) && (
@@ -17436,7 +17586,7 @@ PREFERENCES:
                         overflowX: "visible",
                         display: "flex",
                         flexDirection: "column",
-                        gap: 16,
+                        gap: 0,
                         overscrollBehavior: "contain",
                         WebkitOverflowScrolling: "touch",
                         touchAction: "pan-y",
