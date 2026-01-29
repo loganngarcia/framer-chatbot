@@ -19018,7 +19018,7 @@ PREFERENCES:
                             >
                                 {chatHeight < currentConstraints.maxHeight - 5
                                     ? "Click to expand chat"
-                                    : "Click to hide chat"}
+                                    : "Click to collapse chat"}
                             </Tooltip>
                         )}
                     </motion.div>
