@@ -5934,6 +5934,7 @@ function ReportModal({
 }: ReportModalProps) {
     const [selected, setSelected] = React.useState<string | null>(null)
     const [hoveredRow, setHoveredRow] = React.useState<string | null>(null)
+    const [isCloseHovered, setIsCloseHovered] = React.useState(false)
 
     const reasons = [
         "Violence & self-harm",
@@ -5947,105 +5948,179 @@ function ReportModal({
         "Something else",
     ]
 
+    // Reset selected when modal opens/closes
+    React.useEffect(() => {
+        if (!isOpen) {
+            setSelected(null)
+        }
+    }, [isOpen])
+
     const handleBackdropClick = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) onClose()
     }
 
-    if (!isOpen) return null
-
+    const isMobileLayout = typeof window !== "undefined" && window.innerWidth < 768
     const isMultiParty = participantCount > 2
     const title = "Report user"
     const question = isMultiParty
         ? "Why are you reporting this user? User in violation will be banned."
         : "Why are you reporting this user?"
 
+    if (!isOpen) return null
+
     return (
-        <div
-            style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: colors.overlay.black,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 10000,
-                padding: 24,
-            }}
-            onClick={handleBackdropClick}
-        >
-            <div
-                style={{
-                    width: "100%",
-                    maxWidth: 400,
-                    background: colors.background,
-                    borderRadius: 28,
-                    padding: 16,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 16,
-                    boxShadow: "0 8px 32px hsla(0, 0%, 0%, 0.2)",
-                    border: `1px solid ${colors.hover.strong}`,
-                }}
-            >
+        <AnimatePresence>
+            {isOpen && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 10000,
+                        display: "flex",
+                        justifyContent: isMobileLayout ? "flex-end" : "center",
+                        alignItems: isMobileLayout ? "flex-end" : "center",
+                        pointerEvents: "auto",
+                    }}
+                >
+                    {/* Background Dimmer */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1, transition: isMobileLayout ? { duration: 0.2 } : { duration: 0.1, delay: 0.1 } }}
+                        exit={{ opacity: 0, transition: isMobileLayout ? { duration: 0.2 } : { duration: 0, delay: 0 } }}
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            background: colors.overlay.black,
+                        }}
+                        onClick={handleBackdropClick}
+                    />
+
+                    {/* Content Card */}
+                    <motion.div
+                        data-layer="report overlay"
+                        className="ReportOverlay"
+                        initial={
+                            isMobileLayout
+                                ? { y: "100%", scale: 0, opacity: 0 }
+                                : { opacity: 0 }
+                        }
+                        animate={
+                            isMobileLayout
+                                ? { y: "0%", scale: 1, opacity: 1, transition: { duration: 0.25, ease: "easeInOut" } }
+                                : { opacity: 1, transition: { duration: 0, delay: 0.1 } }
+                        }
+                        exit={
+                            isMobileLayout
+                                ? { y: "100%", scale: 0, opacity: 0, transition: { duration: 0.25, ease: "easeInOut" } }
+                                : { opacity: 0, transition: { duration: 0, delay: 0 } }
+                        }
+                        style={{
+                            flex: isMobileLayout ? "none" : "none",
+                            width: isMobileLayout ? "100%" : 400,
+                            height: isMobileLayout ? "calc(100% - 16px)" : "auto",
+                            maxWidth: isMobileLayout ? "none" : 400,
+                            maxHeight: isMobileLayout ? "none" : 600,
+                            paddingTop: 24,
+                            paddingBottom: 28,
+                            paddingLeft: isMobileLayout ? 16 : 28,
+                            paddingRight: isMobileLayout ? 16 : 28,
+                            background: colors.background,
+                            boxShadow: "0px 4px 24px hsla(0, 0%, 0%, 0.04)",
+                            overflow: isMobileLayout ? "hidden" : "visible",
+                            borderRadius: isMobileLayout ? "24px 24px 0 0" : 48,
+                            outline: `0.33px ${colors.hover.strong} solid`,
+                            outlineOffset: "-0.33px",
+                            flexDirection: "column",
+                            justifyContent: "flex-start",
+                            alignItems: "flex-start",
+                            gap: 24,
+                            display: "inline-flex",
+                            position: "relative",
+                            zIndex: 1,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                 {/* Header */}
                 <div
                     style={{
-                        display: "flex",
-                        justifyContent: "space-between",
+                        alignSelf: "stretch",
+                        height: "auto",
+                        position: "relative",
+                        flexDirection: "column",
+                        justifyContent: "center",
                         alignItems: "flex-start",
+                        gap: 8,
+                        display: "flex",
                     }}
                 >
                     <div
                         style={{
+                            alignSelf: "stretch",
                             color: colors.text.primary,
-                            fontSize: 18,
-                            fontWeight: "600",
+                            fontSize: 16,
+                            fontFamily: "Inter",
+                            fontWeight: "400",
+                            lineHeight: "18px",
+                            wordWrap: "break-word",
                         }}
                     >
                         {title}
                     </div>
-                    <button
-                        onClick={onClose}
+                    <div
                         style={{
-                            background: "transparent",
-                            border: "none",
-                            color: colors.text.primary,
-                            cursor: "pointer",
-                            padding: 0,
-                            opacity: 0.8,
-                            marginTop: -4,
+                            alignSelf: "stretch",
+                            justifyContent: "center",
+                            display: "flex",
+                            flexDirection: "column",
+                            color: colors.text.secondary,
+                            fontSize: 12,
+                            fontFamily: "Inter",
+                            fontWeight: "400",
+                            lineHeight: "17px",
+                            wordWrap: "break-word",
                         }}
                     >
+                        {question}
+                    </div>
+                    <div
+                        data-svg-wrapper
+                        data-layer="close report button"
+                        className="CloseReportButtonHasAFillHoverEffect"
+                        style={{
+                            right: isMobileLayout ? 0 : -12,
+                            top: -12,
+                            position: "absolute",
+                            cursor: "pointer",
+                            width: 36,
+                            height: 36,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: isCloseHovered ? colors.hover.strong : "transparent",
+                            borderRadius: "50%",
+                            transition: "background 0.2s",
+                        }}
+                        onClick={onClose}
+                        onMouseEnter={() => !isMobileLayout && setIsCloseHovered(true)}
+                        onMouseLeave={() => setIsCloseHovered(false)}
+                    >
                         <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
+                            width="36"
+                            height="36"
+                            viewBox="0 0 36 36"
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"
                         >
                             <path
-                                d="M18 6L6 18M6 6L18 18"
-                                stroke="currentColor"
-                                strokeWidth="2"
+                                d="M23.25 12.75L12.75 23.25M12.75 12.75L23.25 23.25"
+                                stroke={colors.text.primary}
+                                strokeOpacity="0.95"
+                                strokeWidth="1.2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                             />
                         </svg>
-                    </button>
-                </div>
-
-                <div
-                    style={{
-                        color: colors.text.primary,
-                        fontSize: 16,
-                        fontWeight: "500",
-                        marginTop: 4,
-                    }}
-                >
-                    {question}
+                    </div>
                 </div>
 
                 {/* Options List */}
@@ -6053,7 +6128,6 @@ function ReportModal({
                     style={{
                         display: "flex",
                         flexDirection: "column",
-                        marginTop: 4,
                     }}
                 >
                     {reasons.map((reason) => (
@@ -6100,7 +6174,8 @@ function ReportModal({
                             <div
                                 style={{
                                     color: colors.text.primary,
-                                    fontSize: 16,
+                                    fontSize: 15,
+                                    fontFamily: "Inter",
                                     fontWeight: "400",
                                     opacity: 0.95,
                                 }}
@@ -6116,7 +6191,6 @@ function ReportModal({
                     style={{
                         display: "flex",
                         justifyContent: "flex-end",
-                        marginTop: 4,
                     }}
                 >
                     <button
@@ -6127,10 +6201,11 @@ function ReportModal({
                             borderRadius: 28,
                             background: selected
                                 ? colors.text.primary
-                                : colors.text.secondary,
-                            color: selected ? "black" : colors.text.secondary,
+                                : colors.surface,
+                            color: selected ? colors.surfaceBlack : colors.text.tertiary,
                             border: "none",
                             fontSize: 14,
+                            fontFamily: "Inter",
                             fontWeight: "500",
                             cursor: selected ? "pointer" : "default",
                             boxSizing: "border-box",
@@ -6139,8 +6214,10 @@ function ReportModal({
                         Submit
                     </button>
                 </div>
-            </div>
-        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
     )
 }
 
