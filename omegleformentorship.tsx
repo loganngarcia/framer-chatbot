@@ -16926,6 +16926,9 @@ PREFERENCES:
                     borderRadius: isMobileLayout
                         ? "28px 28px 0 0"
                         : "28px 0 0 28px",
+                    boxShadow: !isMobileLayout && !isWhiteboardOpen
+                        ? "2px 0 24px 2px rgba(0,0,0,0.04)"
+                        : "none",
                     border: "none",
                     paddingBottom: isMobileLayout ? mobileInputHeight : 0,
                 }}
@@ -19613,7 +19616,7 @@ PREFERENCES:
                                         wordWrap: "break-word",
                                     }}
                                 >
-                                    Make conversations more relevant and personal. This information may be shared with others.
+                                    Make chats more relevant and personal. This information may be shared with people you connect with.
                                 </div>
                                 <div
                                     data-svg-wrapper
@@ -19929,7 +19932,7 @@ PREFERENCES:
                             style={{
                                 flex: 1,
                                 position: "relative",
-                                zIndex: 10,
+                                zIndex: 30, // Higher than chat panel (20) so shadow overlays onto it
                                 background: themeColors.background,
                             }}
                         >
