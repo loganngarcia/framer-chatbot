@@ -2140,12 +2140,13 @@ const ChatInputEye = ({ config, id }: { config: any; id: string }) => (
 )
 
 // Custom hook for chat input icon eye animation with interaction detection
+// Animations only run on initial page load and stop completely after any user interaction
 const useChatIconAnimation = () => {
     const [currentState, setCurrentState] = React.useState(CHAT_INPUT_EYE_STATES.LOOKING)
     const [isMounted, setIsMounted] = React.useState(false)
     const hasInteractedRef = React.useRef(false)
     const isLookingDownRef = React.useRef(false)
-    const timeoutIdRef = React.useRef<any>(null)
+    const timeoutIdsRef = React.useRef<any[]>([])
 
     React.useEffect(() => {
         const delayTimer = setTimeout(() => setIsMounted(true), 200)
@@ -2156,12 +2157,15 @@ const useChatIconAnimation = () => {
         const handleInteraction = () => {
             if (hasInteractedRef.current) return
             hasInteractedRef.current = true
-            if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
-            setCurrentState((prev) =>
-                prev.id === "looking_down" || prev.id === "blinking_looking_down"
-                    ? CHAT_INPUT_EYE_STATES.LOOKING
-                    : prev
-            )
+            
+            // Clear all pending animation timeouts
+            timeoutIdsRef.current.forEach((id) => {
+                if (id) clearTimeout(id)
+            })
+            timeoutIdsRef.current = []
+            
+            // Set to static LOOKING state (not blinking, not animated)
+            setCurrentState(CHAT_INPUT_EYE_STATES.LOOKING)
         }
 
         const events = ["mousedown", "touchstart", "keydown", "click"]
@@ -2170,6 +2174,9 @@ const useChatIconAnimation = () => {
     }, [])
 
     React.useEffect(() => {
+        // Only start animations on initial page load if no interaction has occurred
+        if (hasInteractedRef.current) return
+
         const scheduleAnimation = (
             state: any,
             blinkState: any,
@@ -2180,21 +2187,24 @@ const useChatIconAnimation = () => {
             setCurrentState(state)
 
             const blinkDelay = EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN + Math.random() * (EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MAX - EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN)
-            timeoutIdRef.current = setTimeout(() => {
+            const timeoutId1 = setTimeout(() => {
                 if (hasInteractedRef.current) return
                 setCurrentState(blinkState)
-                timeoutIdRef.current = setTimeout(() => {
+                const timeoutId2 = setTimeout(() => {
                     if (hasInteractedRef.current) return
                     setCurrentState(state)
 
                     const transitionDelay = EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN + Math.random() * (EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MAX - EYE_ANIMATION_CONFIG.BLINK_INTERVAL_MIN)
-                    timeoutIdRef.current = setTimeout(() => {
+                    const timeoutId3 = setTimeout(() => {
                         if (hasInteractedRef.current) return
                         isLookingDownRef.current = toggleDirection
                         animateLoop()
                     }, transitionDelay)
+                    timeoutIdsRef.current.push(timeoutId3)
                 }, EYE_ANIMATION_CONFIG.BLINK_DURATION)
+                timeoutIdsRef.current.push(timeoutId2)
             }, blinkDelay)
+            timeoutIdsRef.current.push(timeoutId1)
         }
 
         const animateLoop = () => {
@@ -2216,9 +2226,15 @@ const useChatIconAnimation = () => {
             }
         }
 
-        if (!hasInteractedRef.current) animateLoop()
+        // Start animation loop only on initial page load
+        animateLoop()
+        
         return () => {
-            if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+            // Cleanup: clear all pending timeouts
+            timeoutIdsRef.current.forEach((id) => {
+                if (id) clearTimeout(id)
+            })
+            timeoutIdsRef.current = []
         }
     }, [])
 
@@ -6674,6 +6690,173 @@ function ReportModal({
     )
 }
 
+// --- WELCOME OVERLAY COMPONENT ---
+const WelcomeOverlay = ({ isMobile, onClose, themeColors }: { isMobile: boolean; onClose: () => void; themeColors: typeof darkColors }) => {
+    return (
+        <div
+            data-layer="welcome-overlay-container"
+            className="WelcomeOverlayContainer"
+            style={{
+                width: "100%",
+                height: "100%",
+                left: 0,
+                top: 0,
+                position: "fixed",
+                background: themeColors.overlay.black,
+                overflow: "hidden",
+                justifyContent: "center",
+                alignItems: isMobile ? "flex-end" : "center",
+                gap: 10,
+                display: "inline-flex",
+                zIndex: 99999,
+            }}
+            onClick={onClose}
+        >
+            <motion.div
+                data-layer="welcome-modal"
+                className="WelcomeModal"
+                initial={
+                    isMobile
+                        ? { y: "100%", scale: 0, opacity: 0 }
+                        : { scale: 0.95, opacity: 0 }
+                }
+                animate={
+                    isMobile
+                        ? { y: "0%", scale: 1, opacity: 1 }
+                        : { scale: 1, opacity: 1 }
+                }
+                exit={
+                    isMobile
+                        ? { y: "100%", scale: 0, opacity: 0 }
+                        : { scale: 0.95, opacity: 0 }
+                }
+                transition={
+                    isMobile
+                        ? { duration: 0.25, ease: "easeInOut" }
+                        : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
+                }
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    flex: isMobile ? "none" : "1 1 0",
+                    width: isMobile ? "100%" : "auto",
+                    maxWidth: isMobile ? "100%" : 400,
+                    maxHeight: 600,
+                    background: themeColors.background,
+                    boxShadow: "0px 4px 24px rgba(0, 0, 0, 0.04)",
+                    overflow: "hidden",
+                    borderRadius: isMobile ? "48px 48px 0px 0px" : 48,
+                    flexDirection: "column",
+                    justifyContent: "flex-start",
+                    alignItems: "flex-start",
+                    display: "inline-flex",
+                    marginBottom: isMobile ? 0 : "auto",
+                    marginTop: isMobile ? "auto" : "auto",
+                    transformOrigin: isMobile ? "bottom center" : "center",
+                }}
+            >
+                <div
+                    data-layer="welcome-image-container"
+                    className="WelcomeImageContainer"
+                    style={{
+                        alignSelf: "stretch",
+                        height: 224,
+                        background: "#E9E9EA",
+                        overflow: "hidden",
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
+                        alignItems: "center",
+                        gap: 10,
+                        display: "flex",
+                    }}
+                >
+                    <img
+                        data-layer="welcome-image"
+                        className="WelcomeImage"
+                        style={{
+                            alignSelf: "center",
+                            flex: "1 1 0",
+                            position: "relative",
+                            width: "100%",
+                            maxWidth: 400,
+                            height: "100%",
+                            objectFit: "cover",
+                        }}
+                        src="https://framerusercontent.com/images/iDGXsLUjWFYougkKQaiObRc6vng.jpg?scale-down-to=2048&width=2720&height=1568"
+                    />
+                </div>
+                <div
+                    data-layer="welcome-content"
+                    className="WelcomeContent"
+                    style={{
+                        alignSelf: "stretch",
+                        paddingTop: 28,
+                        paddingBottom: 36,
+                        paddingLeft: 28,
+                        paddingRight: 28,
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        display: "flex",
+                    }}
+                >
+                    <div
+                        data-layer="welcome-title"
+                        className="WelcomeTitle"
+                        style={{
+                            alignSelf: "stretch",
+                            color: themeColors.text.primary,
+                            fontSize: 16,
+                            fontFamily: "Inter",
+                            fontWeight: "400",
+                            lineHeight: "21px",
+                            wordWrap: "break-word",
+                        }}
+                    >
+                        Curastem is the #1 way to get a job
+                    </div>
+                    <div
+                        data-layer="welcome-description"
+                        className="WelcomeDescription"
+                        style={{
+                            alignSelf: "stretch",
+                        }}
+                    >
+                        <span
+                            style={{
+                                color: themeColors.text.secondary,
+                                fontSize: 14,
+                                fontFamily: "Inter",
+                                fontWeight: "400",
+                                lineHeight: "19.60px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            Collaborate with others or chat with AI to create
+                            resumes, make apps, and practice for interviews.{" "}
+                        </span>
+                        <span
+                            onClick={() => window.open("https://curastem.org/about", "_blank")}
+                            style={{
+                                color: themeColors.text.secondary,
+                                fontSize: 14,
+                                fontFamily: "Inter",
+                                fontWeight: "400",
+                                textDecoration: "underline",
+                                lineHeight: "19.60px",
+                                wordWrap: "break-word",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Learn more
+                        </span>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    )
+}
+
 // --- HELPER: PII & SAFETY FILTER ---
 function sanitizeMessage(text: string): string {
     let sanitized = text
@@ -10026,6 +10209,68 @@ export default function OmegleMentorshipUI(props: Props) {
     
     // REF for Direct Mutation Access (Fixes P2P App Sync Lag)
     const miniIDERef = React.useRef<MiniIDEHandle>(null)
+
+    // Welcome Overlay State
+    const [showWelcome, setShowWelcome] = React.useState(false)
+    const hasInteractedRef = React.useRef(false)
+    const interactionTimeoutRef = React.useRef<any>(null)
+
+    React.useEffect(() => {
+        if (typeof window === "undefined") return
+
+        // Check if user should never see the overlay (they interacted before 5 seconds on a previous visit)
+        const shouldNeverShow = localStorage.getItem("should_never_show_welcome_overlay")
+        if (shouldNeverShow === "true") {
+            return
+        }
+
+        // Check if user has already seen it
+        const hasSeen = localStorage.getItem("has_seen_welcome_overlay")
+        if (hasSeen === "true") {
+            return
+        }
+
+        // Track user interactions
+        const handleInteraction = () => {
+            hasInteractedRef.current = true
+            // If they interact before 5 seconds, mark them to never show it
+            localStorage.setItem("should_never_show_welcome_overlay", "true")
+            // Clear the timer since they interacted
+            if (interactionTimeoutRef.current) {
+                clearTimeout(interactionTimeoutRef.current)
+            }
+        }
+
+        // Listen for various interaction types (excluding mousemove to avoid accidental triggers)
+        const events = ["click", "keydown", "scroll", "touchstart"]
+        events.forEach((event) => {
+            window.addEventListener(event, handleInteraction, { passive: true })
+        })
+
+        // Set 5-second timer
+        interactionTimeoutRef.current = setTimeout(() => {
+            // Only show if no interaction occurred
+            if (!hasInteractedRef.current) {
+                setShowWelcome(true)
+            }
+        }, 5000)
+
+        return () => {
+            if (interactionTimeoutRef.current) {
+                clearTimeout(interactionTimeoutRef.current)
+            }
+            events.forEach((event) => {
+                window.removeEventListener(event, handleInteraction)
+            })
+        }
+    }, [])
+
+    const handleCloseWelcome = () => {
+        setShowWelcome(false)
+        if (typeof window !== "undefined") {
+            localStorage.setItem("has_seen_welcome_overlay", "true")
+        }
+    }
 
     /**
      * User's session role.
@@ -20614,6 +20859,29 @@ PREFERENCES:
                     </div>
                 </div>
             </div>
+
+            {/* WELCOME OVERLAY */}
+            <AnimatePresence>
+                {showWelcome && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{
+                            position: "fixed",
+                            zIndex: 100000,
+                            inset: 0,
+                        }}
+                    >
+                        <WelcomeOverlay
+                            isMobile={isMobileLayout}
+                            onClose={handleCloseWelcome}
+                            themeColors={themeColors}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* SIDEBAR ACTIONS MENU PORTAL */}
             {menuOpenChatId &&
