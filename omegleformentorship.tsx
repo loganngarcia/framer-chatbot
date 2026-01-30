@@ -6838,7 +6838,7 @@ const WelcomeOverlay = ({ isMobile, onClose, themeColors }: { isMobile: boolean;
                                 wordWrap: "break-word",
                             }}
                         >
-                            Collaborate with others or chat with AI to create
+                            Video call with mentors or chat with AI to create
                             resumes, make apps, and practice for interviews.{" "}
                         </span>
                         <span
@@ -9234,7 +9234,7 @@ const RoleSelectionButton = React.memo(
         const isStudent = type === "student"
         const label = isStudent ? "Get free help" : "Volunteer"
         const desc = isStudent
-            ? "Join a call with a mentor"
+            ? "Video call with a mentor"
             : "Support students with free advice"
         // Student tile text always white (dark mode), volunteer uses theme colors
         const textColor = isStudent ? darkColors.text.primary : colors.text.primary
@@ -10224,7 +10224,7 @@ export default function OmegleMentorshipUI(props: Props) {
     React.useEffect(() => {
         if (typeof window === "undefined") return
 
-        // Check if user should never see the overlay (they interacted before 5 seconds on a previous visit)
+        // Check if user should never see the welcome overlay (they interacted before 3 seconds on a previous visit)
         const shouldNeverShow = localStorage.getItem("should_never_show_welcome_overlay")
         if (shouldNeverShow === "true") {
             return
@@ -10239,7 +10239,7 @@ export default function OmegleMentorshipUI(props: Props) {
         // Track user interactions
         const handleInteraction = () => {
             hasInteractedRef.current = true
-            // If they interact before 5 seconds, mark them to never show it
+            // If they interact before 3 seconds, mark them to never show the welcome overlay
             localStorage.setItem("should_never_show_welcome_overlay", "true")
             // Clear the timer since they interacted
             if (interactionTimeoutRef.current) {
@@ -10253,13 +10253,13 @@ export default function OmegleMentorshipUI(props: Props) {
             window.addEventListener(event, handleInteraction, { passive: true })
         })
 
-        // Set 5-second timer
+        // Set 3-second timer
         interactionTimeoutRef.current = setTimeout(() => {
             // Only show if no interaction occurred
             if (!hasInteractedRef.current) {
                 setShowWelcome(true)
             }
-        }, 5000)
+        }, 3000)
 
         return () => {
             if (interactionTimeoutRef.current) {
