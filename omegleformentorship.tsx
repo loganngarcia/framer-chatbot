@@ -6392,6 +6392,7 @@ interface ReportModalProps {
     onSubmit: (reason: string) => void
     participantCount?: number
     themeColors?: typeof darkColors
+    reportType?: "user" | "chat"
 }
 
 function ReportModal({
@@ -6400,6 +6401,7 @@ function ReportModal({
     onSubmit,
     participantCount = 2,
     themeColors = darkColors,
+    reportType = "user",
 }: ReportModalProps) {
     const [selected, setSelected] = React.useState<string | null>(null)
     const [hoveredRow, setHoveredRow] = React.useState<string | null>(null)
@@ -6430,10 +6432,14 @@ function ReportModal({
 
     const isMobileLayout = typeof window !== "undefined" && window.innerWidth < 768
     const isMultiParty = participantCount > 2
-    const title = "Report user"
-    const question = isMultiParty
-        ? "Why are you reporting this user? User in violation will be banned."
-        : "Why are you reporting this user?"
+    const title = reportType === "chat" ? "Report chat" : "Report user"
+    const question = reportType === "chat"
+        ? (isMultiParty
+            ? "Why are you reporting this chat? User in violation will be banned."
+            : "Why are you reporting this chat?")
+        : (isMultiParty
+            ? "Why are you reporting this user? User in violation will be banned."
+            : "Why are you reporting this user?")
 
     if (!isOpen) return null
 
@@ -11848,6 +11854,7 @@ Do not include markdown formatting or explanations.`
     // Useful for mobile debugging where browser console isn't easily accessible.
     const [logs, setLogs] = React.useState<string[]>([])
     const [showReportModal, setShowReportModal] = React.useState(false)
+    const [reportType, setReportType] = React.useState<"user" | "chat">("user")
     const [isBanned, setIsBanned] = React.useState(false)
 
     // --- BAN SYSTEM LOGIC ---
@@ -14263,6 +14270,7 @@ Do not include markdown formatting or explanations.`
     }, [])
 
     const handleReport = React.useCallback(() => {
+        setReportType("user")
         setShowReportModal(true)
     }, [])
 
@@ -20783,6 +20791,7 @@ PREFERENCES:
                 onSubmit={onSubmitReport}
                 participantCount={remoteStreams.size + 1}
                 themeColors={themeColors}
+                reportType={reportType}
             />
 
             {/* FILE DRAG OVERLAY */}
@@ -21072,6 +21081,7 @@ PREFERENCES:
                                             </svg>
                                         ),
                                         onClick: () => {
+                                            setReportType("chat")
                                             setShowReportModal(true)
                                             setMenuOpenChatId(null)
                                             setHoveredActionId(null)
