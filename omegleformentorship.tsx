@@ -5723,7 +5723,7 @@ const ChatInput = React.memo(function ChatInput({
                                                 right: 0,
                                                 bottom: 0,
                                                 background:
-                                                    themeColors.text.primary,
+                                                    themeColors.overlay.black,
                                                 zIndex: 1004,
                                                 pointerEvents: "auto",
                                             }}
@@ -9512,7 +9512,7 @@ const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(functio
 
     const editorStyles: React.CSSProperties = {
         fontFamily: '"Google Sans Code", monospace',
-        fontSize: 14,
+        fontSize: 15,
         lineHeight: "24px",
         whiteSpace: "pre",
         padding: "20px",
@@ -9642,7 +9642,7 @@ const MiniIDE = React.memo(React.forwardRef<MiniIDEHandle, MiniIDEProps>(functio
                         style={{
                             textAlign: "right",
                             color: themeColors.text.tertiary,
-                            fontSize: 14,
+                            fontSize: 15,
                             fontFamily: '"Google Sans Code", monospace',
                             lineHeight: "24px",
                             whiteSpace: "pre",
@@ -19399,7 +19399,7 @@ PREFERENCES:
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                background: "${themeColors.hover.default}",
+                                background: themeColors.overlay.black,
                                 zIndex: 9999,
                                 opacity: sidebarOverlayOpacity,
                                 pointerEvents: isSidebarOpen ? "auto" : "none",
@@ -19669,7 +19669,7 @@ PREFERENCES:
                                                         background:
                                                             "transparent",
                                                         border: "none",
-                                                        color: "${themeColors.text.primary}",
+                                                        color: chatThemeColors.text.primary,
                                                         fontSize: 14,
                                                         fontFamily: "Inter",
                                                         fontWeight: "400",
@@ -19687,7 +19687,7 @@ PREFERENCES:
                                                             "center",
                                                         display: "flex",
                                                         flexDirection: "column",
-                                                        color: "${themeColors.text.primary}",
+                                                        color: chatThemeColors.text.primary,
                                                         fontSize: 14,
                                                         fontFamily: "Inter",
                                                         fontWeight: "400",
