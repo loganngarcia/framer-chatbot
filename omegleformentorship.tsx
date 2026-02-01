@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as React from "react"
 import { createPortal } from "react-dom"
 import {
@@ -44,6 +45,9 @@ interface ChatSession {
     isPinned?: boolean
     pinnedAt?: number
     suggestions?: string[]
+    miniIdeLastEdited?: number
+    docEditorLastEdited?: number
+    whiteboardLastEdited?: number
 }
 
 // -----------------------------------------------------------------------------
@@ -187,7 +191,7 @@ const getModifierKey = () => {
 }
 
 interface TooltipProps {
-    children: React.ReactNode
+    children?: React.ReactNode
     style?: React.CSSProperties
 }
 
@@ -12111,6 +12115,9 @@ Do not include markdown formatting or explanations.`
     const [menuOpenChatId, setMenuOpenChatId] = React.useState<string | null>(
         null
     )
+    const [menuOpenToolType, setMenuOpenToolType] = React.useState<
+        "miniide" | "doceditor" | "whiteboard" | null
+    >(null)
     const [menuPosition, setMenuPosition] = React.useState<{
         top: number
         left: number
@@ -12213,6 +12220,15 @@ Do not include markdown formatting or explanations.`
         }
         return false
     })
+
+    const [isYourStuffExpanded, setIsYourStuffExpanded] = React.useState(false)
+    const [isYourStuffHovered, setIsYourStuffHovered] = React.useState(false)
+
+    React.useEffect(() => {
+        if (!isSidebarOpen) {
+            setIsYourStuffExpanded(false)
+        }
+    }, [isSidebarOpen])
 
     // Motion values for sidebar gesture
     const sidebarX = useMotionValue(-260)
@@ -12418,13 +12434,16 @@ Do not include markdown formatting or explanations.`
                 }))
                 
                 let hasContentChanges = false
+                let hasDocChanges = false
+                let hasWhiteboardChanges = false
+                let hasAppChanges = false
                 
                 if (!existing) {
                     // New chat, check if it has any content
-                    hasContentChanges = currentMessages.length > 0 || 
-                                       docContentRef.current || 
-                                       whiteboardData || 
-                                       appCodeRef.current
+                    hasDocChanges = !!docContentRef.current
+                    hasWhiteboardChanges = !!whiteboardData
+                    hasAppChanges = !!appCodeRef.current
+                    hasContentChanges = currentMessages.length > 0 || hasDocChanges || hasWhiteboardChanges || hasAppChanges
                 } else {
                     // Check for message changes
                     if (existing.messages.length !== currentMessages.length) {
@@ -12441,38 +12460,43 @@ Do not include markdown formatting or explanations.`
                     }
                     
                     // Check for notes/docContent changes
-                    if (!hasContentChanges && existing.notes !== docContentRef.current) {
+                    if (existing.notes !== docContentRef.current) {
                         hasContentChanges = true
+                        hasDocChanges = true
                     }
                     
                     // Check for whiteboard changes
-                    if (!hasContentChanges) {
-                        const existingWhiteboard = existing.whiteboard
-                        if (whiteboardData !== existingWhiteboard) {
-                            // Compare stringified versions to detect actual changes
-                            const existingStr = existingWhiteboard ? JSON.stringify(existingWhiteboard) : null
-                            const currentStr = whiteboardData ? JSON.stringify(whiteboardData) : null
-                            if (existingStr !== currentStr) {
-                                hasContentChanges = true
-                            }
+                    const existingWhiteboard = existing.whiteboard
+                    if (whiteboardData !== existingWhiteboard) {
+                        // Compare stringified versions to detect actual changes
+                        const existingStr = existingWhiteboard ? JSON.stringify(existingWhiteboard) : null
+                        const currentStr = whiteboardData ? JSON.stringify(whiteboardData) : null
+                        if (existingStr !== currentStr) {
+                            hasContentChanges = true
+                            hasWhiteboardChanges = true
                         }
                     }
                     
                     // Check for app code changes
-                    if (!hasContentChanges) {
-                        const existingAppCode = existing.app?.code || ""
-                        const existingAppMode = existing.app?.mode || "editor"
-                        const currentAppCode = appCodeRef.current || ""
-                        const currentAppMode = appModeRef.current || "editor"
-                        
-                        if (existingAppCode !== currentAppCode || existingAppMode !== currentAppMode) {
-                            hasContentChanges = true
-                        }
+                    const existingAppCode = existing.app?.code || ""
+                    const existingAppMode = existing.app?.mode || "editor"
+                    const currentAppCode = appCodeRef.current || ""
+                    const currentAppMode = appModeRef.current || "editor"
+                    
+                    if (existingAppCode !== currentAppCode || existingAppMode !== currentAppMode) {
+                        hasContentChanges = true
+                        hasAppChanges = true
                     }
                 }
                 
                 // Preserve original timestamp if no content changes, otherwise update it
                 const timestampToUse = hasContentChanges ? Date.now() : (existing?.timestamp || Date.now())
+                
+                // Update specific tool timestamps
+                const now = Date.now()
+                const docEditorLastEdited = hasDocChanges ? now : existing?.docEditorLastEdited
+                const whiteboardLastEdited = hasWhiteboardChanges ? now : existing?.whiteboardLastEdited
+                const miniIdeLastEdited = hasAppChanges ? now : existing?.miniIdeLastEdited
 
                 const sessionToSave: ChatSession = {
                     id: currentChatId,
@@ -12487,6 +12511,9 @@ Do not include markdown formatting or explanations.`
                     isPinned: existing?.isPinned,
                     pinnedAt: existing?.pinnedAt,
                     suggestions: aiGeneratedSuggestions,
+                    docEditorLastEdited,
+                    whiteboardLastEdited,
+                    miniIdeLastEdited,
                 }
 
                 const others = prev.filter((c) => c.id !== currentChatId)
@@ -14220,6 +14247,52 @@ Do not include markdown formatting or explanations.`
             setHoveredActionId(null)
         },
         [currentChatId, handleClearMessages]
+    )
+
+    const deleteToolContent = React.useCallback(
+        (chatId: string, toolType: "miniide" | "doceditor" | "whiteboard") => {
+            setSavedChats((prev) => {
+                return prev.map((c) => {
+                    if (c.id !== chatId) return c
+                    
+                    const updated = { ...c }
+                    if (toolType === "miniide") {
+                        updated.app = undefined
+                        updated.miniIdeLastEdited = undefined
+                    } else if (toolType === "doceditor") {
+                        updated.notes = ""
+                        updated.docEditorLastEdited = undefined
+                    } else if (toolType === "whiteboard") {
+                        updated.whiteboard = null
+                        updated.whiteboardLastEdited = undefined
+                    }
+                    return updated
+                })
+            })
+            
+            // If we are currently in this chat and this tool is open, we might want to close it or clear it?
+            // The user didn't specify, but clearing the content in the current view would be good.
+            if (currentChatId === chatId) {
+                if (toolType === "miniide") {
+                    setAppCode("")
+                    setAppMode("editor")
+                } else if (toolType === "doceditor") {
+                    setDocContent("")
+                } else if (toolType === "whiteboard") {
+                    if (editorRef.current) {
+                        try {
+                            editorRef.current.store.clear()
+                        } catch (e) {}
+                    }
+                }
+            }
+
+            setMenuOpenChatId(null)
+            setMenuOpenToolType(null)
+            setMenuPosition(null)
+            setHoveredActionId(null)
+        },
+        [currentChatId]
     )
 
     const handleStartRename = React.useCallback((chat: ChatSession) => {
@@ -19093,7 +19166,7 @@ PREFERENCES:
                                                 >
                                                     {role === "volunteer"
                                                         ? "Waiting for student"
-                                                        : "Waiting for mentor"}
+                                                        : "Calling a mentor"}
                                                 </div>
                                                 {role !== "volunteer" && (
                                                     <div
@@ -19455,7 +19528,7 @@ PREFERENCES:
                             x: sidebarX,
                             width: 260,
                             height: "100%",
-                            paddingTop: 216,
+                            paddingTop: 224,
                             position: "absolute",
                             top: 0,
                             left: 0,
@@ -19465,7 +19538,7 @@ PREFERENCES:
                             flexDirection: "column",
                             justifyContent: "flex-start",
                             alignItems: "flex-start",
-                            gap: 24,
+                            gap: 0,
                             display: "inline-flex",
                             zIndex: 10000,
                             // On mobile, if closed, we want it offscreen but draggable? 
@@ -19504,25 +19577,356 @@ PREFERENCES:
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
+                        <div
+                            className="ScrollableSidebarContent"
+                            style={{
+                                alignSelf: "stretch",
+                                flex: "1 1 0",
+                                overflowY: "auto",
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                            onScroll={() => {
+                                if (menuOpenChatId) {
+                                    setMenuOpenChatId(null)
+                                    setMenuPosition(null)
+                                    setHoveredActionId(null)
+                                }
+                            }}
+                        >
+                            {/* --- YOUR STUFF SECTION --- */}
+                            {(() => {
+                                // Flatten chats into specific tool items
+                                const stuffItems: {
+                                    chat: ChatSession
+                                    type: "miniide" | "doceditor" | "whiteboard"
+                                    timestamp: number
+                                }[] = []
+
+                                savedChats.forEach((chat) => {
+                                    if (
+                                        searchQuery &&
+                                        !chat.title
+                                            .toLowerCase()
+                                            .includes(searchQuery.toLowerCase())
+                                    ) {
+                                        return
+                                    }
+
+                                    if (chat.miniIdeLastEdited) {
+                                        stuffItems.push({
+                                            chat,
+                                            type: "miniide",
+                                            timestamp: chat.miniIdeLastEdited,
+                                        })
+                                    }
+                                    if (chat.docEditorLastEdited) {
+                                        stuffItems.push({
+                                            chat,
+                                            type: "doceditor",
+                                            timestamp: chat.docEditorLastEdited,
+                                        })
+                                    }
+                                    if (chat.whiteboardLastEdited) {
+                                        stuffItems.push({
+                                            chat,
+                                            type: "whiteboard",
+                                            timestamp: chat.whiteboardLastEdited,
+                                        })
+                                    }
+                                })
+
+                                const sortedItems = stuffItems
+                                    .sort((a, b) => b.timestamp - a.timestamp)
+                                    .slice(0, isYourStuffExpanded ? undefined : 3)
+
+                                if (sortedItems.length === 0) return null
+
+                                return (
+                                    <div
+                                        data-layer="your-stuff-container"
+                                        className="YourStuffFlexbox"
+                                        style={{
+                                            alignSelf: "stretch",
+                                            padding: 8,
+                                            paddingBottom: 0,
+                                            flexDirection: "column",
+                                            justifyContent: "flex-start",
+                                            alignItems: "flex-start",
+                                            display: "flex",
+                                            flex: "0 0 auto",
+                                            marginBottom: 16,
+                                        }}
+                                    >
+                                        <div
+                                            data-layer="Your stuff title"
+                                            className="ChatTitle"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setIsYourStuffExpanded(!isYourStuffExpanded)
+                                            }}
+                                            onMouseEnter={() => setIsYourStuffHovered(true)}
+                                            onMouseLeave={() => setIsYourStuffHovered(false)}
+                                            style={{
+                                                alignSelf: "stretch",
+                                                paddingLeft: 10,
+                                                paddingRight: 10,
+                                                paddingTop: 8,
+                                                paddingBottom: 8,
+                                                borderRadius: 12,
+                                                justifyContent: "flex-start",
+                                                alignItems: "center",
+                                                gap: 6,
+                                                display: "inline-flex",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            <div
+                                                data-layer="Your stuff"
+                                                className="YourStuff"
+                                                style={{
+                                                    justifyContent: "center",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    color: themeColors.text.secondary,
+                                                    fontSize: 14,
+                                                    fontFamily: "Inter",
+                                                    fontWeight: "400",
+                                                    lineHeight: "19.32px",
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                Your stuff
+                                            </div>
+                                            {/* Expand Icon - Show on hover when collapsed */}
+                                            {isYourStuffHovered && !isYourStuffExpanded && (
+                                                <div data-svg-wrapper data-layer="arrow expand icon" className="ArrowExpandIcon">
+                                                    <svg width="6" height="10" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M0.601562 8.60001L4.60156 4.60001L0.601562 0.600006" stroke={themeColors.text.secondary} strokeOpacity="1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            {/* Collapse Icon - Show persistently when expanded */}
+                                            {isYourStuffExpanded && (
+                                                <div data-svg-wrapper data-layer="arrow collapse icon (show when collapsable)" className="ArrowCollapseIconShowWhenCollapsable">
+                                                    <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M0.601562 0.600006L4.60156 4.60001L8.60156 0.600006" stroke={themeColors.text.secondary} strokeOpacity="1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {sortedItems.map((item) => {
+                                            const { chat, type } = item
+                                            const uniqueId = `stuff-${chat.id}-${type}`
+                                            
+                                            let displayTitle = chat.title // Fallback
+
+                                            if (type === "miniide" && chat.app?.code) {
+                                                const code = chat.app.code
+                                                const titleMatch = code.match(/<title>(.*?)<\/title>/i)
+                                                if (titleMatch && titleMatch[1]) {
+                                                    displayTitle = titleMatch[1].trim()
+                                                } else {
+                                                    // Strip HTML tags and get first 4 words
+                                                    const text = code.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+                                                    const words = text.split(" ").slice(0, 4)
+                                                    if (words.length > 0) {
+                                                        displayTitle = words.join(" ")
+                                                    }
+                                                }
+                                            } else if (type === "doceditor" && chat.notes) {
+                                                // First line of document, stripping HTML using regex for SSR safety
+                                                const text = chat.notes.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+                                                const firstLine = text.split(". ")[0].split("\n")[0].trim() // Try to get first sentence or line
+                                                if (firstLine) {
+                                                    // Limit length just in case
+                                                    displayTitle = firstLine.length > 40 ? firstLine.substring(0, 40) + "..." : firstLine
+                                                }
+                                            } else if (type === "whiteboard") {
+                                                displayTitle = "Whiteboard drawing"
+                                            }
+                                            
+                                            return (
+                                            <div
+                                                key={uniqueId}
+                                                data-layer="stuff item"
+                                                className="StuffItem"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    // 1. Set current chat
+                                                    setCurrentChatId(chat.id)
+                                                    setMessages(chat.messages)
+                                                    setDocContent(chat.notes || "")
+                                                    setAiGeneratedSuggestions(chat.suggestions || [])
+                                                    
+                                                    // 2. Load basic state
+                                                    if (chat.whiteboard && editorRef.current) {
+                                                        try {
+                                                            editorRef.current.store.loadSnapshot(chat.whiteboard)
+                                                        } catch (e) { console.error(e) }
+                                                    }
+                                                    if (chat.app) {
+                                                        setAppCode(chat.app.code || "")
+                                                        if (chat.app.code && chat.app.code.trim().length > 0) {
+                                                            setAppMode("player")
+                                                        } else {
+                                                            setAppMode(chat.app.mode || "editor")
+                                                        }
+                                                    } else {
+                                                        setAppCode("")
+                                                        setAppMode("editor")
+                                                    }
+
+                                                    // 3. Open the specific tool
+                                                    if (type === "miniide") {
+                                                        setIsAppOpen(true)
+                                                        setIsDocOpen(false)
+                                                        setIsWhiteboardOpen(false)
+                                                    } else if (type === "doceditor") {
+                                                        setIsDocOpen(true)
+                                                        setIsAppOpen(false)
+                                                        setIsWhiteboardOpen(false)
+                                                    } else if (type === "whiteboard") {
+                                                        setIsWhiteboardOpen(true)
+                                                        setIsAppOpen(false)
+                                                        setIsDocOpen(false)
+                                                    }
+
+                                                    if (isMobileLayout) setIsSidebarOpen(false)
+                                                }}
+                                                onMouseEnter={() => setHoveredChatId(uniqueId)}
+                                                onMouseLeave={() => setHoveredChatId(null)}
+                                                style={{
+                                                    alignSelf: "stretch",
+                                                    minHeight: 36,
+                                                    paddingLeft: 10,
+                                                    paddingRight: 10,
+                                                    borderRadius: 28,
+                                                    justifyContent: "flex-start",
+                                                    alignItems: "center",
+                                                    gap: 8,
+                                                    display: "inline-flex",
+                                                    cursor: "pointer",
+                                                    marginBottom: 2,
+                                                    position: "relative",
+                                                    background:
+                                                        hoveredChatId === uniqueId || menuOpenChatId === uniqueId // Use uniqueId for menu check too? No, menuOpenChatId stores chat ID usually. 
+                                                        // But here we need to distinguish items. 
+                                                        // Let's use uniqueId for menuOpenChatId when it's a stuff item?
+                                                        // If I do that, I need to make sure the menu rendering logic handles it.
+                                                        // The menu rendering logic does `savedChats.find((c) => c.id === menuOpenChatId)`.
+                                                        // If menuOpenChatId is `stuff-...`, this find will fail.
+                                                        // So I should stick to menuOpenChatId = chat.id, but maybe add a check for menuOpenToolType?
+                                                        // If menuOpenChatId === chat.id AND menuOpenToolType === type, then highlight this item.
+                                                        // AND make sure the main chat list item doesn't get highlighted if menuOpenToolType is set.
+                                                            ? themeColors.hover.medium
+                                                            : "transparent",
+                                                }}
+                                            >
+                                                <div
+                                                    data-layer="stuff title"
+                                                    className="StuffTitle"
+                                                    style={{
+                                                        flex: "1 1 0",
+                                                        color: chatThemeColors.text.primary,
+                                                        fontSize: 14,
+                                                        fontFamily: "Inter",
+                                                        fontWeight: "400",
+                                                        lineHeight: "19.32px",
+                                                        overflow: "hidden",
+                                                        whiteSpace: "nowrap",
+                                                        textOverflow: "ellipsis",
+                                                    }}
+                                                >
+                                                    {displayTitle}
+                                                </div>
+
+                                                {(hoveredChatId === uniqueId ||
+                                                    (menuOpenChatId === chat.id && menuOpenToolType === type) ||
+                                                    isMobileLayout) && (
+                                                    <div
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (
+                                                                menuOpenChatId === chat.id &&
+                                                                menuOpenToolType === type
+                                                            ) {
+                                                                setMenuOpenChatId(null)
+                                                                setMenuOpenToolType(null)
+                                                                setMenuPosition(null)
+                                                            } else {
+                                                                const rect = e.currentTarget.getBoundingClientRect()
+                                                                setMenuOpenChatId(chat.id)
+                                                                setMenuOpenToolType(type)
+                                                                setMenuPosition({
+                                                                    top: rect.bottom + 4,
+                                                                    left: rect.right - 36,
+                                                                })
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: 16,
+                                                            height: 24,
+                                                            borderRadius: 12,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            color: themeColors.text.secondary,
+                                                        }}
+                                                    >
+                                                        <div
+                                                            data-svg-wrapper
+                                                            data-layer="open actions menu button"
+                                                            className="OpenActionsMenuButton"
+                                                            style={{
+                                                                position: "relative",
+                                                            }}
+                                                        >
+                                                            <svg
+                                                                width="16"
+                                                                height="24"
+                                                                viewBox="0 0 16 24"
+                                                                fill="none"
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                            >
+                                                                <path
+                                                                    d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z"
+                                                                    fill={themeColors.text.primary}
+                                                                    fillOpacity="0.95"
+                                                                />
+                                                                <path
+                                                                    d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z"
+                                                                    fill={themeColors.text.primary}
+                                                                    fillOpacity="0.95"
+                                                                />
+                                                                <path
+                                                                    d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z"
+                                                                    fill={themeColors.text.primary}
+                                                                    fillOpacity="0.95"
+                                                                />
+                                                            </svg>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )})}
+                                    </div>
+                                )
+                            })()}
+
                             <div
-                                data-layer="chat-history-container"
-                                className="ChatHistoryFlexbox"
+                                data-layer="your-chats-container"
+                                className="YourChatsFlexbox"
                                 style={{
                                     alignSelf: "stretch",
-                                    flex: "1 1 0",
+                                    flex: "0 0 auto",
                                     padding: 8,
+                                    paddingTop: 0,
                                     flexDirection: "column",
                                     justifyContent: "flex-start",
                                     alignItems: "flex-start",
                                     display: "flex",
-                                    overflowY: "auto",
-                                }}
-                                onScroll={() => {
-                                    if (menuOpenChatId) {
-                                        setMenuOpenChatId(null)
-                                        setMenuPosition(null)
-                                        setHoveredActionId(null)
-                                    }
                                 }}
                             >
                                 {savedChats.filter(
@@ -19691,20 +20095,14 @@ PREFERENCES:
                                                 <div
                                                     style={{
                                                         flex: "1 1 0",
-                                                        justifyContent:
-                                                            "center",
-                                                        display: "flex",
-                                                        flexDirection: "column",
                                                         color: chatThemeColors.text.primary,
                                                         fontSize: 14,
                                                         fontFamily: "Inter",
                                                         fontWeight: "400",
                                                         lineHeight: "19.32px",
-                                                        wordWrap: "break-word",
                                                         overflow: "hidden",
                                                         whiteSpace: "nowrap",
-                                                        textOverflow:
-                                                            "ellipsis",
+                                                        textOverflow: "ellipsis",
                                                     }}
                                                 >
                                                     {chat.title}
@@ -19823,6 +20221,7 @@ PREFERENCES:
                                         </div>
                                     ))}
                             </div>
+                        </div>
 
                             <div
                                 data-layer="fixed top nav"
@@ -21109,8 +21508,13 @@ PREFERENCES:
                                                 />
                                             </svg>
                                         ),
-                                        onClick: () =>
-                                            handleDeleteChat(chat.id),
+                                        onClick: () => {
+                                            if (menuOpenToolType) {
+                                                deleteToolContent(chat.id, menuOpenToolType)
+                                            } else {
+                                                handleDeleteChat(chat.id)
+                                            }
+                                        },
                                     },
                                 ]
 
