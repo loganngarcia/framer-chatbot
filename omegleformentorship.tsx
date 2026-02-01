@@ -10228,7 +10228,7 @@ export default function OmegleMentorshipUI(props: Props) {
     React.useEffect(() => {
         if (typeof window === "undefined") return
 
-        // Check if user should never see the welcome overlay (they interacted before 3 seconds on a previous visit)
+        // Check if user should never see the welcome overlay (they interacted before 2 seconds on a previous visit)
         const shouldNeverShow = localStorage.getItem("should_never_show_welcome_overlay")
         if (shouldNeverShow === "true") {
             return
@@ -10243,7 +10243,7 @@ export default function OmegleMentorshipUI(props: Props) {
         // Track user interactions
         const handleInteraction = () => {
             hasInteractedRef.current = true
-            // If they interact before 3 seconds, mark them to never show the welcome overlay
+            // If they interact before 2 seconds, mark them to never show the welcome overlay
             localStorage.setItem("should_never_show_welcome_overlay", "true")
             // Clear the timer since they interacted
             if (interactionTimeoutRef.current) {
@@ -10257,13 +10257,13 @@ export default function OmegleMentorshipUI(props: Props) {
             window.addEventListener(event, handleInteraction, { passive: true })
         })
 
-        // Set 3-second timer
+        // Set 2-second timer
         interactionTimeoutRef.current = setTimeout(() => {
             // Only show if no interaction occurred
             if (!hasInteractedRef.current) {
                 setShowWelcome(true)
             }
-        }, 3000)
+        }, 2000)
 
         return () => {
             if (interactionTimeoutRef.current) {
@@ -10371,7 +10371,7 @@ export default function OmegleMentorshipUI(props: Props) {
                 if (!isNaN(parsed)) return parsed
             }
         }
-        return 440
+        return 940 // set width of doceditor/whiteboard/miniide as 940px when opened as default width
     })
     
     React.useEffect(() => {
@@ -10380,7 +10380,7 @@ export default function OmegleMentorshipUI(props: Props) {
         }
     }, [chatWidth])
 
-    const dragStartWidth = React.useRef(440)
+    const dragStartWidth = React.useRef(940) // set width of doceditor/whiteboard/miniide as 940px when opened as default width
     const [isResizing, setIsResizing] = React.useState(false)
 
     const [remoteAppMutation, setRemoteAppMutation] = React.useState<any>(null)
@@ -11139,7 +11139,7 @@ Do not include markdown formatting or explanations.`
     }, [stopAllAudio])
 
     const cleanup = React.useCallback(
-        (isManualHangup = false) => {
+        (isManualHangup = false, keepTracks = false) => {
             if (
                 statusRef.current === "connected" ||
                 statusRef.current === "searching"
@@ -11184,11 +11184,13 @@ Do not include markdown formatting or explanations.`
             // Always attempt to stop live session to ensure state is reset
             stopLiveSession()
 
-            if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach((t) => t.stop())
-                localStreamRef.current = null
+            if (!keepTracks) {
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach((t) => t.stop())
+                    localStreamRef.current = null
+                }
+                setLocalStream(null)
             }
-            setLocalStream(null)
 
             // Stop screen share when call ends
             // Manually stop screen share logic here instead of calling function that might not be defined
@@ -14483,17 +14485,28 @@ Do not include markdown formatting or explanations.`
     /**
      * Initializes the user's camera/microphone and starts the PeerJS session.
      */
-    const startChat = async () => {
+    const startChat = async (reuseStream = false) => {
         setStatus("searching")
         log("Requesting media permissions...")
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true,
-            })
-            localStreamRef.current = stream
-            setLocalStream(stream)
+            let stream = localStreamRef.current
+
+            // If we are NOT reusing, or if there is no stream, get a new one.
+            if (!reuseStream || !stream) {
+                // Safety: Stop any existing stream before requesting a new one to prevent camera leaks
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach((t) => t.stop())
+                    localStreamRef.current = null
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                })
+                localStreamRef.current = stream
+                setLocalStream(stream)
+            }
 
             initPeerJS()
         } catch (err: any) {
@@ -14827,14 +14840,16 @@ Do not include markdown formatting or explanations.`
                 // If one peer leaves a group call, we stay connected to others.
 
                 // However, if size IS 0, we are alone.
-                cleanup()
+                // If we are auto-restarting (volunteer), we want to keep tracks to avoid camera flicker.
+                const shouldKeepTracks = wasVolunteer && !isManualHangupRef.current
+                cleanup(false, shouldKeepTracks)
 
                 if (wasVolunteer) {
                     log(
                         "All peers disconnected. Restarting search as volunteer..."
                     )
                     setTimeout(() => {
-                        startChat()
+                        startChat(shouldKeepTracks)
                     }, 500)
                 } else if (wasStudent) {
                     log(
@@ -15994,27 +16009,25 @@ Do not include markdown formatting or explanations.`
                                             type: "STRING",
                                             description: `The complete HTML code for the app, including embedded CSS (<style>) and JavaScript (<script>). Must be a valid, self-contained HTML document.
 
-You create apps in HTML with CSS and JS scripts. No non-interactive buttons, instructions, or comments. Only working features.
+Fully interactive buttons, instructions, or comments.
 
 DO NOT:
 - no shadows
-- no borders/strokes
 - no gradients
 - no blurs
-- no animations
 
 DO:
 - must add unique id="..." to EVERY interactive element (buttons, inputs, clickable divs, canvas)
 - must have desktop and mobile support
 - must have 48px top margin
-- must add a label in bottom right corner 12px font size, colors.semantic.accent color saying Curastem.org 
-- must use colors.backgroundDark background
+- must add a label in bottom right corner 12px font size, #0B87DA color saying Curastem.org 
+- must use #141414 background
 - must have links open in new tab
 
 PICK ONE STYLE:
-- bright, huge neobrutalist for all portfolios
-- 3D Three.js for all games
-- modern 28px rounded corners for easy to use 
+- portfolios: always bright, huge neobrutalist 
+- games: always 3D Three.js 
+- other: always modern 28px rounded corners for easy to use 
 
 PREFERENCES:
 - prefer to fill width of screen
@@ -19636,11 +19649,13 @@ PREFERENCES:
                                     }
                                 })
 
-                                const sortedItems = stuffItems
+                                const allSortedItems = stuffItems
                                     .sort((a, b) => b.timestamp - a.timestamp)
-                                    .slice(0, isYourStuffExpanded ? undefined : 3)
 
-                                if (sortedItems.length === 0) return null
+                                const canExpand = allSortedItems.length > 3
+                                const sortedItems = allSortedItems.slice(0, isYourStuffExpanded ? undefined : 3)
+
+                                if (allSortedItems.length === 0) return null
 
                                 return (
                                     <div
@@ -19655,15 +19670,18 @@ PREFERENCES:
                                             alignItems: "flex-start",
                                             display: "flex",
                                             flex: "0 0 auto",
-                                            marginBottom: 16,
+                                            marginBottom: 12,
                                         }}
+                                        
                                     >
                                         <div
                                             data-layer="Your stuff title"
                                             className="ChatTitle"
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                setIsYourStuffExpanded(!isYourStuffExpanded)
+                                                if (canExpand) {
+                                                    setIsYourStuffExpanded(!isYourStuffExpanded)
+                                                }
                                             }}
                                             onMouseEnter={() => setIsYourStuffHovered(true)}
                                             onMouseLeave={() => setIsYourStuffHovered(false)}
@@ -19678,7 +19696,7 @@ PREFERENCES:
                                                 alignItems: "center",
                                                 gap: 6,
                                                 display: "inline-flex",
-                                                cursor: "pointer",
+                                                cursor: canExpand ? "pointer" : "default",
                                             }}
                                         >
                                             <div
@@ -19699,7 +19717,7 @@ PREFERENCES:
                                                 Your stuff
                                             </div>
                                             {/* Expand Icon - Show on hover when collapsed */}
-                                            {isYourStuffHovered && !isYourStuffExpanded && (
+                                            {canExpand && isYourStuffHovered && !isYourStuffExpanded && (
                                                 <div data-svg-wrapper data-layer="arrow expand icon" className="ArrowExpandIcon">
                                                     <svg width="6" height="10" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M0.601562 8.60001L4.60156 4.60001L0.601562 0.600006" stroke={themeColors.text.secondary} strokeOpacity="1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -19707,7 +19725,7 @@ PREFERENCES:
                                                 </div>
                                             )}
                                             {/* Collapse Icon - Show persistently when expanded */}
-                                            {isYourStuffExpanded && (
+                                            {canExpand && isYourStuffExpanded && (
                                                 <div data-svg-wrapper data-layer="arrow collapse icon (show when collapsable)" className="ArrowCollapseIconShowWhenCollapsable">
                                                     <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M0.601562 0.600006L4.60156 4.60001L8.60156 0.600006" stroke={themeColors.text.secondary} strokeOpacity="1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
