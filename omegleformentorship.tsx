@@ -345,7 +345,7 @@ function isHoverCapable() {
 // Use for all colors and styles
 
 const darkColors = {
-    background: "hsl(0, 0%, 13%)", // #212121
+    background: "hsl(0, 0%, 12%)", // #212121
     backgroundDark: "hsl(0, 0%, 8%)", // #141414 - Dark background
     surface: "hsl(0, 0%, 19%)", // #303030
     surfaceMenu: "hsl(0, 0%, 21%)", // #353535
@@ -5785,6 +5785,7 @@ const ChatInput = React.memo(function ChatInput({
                             data-svg-wrapper
                             data-layer="upload-button"
                             className="UploadButton"
+                            tabIndex={2}
                             onClick={(e) => {
                                 e.stopPropagation()
                                 if (attachments.length < 10) {
@@ -6057,6 +6058,7 @@ const ChatInput = React.memo(function ChatInput({
                         >
                             <textarea
                                 ref={textareaRef}
+                                tabIndex={1}
                                 value={value}
                                 onChange={(e) => {
                                     onChange(e)
@@ -6231,6 +6233,7 @@ const ChatInput = React.memo(function ChatInput({
                                     data-svg-wrapper
                                     data-layer="start ai live call"
                                     className="StartAiLiveCall"
+                                    tabIndex={3}
                                     onClick={onConnectWithAI}
                                     onMouseEnter={() =>
                                         isHoverCapable() &&
@@ -19444,9 +19447,17 @@ PREFERENCES:
                                     .map((suggestion, index) => (
                                         <div
                                             key={index}
+                                            role="button"
+                                            tabIndex={6 + index}
                                             onClick={() =>
                                                 handleSendMessage(suggestion)
                                             }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault()
+                                                    handleSendMessage(suggestion)
+                                                }
+                                            }}
                                             className={`Suggestion${index + 1}`}
                                             style={{
                                                 maxWidth: 380,
@@ -19489,6 +19500,15 @@ PREFERENCES:
                                                     lightColors.background
                                                         ? themeColors.background
                                                         : themeColors.surface
+                                            }}
+                                            onFocus={(e) => {
+                                                e.currentTarget.style.outline = `1px solid ${themeColors.semantic.accent}`
+                                                e.currentTarget.style.outlineOffset = "2px"
+                                                e.currentTarget.style.boxShadow = `0 0 0 1px ${themeColors.text.primary}`
+                                            }}
+                                            onBlur={(e) => {
+                                                e.currentTarget.style.outline = "none"
+                                                e.currentTarget.style.boxShadow = "none"
                                             }}
                                         >
                                             <div
@@ -19900,6 +19920,15 @@ PREFERENCES:
                                             : 1,
                                 }}
                                 layout // Added layout prop to animate aspect ratio/size changes
+                                tabIndex={
+                                    !role && status === "idle" && !isLiveMode
+                                        ? isLocal
+                                            ? 4
+                                            : isPlaceholder
+                                              ? 5
+                                              : undefined
+                                        : undefined
+                                }
                                 onClick={onClick}
                             >
                                 {/* CONTENT FOR TILE */}
@@ -20211,7 +20240,7 @@ PREFERENCES:
                             >
                                 {chatHeight < currentConstraints.maxHeight - 5
                                     ? "Click to expand chat"
-                                    : "Click to collapse chat"}
+                                    : "Click to minimize chat"}
                             </Tooltip>
                         )}
                     </motion.div>
@@ -20260,12 +20289,22 @@ PREFERENCES:
         )
     }
 
+    const suggestionCount = Math.min(
+        aiGeneratedSuggestions.length,
+        messages.length === 0
+            ? isMobileLayout
+                ? 10
+                : 5
+            : isMobileLayout
+              ? 5
+              : 3
+    )
+
     return (
         <div
             ref={containerRef}
             data-layer="main-app-container"
             className="MainAppContainer"
-            role="application"
             aria-label="Curastem mentorship platform"
             onClick={() =>
                 isMobileLayout && isSidebarOpen && setIsSidebarOpen(false)
@@ -20288,12 +20327,13 @@ PREFERENCES:
                 // touchAction: "none", // Removed to fix mobile tap accuracy issues
             }}
         >
-            {/* --- SIDEBAR & BUTTON --- */}
+                            {/* --- SIDEBAR & BUTTON --- */}
             <button
                 data-svg-wrapper
                 data-layer="open sidebar (6% white fill on hover)"
                 className="OpenSidebar6WhiteFillOnHover"
                 aria-label="Open navigation menu"
+                tabIndex={!isSidebarOpen ? 6 + suggestionCount : undefined}
                 style={{
                     left: 8,
                     top: 8,
@@ -20556,6 +20596,9 @@ PREFERENCES:
                                         <div
                                             data-layer="Your stuff title"
                                             className="ChatTitle"
+                                            tabIndex={
+                                                isSidebarOpen && canExpand ? 12 + suggestionCount : undefined
+                                            }
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 if (canExpand) {
@@ -20667,7 +20710,7 @@ PREFERENCES:
                                                 )}
                                         </div>
 
-                                        {sortedItems.map((item) => {
+                                        {sortedItems.map((item, stuffIndex) => {
                                             const { chat, type } = item
                                             const uniqueId = `stuff-${chat.id}-${type}`
 
@@ -20737,6 +20780,11 @@ PREFERENCES:
                                                     key={uniqueId}
                                                     data-layer="stuff item"
                                                     className="StuffItem"
+                                                    tabIndex={
+                                                        isSidebarOpen
+                                                            ? 13 + suggestionCount + stuffIndex
+                                                            : undefined
+                                                    }
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         // 1. Set current chat
@@ -20997,12 +21045,11 @@ PREFERENCES:
                                                             </div>
                                                         </div>
                                                     )}
-                                                </div>
+                                        </div>
                                             )
                                         })}
                                     </div>
-                                )
-                            })()}
+                                )})()}
 
                             <div
                                 data-layer="your-chats-container"
@@ -21072,11 +21119,29 @@ PREFERENCES:
                                                     searchQuery.toLowerCase()
                                                 )
                                     )
-                                    .map((chat) => (
-                                        <div
-                                            key={chat.id}
-                                            aria-label={`Open chat: ${chat.title}`}
-                                            onClick={() => {
+                                    .map((chat, chatIndex) => {
+                                        // Calculate stuff items count for tabIndex offset
+                                        const visibleStuffItemsCount = Math.min(
+                                            savedChats.reduce((count, c) => {
+                                                if (searchQuery && !c.title.toLowerCase().includes(searchQuery.toLowerCase())) return count
+                                                let itemCount = 0
+                                                if (c.miniIdeLastEdited) itemCount++
+                                                if (c.docEditorLastEdited) itemCount++
+                                                if (c.whiteboardLastEdited) itemCount++
+                                                return count + itemCount
+                                            }, 0),
+                                            isYourStuffExpanded ? Infinity : 3
+                                        )
+                                        return (
+                                            <div
+                                                key={chat.id}
+                                                tabIndex={
+                                                    isSidebarOpen
+                                                        ? 13 + suggestionCount + visibleStuffItemsCount + chatIndex
+                                                        : undefined
+                                                }
+                                                aria-label={`Open chat: ${chat.title}`}
+                                                onClick={() => {
                                                 if (editingChatId === chat.id)
                                                     return
                                                 setCurrentChatId(chat.id)
@@ -21370,7 +21435,8 @@ PREFERENCES:
                                                 </div>
                                             )}
                                         </div>
-                                    ))}
+                                        )
+                                    })}
                             </div>
                         </div>
                         <div
@@ -21404,6 +21470,8 @@ PREFERENCES:
                                     data-svg-wrapper
                                     data-layer="close sidebar button (6% white fill on HOVER)"
                                     className="CloseSidebarButton6WhiteFillOnHover"
+                                    role="button"
+                                    tabIndex={isSidebarOpen ? 6 + suggestionCount : undefined}
                                     aria-label="Close navigation sidebar"
                                     onClick={(e) => {
                                         e.stopPropagation()
@@ -21451,6 +21519,8 @@ PREFERENCES:
                                     data-svg-wrapper
                                     data-layer="open curastem.org in new tab"
                                     className="OpenCurastemOrgInNewTab"
+                                    role="link"
+                                    tabIndex={isSidebarOpen ? 7 + suggestionCount : undefined}
                                     aria-label="Learn more about Curastem (opens in new tab)"
                                     onClick={(e) => {
                                         e.stopPropagation()
@@ -21554,6 +21624,7 @@ PREFERENCES:
                                     type="search"
                                     aria-label="Search chats and content"
                                     role="searchbox"
+                                    tabIndex={isSidebarOpen ? 8 + suggestionCount : undefined}
                                     style={{
                                         flex: "1 1 0",
                                         color: themeColors.text.primary,
@@ -21584,6 +21655,7 @@ PREFERENCES:
                                 <div
                                     data-layer="new chat"
                                     className="NewChat"
+                                    tabIndex={isSidebarOpen ? 9 + suggestionCount : undefined}
                                     aria-label="Start new chat"
                                     onClick={(e) => {
                                         e.stopPropagation()
@@ -21659,6 +21731,7 @@ PREFERENCES:
                                 <div
                                     data-layer="new chat"
                                     className="NewChat"
+                                    tabIndex={isSidebarOpen ? 10 + suggestionCount : undefined}
                                     aria-label={
                                         isMobileLayout
                                             ? "Share call link"
@@ -21775,6 +21848,7 @@ PREFERENCES:
                                 <div
                                     data-layer="You"
                                     className="You"
+                                    tabIndex={isSidebarOpen ? 11 + suggestionCount : undefined}
                                     aria-label="Open your profile settings"
                                     onClick={(e) => {
                                         e.stopPropagation()
@@ -22409,7 +22483,6 @@ PREFERENCES:
             <motion.main
                 data-layer="main-content-layout"
                 className="MainContentLayout"
-                role="main"
                 aria-label="Main content area"
                 animate={{
                     paddingLeft: !isMobileLayout && isSidebarOpen ? 260 : 0,
