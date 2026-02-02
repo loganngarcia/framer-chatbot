@@ -9651,6 +9651,10 @@ interface MiniIDEProps {
     remoteAppMutation?: any
     amIHost?: boolean
     isResizing?: boolean
+    onAppInitialState?: (state: any) => void
+    remoteAppInitialState?: any
+    onRequestInitialState?: () => void
+    debugMode?: boolean
 }
 
 // Simple syntax highlighter
@@ -9701,6 +9705,7 @@ const highlightSyntax = (
 export interface MiniIDEHandle {
     applyMutation: (mutation: any) => void
     replayInteraction: (interaction: any) => void
+    requestInitialState: () => void
 }
 
 const MiniIDE = React.memo(
@@ -9722,6 +9727,10 @@ const MiniIDE = React.memo(
             remoteAppMutation, // Keep for backward compat or remove
             amIHost,
             isResizing,
+            onAppInitialState,
+            remoteAppInitialState,
+            onRequestInitialState,
+            debugMode = false,
         },
         ref
     ) {
@@ -9746,6 +9755,16 @@ const MiniIDE = React.memo(
                         {
                             ...interaction,
                             type: "replay-interaction",
+                        },
+                        "*"
+                    )
+                }
+            },
+            requestInitialState: () => {
+                if (iframeRef.current && iframeRef.current.contentWindow) {
+                    iframeRef.current.contentWindow.postMessage(
+                        {
+                            type: "request-initial-state",
                         },
                         "*"
                     )
@@ -9821,11 +9840,11 @@ const MiniIDE = React.memo(
                             onCursorMove(e.data.x, e.data.y)
                         }
                     } else if (e.data.type === "iframe-interaction") {
-                        if (debugMode)
-                            console.log(
-                                "[MiniIDE] Received iframe-interaction:",
-                                e.data
-                            )
+                        // if (debugMode)
+                        //     console.log(
+                        //         "[MiniIDE] Received iframe-interaction:",
+                        //         e.data
+                        //     )
                         if (onAppInteraction) {
                             onAppInteraction(e.data)
                         }
@@ -9833,13 +9852,28 @@ const MiniIDE = React.memo(
                         if (onAppMutation) {
                             onAppMutation(e.data.payload)
                         }
+                    } else if (e.data.type === "iframe-initial-state") {
+                        // if (debugMode)
+                        //     console.log(
+                        //         "[MiniIDE] Received iframe-initial-state:",
+                        //         e.data.payload
+                        //     )
+                        if (onAppInitialState) {
+                            onAppInitialState(e.data.payload)
+                        }
+                    } else if (e.data.type === "request-initial-state") {
+                        // if (debugMode)
+                        //     console.log("[MiniIDE] Received request-initial-state")
+                        if (onRequestInitialState) {
+                            onRequestInitialState()
+                        }
                     }
                 }
             }
 
             window.addEventListener("message", handleMessage)
             return () => window.removeEventListener("message", handleMessage)
-        }, [mode, onCursorMove, onAppInteraction, onAppMutation])
+        }, [mode, onCursorMove, onAppInteraction, onAppMutation, onAppInitialState, onRequestInitialState, debugMode])
 
         // Replay remote events
         React.useEffect(() => {
@@ -9857,6 +9891,29 @@ const MiniIDE = React.memo(
                 )
             }
         }, [remoteAppEvent])
+
+        // Apply remote initial state (Client only)
+        React.useEffect(() => {
+            if (
+                remoteAppInitialState &&
+                !amIHost &&
+                iframeRef.current &&
+                iframeRef.current.contentWindow
+            ) {
+                // if (debugMode)
+                //     console.log(
+                //         "[MiniIDE] Applying remote initial state:",
+                //         remoteAppInitialState
+                //     )
+                iframeRef.current.contentWindow.postMessage(
+                    {
+                        type: "apply-initial-state",
+                        payload: remoteAppInitialState,
+                    },
+                    "*"
+                )
+            }
+        }, [remoteAppInitialState, amIHost, debugMode])
 
         // Apply remote mutations (Client only)
         React.useEffect(() => {
@@ -10208,8 +10265,8 @@ const MiniIDE = React.memo(
                                     // HOST: Mutation Observer
                                     const observer = new MutationObserver((mutations) => {
                                         mutations.forEach((mutation) => {
-                                            // DEBUG: Log mutation
-                                            if (debugMode) console.log('[Host] Mutation observed:', mutation.type, mutation.target);
+                                            // DEBUG: Log mutation (commented out for performance)
+                                            // ${debugMode ? "console.log('[Host] Mutation observed:', mutation.type, mutation.target);" : ""}
 
                                             // Filter out non-element nodes for simplicity if needed, 
                                             // but text nodes are important for characterData
@@ -10259,6 +10316,62 @@ const MiniIDE = React.memo(
                                         childList: true,
                                         subtree: true,
                                         characterData: true
+                                    });
+
+                                    // Send initial state when DOM is ready
+                                    let initialStateSent = false;
+                                    function sendInitialState() {
+                                        if (initialStateSent) return;
+                                        
+                                        try {
+                                            const bodyHTML = document.body.innerHTML;
+                                            const boardEl = document.getElementById('board');
+                                            const boardHTML = boardEl ? boardEl.innerHTML : null;
+                                            
+                                            // Only send if body has content and board exists with children
+                                            if (bodyHTML && bodyHTML.trim().length > 0) {
+                                                const state = {
+                                                    bodyHTML: bodyHTML,
+                                                    boardHTML: boardHTML
+                                                };
+                                                
+                                                // Verify board has children if it exists
+                                                if (!boardEl || (boardEl && boardEl.children.length > 0)) {
+                                                    // ${debugMode ? "console.log('[Host] Sending initial state:', state);" : ""}
+                                                    window.parent.postMessage({
+                                                        type: 'iframe-initial-state',
+                                                        payload: state
+                                                    }, '*');
+                                                    initialStateSent = true;
+                                                }
+                                            }
+                                        } catch (e) {
+                                            // ${debugMode ? "console.error('[Host] Error sending initial state:', e);" : ""}
+                                        }
+                                    }
+                                    
+                                    // Try sending initial state multiple times
+                                    if (document.readyState === 'complete') {
+                                        sendInitialState();
+                                    } else {
+                                        window.addEventListener('load', sendInitialState);
+                                    }
+                                    
+                                    // Also try after a short delay to catch dynamically created boards
+                                    setTimeout(() => {
+                                        sendInitialState();
+                                    }, 500);
+                                    
+                                    setTimeout(() => {
+                                        sendInitialState();
+                                    }, 1500);
+                                    
+                                    // Listen for initial state requests from clients
+                                    window.addEventListener('message', (e) => {
+                                        if (e.data && e.data.type === 'request-initial-state') {
+                                            // ${debugMode ? "console.log('[Host] Received request for initial state');" : ""}
+                                            sendInitialState();
+                                        }
                                     });
 
                                     // Listen for replay events (from Client)
@@ -10427,28 +10540,101 @@ const MiniIDE = React.memo(
                                         }, 50);
                                     }, true);
 
+                                    // Request initial state multiple times until received
+                                    let initialStateReceived = false;
+                                    let requestAttempts = 0;
+                                    const maxRequestAttempts = 10;
+                                    
+                                    function requestInitialState() {
+                                        if (initialStateReceived) return;
+                                        requestAttempts++;
+                                        if (requestAttempts > maxRequestAttempts) {
+                                            // ${debugMode ? "console.warn('[Client] Max initial state requests reached');" : ""}
+                                            return;
+                                        }
+                                        // ${debugMode ? "console.log('[Client] Requesting initial state (attempt ' + requestAttempts + ')');" : ""}
+                                        window.parent.postMessage({ type: 'request-initial-state' }, '*');
+                                    }
+                                    
+                                    // Request initial state immediately and on intervals
+                                    requestInitialState();
+                                    setTimeout(requestInitialState, 300);
+                                    setTimeout(requestInitialState, 800);
+                                    setTimeout(requestInitialState, 1500);
+                                    
+                                    // Apply initial state from Host
+                                    window.addEventListener('message', (e) => {
+                                        if (e.data && e.data.type === 'apply-initial-state') {
+                                            if (initialStateReceived) return;
+                                            
+                                            const { bodyHTML, boardHTML } = e.data.payload;
+                                            if (!bodyHTML || bodyHTML.trim().length === 0) {
+                                                // ${debugMode ? "console.warn('[Client] Received empty initial state, requesting again');" : ""}
+                                                setTimeout(requestInitialState, 200);
+                                                return;
+                                            }
+                                            
+                                            try {
+                                                // ${debugMode ? "console.log('[Client] Applying initial state');" : ""}
+                                                
+                                                // Apply body HTML
+                                                document.body.innerHTML = bodyHTML;
+                                                
+                                                // Apply board HTML if provided
+                                                if (boardHTML !== null && boardHTML !== undefined) {
+                                                    const boardEl = document.getElementById('board');
+                                                    if (boardEl) {
+                                                        boardEl.innerHTML = boardHTML;
+                                                        // ${debugMode ? "console.log('[Client] Applied board HTML, children:', boardEl.children.length);" : ""}
+                                                    } else {
+                                                        // Retry board application after delay
+                                                        setTimeout(() => {
+                                                            const retryBoardEl = document.getElementById('board');
+                                                            if (retryBoardEl) {
+                                                                retryBoardEl.innerHTML = boardHTML;
+                                                                // ${debugMode ? "console.log('[Client] Applied board HTML on retry');" : ""}
+                                                            } else {
+                                                                // ${debugMode ? "console.warn('[Client] Board element not found after retry');" : ""}
+                                                            }
+                                                        }, 200);
+                                                    }
+                                                }
+                                                
+                                                initialStateReceived = true;
+                                                // ${debugMode ? "console.log('[Client] Initial state applied successfully');" : ""}
+                                            } catch (err) {
+                                                // ${debugMode ? "console.error('[Client] Error applying initial state:', err);" : ""}
+                                                setTimeout(requestInitialState, 500);
+                                            }
+                                        }
+                                    });
+
                                     // Apply Mutations from Host
                                     window.addEventListener('message', (e) => {
                                         if (e.data && e.data.type === 'apply-mutation') {
                                             const { type, selector, value, attributeName } = e.data.mutation;
-                                            if (debugMode) console.log('[Client] Applying mutation:', type, selector);
+                                            // ${debugMode ? "console.log('[Client] Applying mutation:', type, selector);" : ""}
                                             
                                             // Special case for HTML/Body which might not be queryable in some contexts or need special handling
                                             let el;
                                             if (selector === 'html') el = document.documentElement;
                                             else if (selector === 'body') el = document.body;
+                                            else if (selector === '#board') el = document.getElementById('board');
                                             else el = document.querySelector(selector);
 
                                             if (!el) {
-                                                console.warn('[Client] Element not found for selector:', selector);
-                                                // Retry once after a small delay in case of race condition
+                                                // console.warn('[Client] Element not found for selector:', selector);
+                                                // Retry with delay, especially for board mutations
+                                                const retryDelay = selector === '#board' || selector.includes('board') ? 200 : 50;
                                                 setTimeout(() => {
-                                                    const retryEl = document.querySelector(selector);
+                                                    const retryEl = selector === '#board' ? document.getElementById('board') : document.querySelector(selector);
                                                     if (retryEl) {
-                                                        if (debugMode) console.log('[Client] Found element on retry:', selector);
+                                                        // ${debugMode ? "console.log('[Client] Found element on retry:', selector);" : ""}
                                                         applyMutation(retryEl, type, value, attributeName);
+                                                    } else {
+                                                        // ${debugMode ? "console.warn('[Client] Element still not found after retry:', selector);" : ""}
                                                     }
-                                                }, 50);
+                                                }, retryDelay);
                                                 return;
                                             }
                                             
@@ -10861,6 +11047,7 @@ export default function OmegleMentorshipUI(props: Props) {
 
     const [remoteAppMutation, setRemoteAppMutation] = React.useState<any>(null)
     const [remoteAppEvent, setRemoteAppEvent] = React.useState<any>(null)
+    const [remoteAppInitialState, setRemoteAppInitialState] = React.useState<any>(null)
     const [amIHost, setAmIHost] = React.useState(false)
 
     // --- STATE: WEBRTC & CONNECTIVITY ---
@@ -14491,11 +14678,11 @@ Do not include markdown formatting or explanations.`
     }, [])
 
     const handleAppInteraction = React.useCallback((event: any) => {
-        if (debugMode)
-            console.log("[Host] handleAppInteraction received:", event)
+        // if (debugMode)
+        //     console.log("[Host] handleAppInteraction received:", event)
         if (dataConnectionsRef.current.size === 0) {
-            if (debugMode)
-                console.log("[Host] No data connections to broadcast to.")
+            // if (debugMode)
+            //     console.log("[Host] No data connections to broadcast to.")
             return
         }
 
@@ -14510,7 +14697,7 @@ Do not include markdown formatting or explanations.`
             if (dataConnectionsRef.current.size === 0) return
 
             // Debug log
-            if (debugMode) console.log("[App] Broadcasting mutation:", mutation)
+            // if (debugMode) console.log("[App] Broadcasting mutation:", mutation)
 
             broadcastData({
                 type: "app-mutation",
@@ -14519,6 +14706,31 @@ Do not include markdown formatting or explanations.`
         },
         [debugMode]
     )
+
+    const handleAppInitialState = React.useCallback(
+        (state: any) => {
+            if (dataConnectionsRef.current.size === 0) return
+
+            // Debug log
+            // if (debugMode)
+            //     console.log("[App] Broadcasting initial state:", state)
+
+            broadcastData({
+                type: "app-initial-state",
+                payload: state,
+            })
+        },
+        [debugMode]
+    )
+
+    const handleRequestInitialState = React.useCallback(() => {
+        // Forward request to host iframe
+        if (miniIDERef.current && amIHost) {
+            // if (debugMode)
+            //     console.log("[App] Forwarding initial state request to host")
+            miniIDERef.current.requestInitialState()
+        }
+    }, [amIHost, debugMode])
 
     const handleDocChange = React.useCallback((content: string) => {
         setDocContent(content)
@@ -16200,13 +16412,28 @@ Do not include markdown formatting or explanations.`
                     miniIDERef.current.replayInteraction(data.payload)
                 }
             } else if (data.type === "app-mutation") {
-                if (debugMode)
-                    console.log("[App] Received remote mutation:", data.payload)
+                // if (debugMode)
+                //     console.log("[App] Received remote mutation:", data.payload)
 
                 // OPTIMIZATION: Bypass React state batching for high-frequency updates
                 if (miniIDERef.current) {
                     miniIDERef.current.applyMutation(data.payload)
                 }
+            } else if (data.type === "app-initial-state") {
+                // if (debugMode)
+                //     console.log(
+                //         "[App] Received remote initial state:",
+                //         data.payload
+                //     )
+                // Only apply if we're a client (not host)
+                if (!amIHost) {
+                    setRemoteAppInitialState(data.payload)
+                }
+            } else if (data.type === "request-initial-state") {
+                // if (debugMode)
+                //     console.log("[App] Received request for initial state")
+                // Forward to host iframe
+                handleRequestInitialState()
             } else if (data.type === "tldraw-update") {
                 if (editorRef.current) {
                     try {
@@ -18500,6 +18727,15 @@ PREFERENCES:
                                 onModeChange={handleAppModeChange}
                                 onClose={toggleApp}
                                 isResizing={isResizing}
+                                onAppInteraction={handleAppInteraction}
+                                remoteAppEvent={remoteAppEvent}
+                                onAppMutation={handleAppMutation}
+                                remoteAppMutation={remoteAppMutation}
+                                remoteAppInitialState={remoteAppInitialState}
+                                onAppInitialState={handleAppInitialState}
+                                onRequestInitialState={handleRequestInitialState}
+                                amIHost={amIHost}
+                                debugMode={debugMode}
                                 onDownload={() => {
                                     const blob = new Blob([appCode], {
                                         type: "text/html",
