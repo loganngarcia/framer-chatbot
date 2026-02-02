@@ -2005,6 +2005,10 @@ const AnimatedEye = ({
                 width: `${config.width}px`,
                 height: `${config.height}px`,
                 ...transitionStyles,
+                WebkitBackfaceVisibility: "hidden",
+                backfaceVisibility: "hidden",
+                WebkitTransformStyle: "preserve-3d",
+                transformStyle: "preserve-3d",
             }}
         >
             {useBlinkSVG && (
@@ -2016,13 +2020,16 @@ const AnimatedEye = ({
                         width: "100%",
                         height: "100%",
                         opacity: isBlinking ? 1 : 0,
-                        transform: `scale(${isBlinking ? 1 : 0.8})`,
+                        transform: `scale(${isBlinking ? 1 : 0.8}) translateZ(0)`,
+                        WebkitTransform: `scale(${isBlinking ? 1 : 0.8}) translateZ(0)`,
                         transition:
                             "opacity 100ms ease-in-out, transform 100ms ease-in-out",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         pointerEvents: "none",
+                        WebkitBackfaceVisibility: "hidden",
+                        backfaceVisibility: "hidden",
                     }}
                 >
                     <svg
@@ -2031,7 +2038,11 @@ const AnimatedEye = ({
                         viewBox="0 0 74 55"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
-                        style={{ transform: blinkSVGTransform }}
+                        style={{
+                            transform: blinkSVGTransform,
+                            WebkitBackfaceVisibility: "hidden",
+                            backfaceVisibility: "hidden",
+                        }}
                     >
                         <g filter={`url(#filter_${filterPrefix}_blink_${id})`}>
                             <path
@@ -2106,6 +2117,8 @@ const AnimatedEye = ({
                     opacity: isBlinking ? 0 : 1,
                     transition: "opacity 100ms ease-in-out",
                     pointerEvents: "none",
+                    WebkitBackfaceVisibility: "hidden",
+                    backfaceVisibility: "hidden",
                 }}
             >
                 <svg
@@ -2114,6 +2127,10 @@ const AnimatedEye = ({
                     viewBox={`0 0 ${config.width} ${config.height}`}
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
+                    style={{
+                        WebkitBackfaceVisibility: "hidden",
+                        backfaceVisibility: "hidden",
+                    }}
                 >
                     <g
                         filter={`url(#filter_${filterPrefix}_open_${id})`}
@@ -2133,8 +2150,12 @@ const AnimatedEye = ({
                             fillOpacity={
                                 filterPrefix === "chat" ? "0.95" : "0.85"
                             }
-                            shapeRendering="crispEdges"
-                            style={transitionStyles}
+                            shapeRendering="geometricPrecision"
+                            style={{
+                                ...transitionStyles,
+                                WebkitBorderRadius: "50%",
+                                borderRadius: "50%",
+                            }}
                         />
                     </g>
                     <defs>
@@ -2347,80 +2368,49 @@ const ChatInputBarAiIcon = () => {
                 height: 36,
                 transform: isMounted ? "scale(1)" : "scale(0)",
                 transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                overflow: "hidden",
+                borderRadius: "50%",
+                WebkitBorderRadius: "50%",
+                WebkitBackfaceVisibility: "hidden",
+                WebkitTransform: isMounted
+                    ? "scale(1) translateZ(0)"
+                    : "scale(0) translateZ(0)",
+                backfaceVisibility: "hidden",
+                willChange: "transform",
+                backgroundColor: "rgba(255, 255, 255, 0.85)", // Fallback/Base white
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.02)", // Subtle border like original?
             }}
         >
-            <svg
-                width="36"
-                height="36"
-                viewBox="0 0 36 36"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                style={{ position: "absolute", top: 0, left: 0 }}
-            >
-                <g opacity="0.95">
-                    <g clipPath="url(#clip0_523_848)">
-                        <ellipse
-                            cx="17.6471"
-                            cy="18"
-                            rx="17.6471"
-                            ry="18"
-                            fill="white"
-                            fillOpacity="0.85"
-                        />
-                        <g filter="url(#filter0_f_523_848)">
-                            <ellipse
-                                cx="17.6406"
-                                cy="18"
-                                rx="19.6094"
-                                ry="20"
-                                fill="url(#paint0_linear_523_848)"
-                            />
-                        </g>
-                    </g>
-                </g>
-                <defs>
-                    <filter
-                        id="filter0_f_523_848"
-                        x="-9.96875"
-                        y="-10"
-                        width="55.2188"
-                        height="56"
-                        filterUnits="userSpaceOnUse"
-                        colorInterpolationFilters="sRGB"
-                    >
-                        <feFlood floodOpacity="0" result="BackgroundImageFix" />
-                        <feBlend
-                            mode="normal"
-                            in="SourceGraphic"
-                            in2="BackgroundImageFix"
-                            result="shape"
-                        />
-                        <feGaussianBlur
-                            stdDeviation="4"
-                            result="effect1_foregroundBlur_523_848"
-                        />
-                    </filter>
-                    <linearGradient
-                        id="paint0_linear_523_848"
-                        x1="17.6406"
-                        y1="-2"
-                        x2="17.6406"
-                        y2="38"
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <stop stopColor="#0099FF" />
-                        <stop offset="1" stopColor="white" stopOpacity="0.85" />
-                    </linearGradient>
-                    <clipPath id="clip0_523_848">
-                        <rect
-                            width="35.2941"
-                            height="36"
-                            rx="17.6471"
-                            fill="white"
-                        />
-                    </clipPath>
-                </defs>
-            </svg>
+            {/* White Background Layer */}
+            <div
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundColor: "white",
+                    opacity: 0.85,
+                    WebkitBackfaceVisibility: "hidden",
+                }}
+            />
+
+            {/* Blue Blur Layer - CSS Gradient */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    width: "40px",
+                    height: "40px",
+                    transform: "translate(-50%, -50%)",
+                    background:
+                        "linear-gradient(180deg, #0099FF 0%, rgba(255, 255, 255, 0.85) 100%)",
+                    filter: "blur(4px)",
+                    WebkitFilter: "blur(4px)",
+                    borderRadius: "50%",
+                    opacity: 0.95,
+                    WebkitBackfaceVisibility: "hidden",
+                }}
+            />
+
             {/* Animated Eyes */}
             <ChatInputEye config={currentState.eye1} id="chat_eye1" />
             <ChatInputEye config={currentState.eye2} id="chat_eye2" />
@@ -6255,7 +6245,15 @@ const ChatInput = React.memo(function ChatInput({
                                         height: 36,
                                         display: "block",
                                         position: "relative",
-                                        zIndex: 0, // Force lowest z-index
+                                        zIndex: 0,
+                                        overflow: "hidden",
+                                        borderRadius: "50%",
+                                        WebkitBorderRadius: "50%",
+                                        flexShrink: 0,
+                                        WebkitBackfaceVisibility: "hidden",
+                                        backfaceVisibility: "hidden",
+                                        WebkitTransform: "translateZ(0)",
+                                        transform: "translateZ(0)",
                                     }}
                                 >
                                     {isAiTooltipHovered && (
@@ -16804,11 +16802,7 @@ DO:
 - must add a label in bottom right corner 12px font size, #0B87DA color saying Curastem.org 
 - must use #141414 background
 - must have links open in new tab
-
-PICK ONE STYLE:
-- portfolios: always bright, huge neobrutalist 
-- games: always 3D Three.js 
-- other: always modern 28px rounded corners for easy to use 
+- bright, huge neobrutalist OR modern 28px rounded corners
 
 PREFERENCES:
 - prefer to fill width of screen
