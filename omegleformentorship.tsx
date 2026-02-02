@@ -9810,7 +9810,7 @@ const MiniIDE = React.memo(
 
         const editorStyles: React.CSSProperties = {
             fontFamily: '"Google Sans Code", monospace',
-            fontSize: 15,
+            fontSize: isMobileLayout ? 16 : 15,
             lineHeight: "24px",
             whiteSpace: "pre",
             padding: "20px",
@@ -9997,7 +9997,7 @@ const MiniIDE = React.memo(
                             style={{
                                 textAlign: "right",
                                 color: themeColors.text.tertiary,
-                                fontSize: 15,
+                                fontSize: isMobileLayout ? 16 : 15,
                                 fontFamily: '"Google Sans Code", monospace',
                                 lineHeight: "24px",
                                 whiteSpace: "pre",
@@ -11109,7 +11109,7 @@ export default function OmegleMentorshipUI(props: Props) {
     const isAppOpenRef = React.useRef(false)
     const [appCode, setAppCode] = React.useState(
         `Welcome to Apps
-Ask Curastem to build anything you can imagine`
+Ask Curastem to build portfolios, quizzes, games, and anything you can imagine`
     )
     const [appMode, setAppMode] = React.useState<"editor" | "player">("editor")
 
@@ -12951,7 +12951,6 @@ Do not include markdown formatting or explanations.`
     }, [isDocOpen, isWhiteboardOpen, isAppOpen])
 
     const [isSidebarBtnHovered, setIsSidebarBtnHovered] = React.useState(false)
-    const [isNewChatBtnHovered, setIsNewChatBtnHovered] = React.useState(false)
     const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(
         null
     )
@@ -14473,15 +14472,12 @@ Do not include markdown formatting or explanations.`
         setIsDocOpen((v) => {
             const willBeOpen = !v
 
-            // Notify peer of state change
-            if (dataConnectionsRef.current.size > 0) {
+            // Notify peer of state change (desktop only)
+            if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                 if (willBeOpen) {
                     broadcastData({ type: "doc-start" })
                 } else {
-                    // On mobile, we only close locally. On desktop, we stop the session for everyone.
-                    if (!isMobileLayout) {
-                        broadcastData({ type: "doc-stop" })
-                    }
+                    broadcastData({ type: "doc-stop" })
                 }
             }
 
@@ -14534,7 +14530,7 @@ Do not include markdown formatting or explanations.`
 
             setIsWhiteboardOpen(true)
             setHasWhiteboardStarted(true)
-            if (dataConnectionsRef.current.size > 0) {
+            if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                 log("Sending tldraw-start command...")
                 broadcastData({ type: "tldraw-start" })
 
@@ -14605,8 +14601,8 @@ Do not include markdown formatting or explanations.`
                 }
             }
 
-            // Broadcast start
-            if (dataConnectionsRef.current.size > 0) {
+            // Broadcast start (desktop only)
+            if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                 broadcastData({ type: "app-start" })
                 if (appCode) {
                     broadcastData({ type: "app-update", payload: appCode })
@@ -16302,10 +16298,20 @@ Do not include markdown formatting or explanations.`
                         newArr[newArr.length - 1] = {
                             ...newArr[newArr.length - 1],
                             text: data.payload.text,
+                            functionCall: data.payload.functionCall,
+                            functionResponse: data.payload.functionResponse,
                         }
                         return newArr
                     }
-                    return [...prev, { role: "model", text: data.payload.text }]
+                    return [
+                        ...prev,
+                        {
+                            role: "model",
+                            text: data.payload.text,
+                            functionCall: data.payload.functionCall,
+                            functionResponse: data.payload.functionResponse,
+                        },
+                    ]
                 })
             } else if (data.type === "ai-suggestions") {
                 // Receive and display shared AI suggestions
@@ -16780,7 +16786,7 @@ Do not include markdown formatting or explanations.`
                             {
                                 name: "create_app",
                                 description:
-                                    "Creates a mini app/website (HTML/CSS/JS) for the user. Use this when the user asks to build a game, tool, calculator, interactive demo, or any web application. The code should be a single HTML file with embedded CSS and JavaScript.",
+                                    "Creates a mini app (HTML/CSS/JS) for the user. Use this when the user asks to build a game, portfolio, quiz, interactive demo, or any web application. The code should be a single HTML file with embedded CSS and JavaScript.",
                                 parameters: {
                                     type: "OBJECT",
                                     properties: {
@@ -16788,7 +16794,7 @@ Do not include markdown formatting or explanations.`
                                             type: "STRING",
                                             description: `The complete HTML code for the app, including embedded CSS (<style>) and JavaScript (<script>). Must be a valid, self-contained HTML document.
 
-Fully interactive buttons, instructions, or comments.
+Every button must be fully interactive.
 
 DO NOT:
 - no shadows
@@ -16797,7 +16803,7 @@ DO NOT:
 
 DO:
 - must add unique id="..." to EVERY interactive element (buttons, inputs, clickable divs, canvas)
-- must have desktop and mobile support
+- must have mobile and desktop support
 - must have 48px top margin
 - must add a label in bottom right corner 12px font size, #0B87DA color saying Curastem.org 
 - must use #141414 background
@@ -17171,8 +17177,8 @@ PREFERENCES:
                         // Auto-switch to player mode when complete
                         setAppMode("player")
 
-                        // BROADCAST APP UPDATE
-                        if (dataConnectionsRef.current.size > 0) {
+                        // BROADCAST APP UPDATE (desktop only)
+                        if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                             broadcastData({
                                 type: "app-update",
                                 payload: code,
@@ -17216,8 +17222,8 @@ PREFERENCES:
                         setDocContent(newContent)
                         if (!isDocOpen) setIsDocOpen(true) // Ensure open on completion too
 
-                        // BROADCAST DOC UPDATE - Only broadcast on final completion to avoid flooding peers
-                        if (dataConnectionsRef.current.size > 0) {
+                        // BROADCAST DOC UPDATE - Only broadcast on final completion to avoid flooding peers (desktop only)
+                        if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                             broadcastData({
                                 type: "doc-update",
                                 payload: newContent,
@@ -17268,8 +17274,8 @@ PREFERENCES:
                             setHasWhiteboardStarted(true)
                             setIsWhiteboardOpen(true)
                             setIsDocOpen(false)
-                            // Broadcast open event
-                            if (dataConnectionsRef.current.size > 0) {
+                            // Broadcast open event (desktop only)
+                            if (!isMobileLayout && dataConnectionsRef.current.size > 0) {
                                 broadcastData({ type: "tldraw-start" })
                             }
                         }
@@ -17637,13 +17643,21 @@ PREFERENCES:
                         return newArr
                     })
                 } else if (
-                    accumulatedText &&
+                    (accumulatedText || accumulatedFunctionCall) &&
                     dataConnectionsRef.current.size > 0
                 ) {
-                    // BROADCAST FINAL AI RESPONSE
                     broadcastData({
                         type: "ai-response",
-                        payload: { text: accumulatedText },
+                        payload: {
+                            text: accumulatedText || "",
+                            functionCall: accumulatedFunctionCall,
+                            functionResponse: accumulatedFunctionCall
+                                ? {
+                                      name: accumulatedFunctionCall.name,
+                                      response: {},
+                                  }
+                                : undefined,
+                        },
                     })
                 }
 
@@ -21202,135 +21216,158 @@ PREFERENCES:
                                                 </div>
                                             )}
 
-                                            {(hoveredChatId === chat.id ||
-                                                menuOpenChatId === chat.id ||
-                                                isMobileLayout) &&
-                                            !editingChatId ? (
+                                            {!editingChatId && (
                                                 <div
-                                                    aria-label={`Open menu for ${chat.title}`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        if (
-                                                            menuOpenChatId ===
-                                                            chat.id
-                                                        ) {
-                                                            setMenuOpenChatId(
-                                                                null
-                                                            )
-                                                            setMenuPosition(
-                                                                null
-                                                            )
-                                                        } else {
-                                                            const rect =
-                                                                e.currentTarget.getBoundingClientRect()
-                                                            setMenuOpenChatId(
-                                                                chat.id
-                                                            )
-                                                            setMenuPosition({
-                                                                top:
-                                                                    rect.bottom +
-                                                                    4,
-                                                                left:
-                                                                    rect.right -
-                                                                    36, // Position menu to the right of the button
-                                                            })
-                                                        }
-                                                    }}
                                                     style={{
-                                                        width: 16,
-                                                        height: 24,
-                                                        borderRadius: 12,
                                                         display: "flex",
                                                         alignItems: "center",
-                                                        justifyContent:
-                                                            "center",
-                                                        color: themeColors.text
-                                                            .secondary,
-                                                        cursor: "pointer",
+                                                        gap: 12,
                                                     }}
                                                 >
-                                                    <div
-                                                        data-svg-wrapper
-                                                        data-layer="open actions menu button"
-                                                        className="OpenActionsMenuButton"
-                                                        style={{
-                                                            position:
-                                                                "relative",
-                                                        }}
-                                                    >
-                                                        <svg
-                                                            width="16"
-                                                            height="24"
-                                                            viewBox="0 0 16 24"
-                                                            fill="none"
-                                                            xmlns="http://www.w3.org/2000/svg"
+                                                    {/* Show pinned icon: on mobile when pinned, or on desktop when not showing menu */}
+                                                    {chat.isPinned &&
+                                                        (isMobileLayout ||
+                                                            !(
+                                                                hoveredChatId ===
+                                                                    chat.id ||
+                                                                menuOpenChatId ===
+                                                                    chat.id
+                                                            )) && (
+                                                            <div
+                                                                data-svg-wrapper
+                                                                data-layer="16x24 to make sure its centered and good"
+                                                                style={{
+                                                                    width: 16,
+                                                                    height: 24,
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    justifyContent:
+                                                                        "center",
+                                                                }}
+                                                            >
+                                                                <svg
+                                                                    width="16"
+                                                                    height="24"
+                                                                    viewBox="0 0 16 24"
+                                                                    fill="none"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path
+                                                                        d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z"
+                                                                        fill={
+                                                                            themeColors
+                                                                                .text
+                                                                                .primary
+                                                                        }
+                                                                        fillOpacity="0.45"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                        )}
+
+                                                    {/* Show menu button: always on mobile, or on desktop when hovered/menuOpen */}
+                                                    {(hoveredChatId ===
+                                                        chat.id ||
+                                                        menuOpenChatId ===
+                                                            chat.id ||
+                                                        isMobileLayout) && (
+                                                        <div
+                                                            aria-label={`Open menu for ${chat.title}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                if (
+                                                                    menuOpenChatId ===
+                                                                    chat.id
+                                                                ) {
+                                                                    setMenuOpenChatId(
+                                                                        null
+                                                                    )
+                                                                    setMenuPosition(
+                                                                        null
+                                                                    )
+                                                                } else {
+                                                                    const rect =
+                                                                        e.currentTarget.getBoundingClientRect()
+                                                                    setMenuOpenChatId(
+                                                                        chat.id
+                                                                    )
+                                                                    setMenuPosition(
+                                                                        {
+                                                                            top:
+                                                                                rect.bottom +
+                                                                                4,
+                                                                            left:
+                                                                                rect.right -
+                                                                                36, // Position menu to the right of the button
+                                                                        }
+                                                                    )
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                width: 16,
+                                                                height: 24,
+                                                                borderRadius: 12,
+                                                                display: "flex",
+                                                                alignItems:
+                                                                    "center",
+                                                                justifyContent:
+                                                                    "center",
+                                                                color: themeColors
+                                                                    .text
+                                                                    .secondary,
+                                                                cursor: "pointer",
+                                                            }}
                                                         >
-                                                            <path
-                                                                d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z"
-                                                                fill={
-                                                                    themeColors
-                                                                        .text
-                                                                        .primary
-                                                                }
-                                                                fillOpacity="0.95"
-                                                            />
-                                                            <path
-                                                                d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z"
-                                                                fill={
-                                                                    themeColors
-                                                                        .text
-                                                                        .primary
-                                                                }
-                                                                fillOpacity="0.95"
-                                                            />
-                                                            <path
-                                                                d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z"
-                                                                fill={
-                                                                    themeColors
-                                                                        .text
-                                                                        .primary
-                                                                }
-                                                                fillOpacity="0.95"
-                                                            />
-                                                        </svg>
-                                                    </div>
+                                                            <div
+                                                                data-svg-wrapper
+                                                                data-layer="open actions menu button"
+                                                                className="OpenActionsMenuButton"
+                                                                style={{
+                                                                    position:
+                                                                        "relative",
+                                                                }}
+                                                            >
+                                                                <svg
+                                                                    width="16"
+                                                                    height="24"
+                                                                    viewBox="0 0 16 24"
+                                                                    fill="none"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                >
+                                                                    <path
+                                                                        d="M13.498 10.5016C14.3254 10.5016 14.9959 11.1723 14.9961 11.9996C14.9961 12.8271 14.3256 13.4987 13.498 13.4987C12.6705 13.4987 12 12.8271 12 11.9996C12.0002 11.1723 12.6706 10.5016 13.498 10.5016Z"
+                                                                        fill={
+                                                                            themeColors
+                                                                                .text
+                                                                                .primary
+                                                                        }
+                                                                        fillOpacity="0.95"
+                                                                    />
+                                                                    <path
+                                                                        d="M2.49805 10.5016C3.32544 10.5016 3.99689 11.1723 3.99707 11.9996C3.99707 12.8271 3.32555 13.4987 2.49805 13.4987C1.67069 13.4985 1 12.827 1 11.9996C1.00018 11.1724 1.6708 10.5018 2.49805 10.5016Z"
+                                                                        fill={
+                                                                            themeColors
+                                                                                .text
+                                                                                .primary
+                                                                        }
+                                                                        fillOpacity="0.95"
+                                                                    />
+                                                                    <path
+                                                                        d="M8.0003 10.5016C8.8276 10.5018 9.4982 11.1724 9.4984 11.9996C9.4984 12.827 8.8277 13.4985 8.0003 13.4987C7.17283 13.4987 6.50131 12.8271 6.50131 11.9996C6.50149 11.1723 7.17294 10.5016 8.0003 10.5016Z"
+                                                                        fill={
+                                                                            themeColors
+                                                                                .text
+                                                                                .primary
+                                                                        }
+                                                                        fillOpacity="0.95"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                chat.isPinned &&
-                                                !editingChatId && (
-                                                    <div
-                                                        data-svg-wrapper
-                                                        data-layer="16x24 to make sure its centered and good"
-                                                        style={{
-                                                            width: 16,
-                                                            height: 24,
-                                                            display: "flex",
-                                                            alignItems:
-                                                                "center",
-                                                            justifyContent:
-                                                                "center",
-                                                            marginLeft: 4,
-                                                        }}
-                                                    >
-                                                        <svg
-                                                            width="16"
-                                                            height="24"
-                                                            viewBox="0 0 16 24"
-                                                            fill="none"
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                        >
-                                                            <path
-                                                                d="M9.5138 5.29789C9.96421 4.99953 10.7273 4.78652 11.3032 5.36244L14.6361 8.69604C15.2142 9.27268 15.0005 10.0358 14.7014 10.4855C14.5394 10.7293 14.3287 10.9369 14.0824 11.0951C13.8429 11.2479 13.5402 11.3633 13.2139 11.3461C13.056 11.3351 12.8986 11.3182 12.742 11.2952L12.6932 11.288C12.525 11.2637 12.3558 11.2463 12.1861 11.2357C11.8247 11.2178 11.6855 11.2787 11.6411 11.3217L9.8552 13.1083C9.79782 13.1657 9.7261 13.2934 9.67159 13.5386C9.61923 13.7753 9.59628 14.0665 9.59054 14.3893C9.58552 14.6991 9.59628 15.0161 9.60776 15.3216L9.60848 15.3553C9.61923 15.6587 9.62999 15.9686 9.61493 16.2117C9.56831 16.9511 8.99239 17.4955 8.42579 17.7472C7.8592 17.9983 7.0509 18.0607 6.48932 17.4984L4.8756 15.8846L1.93145 18.8288C1.8822 18.8816 1.82282 18.924 1.75683 18.9534C1.69085 18.9828 1.61962 18.9986 1.5474 18.9999C1.47517 19.0012 1.40343 18.9879 1.33645 18.9609C1.26947 18.9338 1.20863 18.8935 1.15755 18.8425C1.10647 18.7914 1.0662 18.7305 1.03915 18.6635C1.0121 18.5966 0.998809 18.5248 1.00008 18.4526C1.00136 18.3804 1.01717 18.3091 1.04657 18.2432C1.07597 18.1772 1.11836 18.1178 1.1712 18.0686L4.11464 15.1244L2.50091 13.5107C1.93934 12.9484 2.00102 12.1408 2.25276 11.5742C2.50378 11.0076 3.04886 10.4317 3.78759 10.3851C4.03144 10.37 4.34128 10.3808 4.64466 10.3915L4.67837 10.3922C4.9839 10.403 5.30091 10.4145 5.61074 10.4095C5.93349 10.4037 6.22467 10.3808 6.46135 10.3284C6.70664 10.2739 6.8343 10.2015 6.89168 10.1441L8.67754 8.35823C8.72129 8.31448 8.78225 8.17463 8.7636 7.81315C8.75301 7.64349 8.73555 7.47433 8.71124 7.30608L8.70479 7.25731C8.68175 7.10072 8.66476 6.94329 8.65387 6.78539C8.63594 6.45906 8.75141 6.15639 8.90346 5.91685C9.05837 5.67299 9.27282 5.45783 9.5138 5.29789Z"
-                                                                fill={
-                                                                    themeColors
-                                                                        .text
-                                                                        .primary
-                                                                }
-                                                                fillOpacity="0.45"
-                                                            />
-                                                        </svg>
-                                                    </div>
-                                                )
                                             )}
                                         </div>
                                     ))}
@@ -22478,40 +22515,45 @@ PREFERENCES:
 
                     {/* New Chat Button (Top Right of RightContentPanel) */}
                     {messages.length > 0 && (
-                        <div
-                            data-svg-wrapper
-                            data-layer="new chat"
-                            aria-label="Start new chat"
-                            style={{
-                                right: 8,
-                                top: 8,
-                                position: "absolute",
-                                zIndex: 100,
-                                cursor: "pointer",
-                                background: isNewChatBtnHovered
-                                    ? themeColors.hover.medium
-                                    : "transparent",
-                                borderRadius: "50%",
-                                width: 36,
-                                height: 36,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}
-                            onMouseEnter={() => setIsNewChatBtnHovered(true)}
-                            onMouseLeave={() => setIsNewChatBtnHovered(false)}
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleClearMessages()
-                            }}
-                        >
-                            <svg
-                                width="36"
-                                height="36"
-                                viewBox="0 0 36 36"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
+                        <>
+                            <style>{`
+                                [data-layer="new chat"] {
+                                    background: transparent;
+                                }
+                                [data-layer="new chat"]:hover {
+                                    background: ${themeColors.hover.medium};
+                                }
+                            `}</style>
+                            <div
+                                data-svg-wrapper
+                                data-layer="new chat"
+                                aria-label="Start new chat"
+                                style={{
+                                    right: 8,
+                                    top: 8,
+                                    position: "absolute",
+                                    zIndex: 100,
+                                    cursor: "pointer",
+                                    borderRadius: "50%",
+                                    width: 36,
+                                    height: 36,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleClearMessages()
+                                }}
                             >
+                                <svg
+                                    width="36"
+                                    height="36"
+                                    viewBox="0 0 36 36"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    style={{ pointerEvents: "none" }}
+                                >
                                 <path
                                     d="M24.9998 18.0001C24.9998 21.1823 24.9998 22.773 23.9747 23.7615C22.9496 24.75 21.2992 24.75 17.9999 24.75C14.6998 24.75 13.0502 24.75 12.0251 23.7615C11 22.773 11 21.1816 11 18.0001C11 14.8179 11 13.2272 12.0251 12.2387C13.0502 11.2502 14.7006 11.2502 17.9999 11.2502M16.0811 17.3626C15.8157 17.619 15.6666 17.9664 15.6666 18.3286V20.2501H17.6717C18.0473 20.2501 18.4082 20.1061 18.6742 19.8496L24.5852 14.1467C24.7168 14.0198 24.8213 13.8691 24.8925 13.7033C24.9637 13.5375 25.0004 13.3598 25.0004 13.1803C25.0004 13.0008 24.9637 12.8231 24.8925 12.6573C24.8213 12.4915 24.7168 12.3409 24.5852 12.214L24.0011 11.6507C23.8695 11.5237 23.7132 11.4229 23.5412 11.3541C23.3692 11.2854 23.1848 11.25 22.9986 11.25C22.8124 11.25 22.628 11.2854 22.4559 11.3541C22.2839 11.4229 22.1276 11.5237 21.996 11.6507L16.0811 17.3626Z"
                                     stroke={themeColors.text.primary}
@@ -22522,6 +22564,7 @@ PREFERENCES:
                                 />
                             </svg>
                         </div>
+                        </>
                     )}
                 </motion.div>
 
