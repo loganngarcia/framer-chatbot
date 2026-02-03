@@ -1500,36 +1500,6 @@ const FileAttachment = React.memo(function FileAttachment({
     onRemove,
     themeColors,
 }: FileAttachmentProps) {
-    const getIconColor = (fileName: string, fileType: string) => {
-        const n = (fileName || "").toLowerCase()
-        const t = (fileType || "").toLowerCase()
-        if (n.endsWith(".pdf") || t.includes("pdf")) return darkColors.file.pdf
-        if (
-            n.endsWith(".xls") ||
-            n.endsWith(".xlsx") ||
-            n.endsWith(".csv") ||
-            t.includes("excel") ||
-            t.includes("spreadsheet") ||
-            t.includes("csv")
-        )
-            return darkColors.file.excel
-        if (
-            n.endsWith(".ppt") ||
-            n.endsWith(".pptx") ||
-            t.includes("presentation") ||
-            t.includes("powerpoint")
-        )
-            return darkColors.file.ppt
-        if (
-            n.endsWith(".doc") ||
-            n.endsWith(".docx") ||
-            t.includes("word") ||
-            t.includes("document")
-        )
-            return darkColors.file.default
-        return darkColors.file.default
-    }
-
     const handleDownload = (e: React.MouseEvent) => {
         if (!url || onRemove) return
         e.stopPropagation()
@@ -1541,103 +1511,81 @@ const FileAttachment = React.memo(function FileAttachment({
         document.body.removeChild(link)
     }
 
+    const fileLabel = React.useMemo(() => {
+        if (name) {
+            const ext = name.split(".").pop()
+            if (ext && ext !== name) return ext.toUpperCase()
+        }
+        if (type) {
+            if (type.includes("pdf")) return "PDF"
+            if (type.includes("word") || type.includes("document")) return "DOC"
+            if (type.includes("sheet") || type.includes("excel")) return "XLS"
+            if (type.includes("presentation")) return "PPT"
+            return type.split("/").pop()?.toUpperCase() || "FILE"
+        }
+        return "FILE"
+    }, [name, type])
+
     return (
         <div
+            data-layer="uploaded file"
+            className="UploadedFile"
             onClick={handleDownload}
             style={{
-                width: 296,
-                height: 56,
-                padding: 0,
+                width: 86,
+                height: 86,
+                flexShrink: 0,
+                padding: 8,
                 position: "relative",
-                background: themeColors.surfaceHighlight,
-                borderRadius: 14,
-                justifyContent: "flex-start",
-                alignItems: "center",
-                display: "flex",
+                background: themeColors.background,
+                border:
+                    themeColors.background === lightColors.background
+                        ? `0.33px solid ${themeColors.border.subtle}`
+                        : "none",
                 overflow: "hidden",
+                borderRadius: 16,
+                flexDirection: "column",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                display: "inline-flex",
                 cursor: url && !onRemove ? "pointer" : "default",
             }}
         >
-            <div
-                style={{
-                    position: "relative",
-                    width: 56,
-                    height: 56,
-                    flexShrink: 0,
-                    // background: getIconColor(name, type), // Replaced by SVG fill
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                }}
-            >
-                <div
-                    data-svg-wrapper
-                    data-layer="file-icon"
-                    className="FileIcon"
-                    style={{
-                        position: "relative",
-                        width: "100%",
-                        height: "100%",
-                    }}
-                >
-                    <svg
-                        width="100%"
-                        height="100%"
-                        viewBox="0 0 48 48"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M0 14C0 6.26801 6.26801 0 14 0H48V48H14C6.26801 48 0 41.732 0 34V14Z"
-                            fill={getIconColor(name, type)}
-                        />
-                        <path
-                            d="M15 17C15 16.4477 15.4477 16 16 16H32C32.5523 16 33 16.4477 33 17C33 17.5523 32.5523 18 32 18H16C15.4477 18 15 17.5523 15 17ZM15 24C15 23.4477 15.4477 23 16 23H32C32.5523 23 33 23.4477 33 24C33 24.5523 32.5523 25 32 25H16C15.4477 25 15 24.5523 15 24ZM15 31C15 30.4477 15.4477 30 16 30H23C23.5523 30 24 30.4477 24 31C24 31.5523 23.5523 32 23 32H16C15.4477 32 15 31.5523 15 31Z"
-                            fill={themeColors.text.primary}
-                            fillOpacity="0.95"
-                        />
-                        <path
-                            d="M23 29.835C23.6434 29.835 24.165 30.3566 24.165 31C24.165 31.6434 23.6434 32.165 23 32.165H16C15.3566 32.165 14.835 31.6434 14.835 31C14.835 30.3566 15.3566 29.835 16 29.835H23ZM32 22.835C32.6434 22.835 33.165 23.3566 33.165 24C33.165 24.6434 32.6434 25.165 32 25.165H16C15.3566 25.165 14.835 24.6434 14.835 24C14.835 23.3566 15.3566 22.835 16 22.835H32ZM32 15.835C32.6434 15.835 33.165 16.3566 33.165 17C33.165 17.6434 32.6434 18.165 32 18.165H16C15.3566 18.165 14.835 17.6434 14.835 17C14.835 16.3566 15.3566 15.835 16 15.835H32Z"
-                            stroke={themeColors.text.primary}
-                            strokeOpacity="0.95"
-                            strokeWidth="0.33"
-                        />
-                    </svg>
-                </div>
-            </div>
             {onRemove && (
                 <div
+                    data-svg-wrapper
+                    data-layer="remove button"
+                    className="RemoveButton"
                     onClick={(e) => {
                         e.stopPropagation()
                         onRemove()
                     }}
                     style={{
+                        right: 6,
+                        top: 6,
                         position: "absolute",
-                        right: 8,
-                        top: 8,
-                        width: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        background: themeColors.background,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
                         cursor: "pointer",
-                        border: "none",
                         zIndex: 10,
                     }}
                 >
                     <svg
-                        width="8"
-                        height="8"
-                        viewBox="0 0 10 10"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                     >
+                        <rect
+                            width="16"
+                            height="16"
+                            rx="8"
+                            fill={themeColors.surfaceHighlight}
+                        />
                         <path
-                            d="M1 1L9 9M9 1L1 9"
+                            d="M11 5L5 11M5 5L11 11"
                             stroke={themeColors.text.primary}
-                            strokeWidth="1.5"
+                            strokeOpacity="0.95"
+                            strokeWidth="1.2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                         />
@@ -1645,45 +1593,42 @@ const FileAttachment = React.memo(function FileAttachment({
                 </div>
             )}
             <div
+                data-layer="file type"
+                className="FileType"
                 style={{
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "flex-start",
-                    overflow: "hidden",
-                    flex: 1,
-                    paddingLeft: 12,
-                    paddingRight: 12,
-                    gap: 2,
+                    color: themeColors.text.secondary,
+                    fontSize: 12,
+                    fontFamily: "Inter",
+                    fontWeight: "400",
+                    lineHeight: "18px",
+                    wordWrap: "break-word",
+                    flexShrink: 0,
                 }}
             >
-                <div
-                    style={{
-                        color: themeColors.text.primary,
-                        fontSize: 13,
-                        fontFamily: "Inter",
-                        fontWeight: 500,
-                        lineHeight: "16px",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        width: "100%",
-                        maxWidth: 190,
-                    }}
-                >
-                    {name}
-                </div>
-                <div
-                    style={{
-                        color: themeColors.text.secondary,
-                        fontSize: 11,
-                        fontFamily: "Inter",
-                        fontWeight: 400,
-                        lineHeight: "14px",
-                    }}
-                >
-                    {type.split("/")[1]?.toUpperCase() || "FILE"}
-                </div>
+                {fileLabel}
+            </div>
+            <div
+                data-layer="file name"
+                className="FileName"
+                style={{
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    color: themeColors.text.primary,
+                    fontSize: 14,
+                    fontFamily: "Inter",
+                    fontWeight: "400",
+                    lineHeight: "18px",
+                    wordWrap: "break-word",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    width: "100%",
+                    flexShrink: 0,
+                }}
+            >
+                {name}
             </div>
         </div>
     )
@@ -5616,7 +5561,9 @@ const ChatInput = React.memo(function ChatInput({
                 data-layer="bottom-controls-container"
                 className="BottomControlsContainer"
                 style={{
-                    width: "100%",
+                    width: isMobileLayout
+                        ? "calc(100% - 32px)"
+                        : "calc(100% - 48px)",
                     padding: "10px 0 16px 0",
                     background:
                         !hideGradient && showGradient
@@ -5628,10 +5575,6 @@ const ChatInput = React.memo(function ChatInput({
                     display: "flex",
                     marginLeft: isMobileLayout ? 16 : 24,
                     marginRight: isMobileLayout ? 16 : 24,
-                    // Account for margin to keep width consistent
-                    width: isMobileLayout
-                        ? "calc(100% - 32px)"
-                        : "calc(100% - 48px)",
                     boxSizing: "border-box",
                 }}
             >
@@ -5641,9 +5584,12 @@ const ChatInput = React.memo(function ChatInput({
                     className="ChatInputBar"
                     style={{
                         flex: "1 1 0",
+                        minWidth: 0,
+                        width: "100%",
+                        maxWidth: "100%",
                         minHeight: 56,
                         maxHeight: 384,
-                        padding: 10,
+                        padding: 0,
                         background:
                             themeColors.background === lightColors.background
                                 ? themeColors.background
@@ -5655,7 +5601,7 @@ const ChatInput = React.memo(function ChatInput({
                         boxShadow: "0px 8px 24px hsla(0, 0%, 0%, 0.04)",
                         outline: "none",
                         outlineOffset: 0,
-                        overflow: "visible",
+                        overflow: "hidden",
                         borderRadius: 28,
                         display: "flex",
                         flexDirection: "column", // Stack attachments above input row
@@ -5664,36 +5610,59 @@ const ChatInput = React.memo(function ChatInput({
                         pointerEvents: "auto",
                     }}
                 >
-                    {/* ATTACHMENTS ROW */}
                     {attachments.length > 0 && (
                         <div
+                            className="UploadedFileContainer"
                             style={{
                                 display: "flex",
-                                flexWrap: "wrap",
+                                flexDirection: "row",
+                                flexWrap: "nowrap",
                                 gap: 8,
                                 width: "100%",
+                                overflowX: "auto",
+                                overflowY: "hidden",
+                                padding: "10px 10px 0px 10px",
+                                scrollbarWidth: "none",
+                                msOverflowStyle: "none",
                             }}
                         >
+                            {/* Hide scrollbar for Webkit */}
+                            <style>{`
+                                .UploadedFileContainer::-webkit-scrollbar {
+                                    display: none;
+                                }
+                            `}</style>
                             {attachments.map((att) => (
                                 <React.Fragment key={att.id}>
                                     {att.type === "image" ||
                                     att.type === "video" ? (
                                         <div
+                                            data-layer="uploaded file"
+                                            className="UploadedFile"
                                             style={{
-                                                position: "relative",
-                                                width: 56,
-                                                height: 56,
+                                                width: 86,
+                                                height: 86,
                                                 flexShrink: 0,
-                                                borderRadius: 12,
+                                                marginRight: 8,
+                                                position: "relative",
+                                                background: themeColors.background,
+                                                border:
+                                                    themeColors.background === lightColors.background
+                                                        ? `0.33px solid ${themeColors.border.subtle}`
+                                                        : "none",
                                                 overflow: "hidden",
-                                                display: "flex",
-                                                background: "transparent",
-                                                alignItems: "center",
-                                                justifyContent: "center",
+                                                borderRadius: 16,
+                                                flexDirection: "column",
+                                                justifyContent: "space-between",
+                                                alignItems: "flex-start",
+                                                display: "inline-flex",
                                             }}
                                         >
                                             {/* Remove Button */}
                                             <div
+                                                data-svg-wrapper
+                                                data-layer="remove button"
+                                                className="RemoveButton"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
                                                     if (onRemoveAttachment)
@@ -5702,37 +5671,35 @@ const ChatInput = React.memo(function ChatInput({
                                                         )
                                                 }}
                                                 style={{
+                                                    right: 6,
+                                                    top: 6,
                                                     position: "absolute",
-                                                    right: 3,
-                                                    top: 3,
-                                                    width: 18,
-                                                    height: 18,
-                                                    borderRadius: 9,
-                                                    background:
-                                                        themeColors.text
-                                                            .primary,
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
                                                     cursor: "pointer",
-                                                    border: "none",
                                                     zIndex: 10,
                                                 }}
                                             >
                                                 <svg
-                                                    width="8"
-                                                    height="8"
-                                                    viewBox="0 0 10 10"
+                                                    width="16"
+                                                    height="16"
+                                                    viewBox="0 0 16 16"
                                                     fill="none"
                                                     xmlns="http://www.w3.org/2000/svg"
                                                 >
+                                                    <rect
+                                                        width="16"
+                                                        height="16"
+                                                        rx="8"
+                                                        fill={
+                                                            themeColors.surfaceHighlight
+                                                        }
+                                                    />
                                                     <path
-                                                        d="M1 1L9 9M9 1L1 9"
+                                                        d="M11 5L5 11M5 5L11 11"
                                                         stroke={
                                                             themeColors.text
                                                                 .primary
                                                         }
-                                                        strokeWidth="1.5"
+                                                        strokeWidth="1.2"
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
                                                     />
@@ -5745,11 +5712,14 @@ const ChatInput = React.memo(function ChatInput({
                                                     src={att.previewUrl}
                                                     alt={att.name}
                                                     style={{
-                                                        width: 56,
-                                                        height: 56,
-                                                        borderRadius: 12,
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        borderRadius: 8,
                                                         objectFit: "cover",
                                                         display: "block",
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
                                                     }}
                                                 />
                                             )}
@@ -5777,6 +5747,7 @@ const ChatInput = React.memo(function ChatInput({
                             alignItems: "flex-end",
                             gap: 8,
                             width: "100%",
+                            padding: "0 10px 10px 10px",
                         }}
                     >
                         {/* UPLOAD ICON (the button to open the + menu) */}
@@ -8755,29 +8726,54 @@ const MessageBubble = React.memo(
                                         </div>
                                     )}
 
-                                    {/* 2. File Stack (Always Vertical) */}
+                                    {/* 2. File Stack (Horizontal Scroll) */}
                                     {fileAttachments.length > 0 && (
                                         <div
+                                            className="FileAttachmentsScroll"
                                             style={{
                                                 width: "100%",
                                                 display: "flex",
-                                                flexDirection: "column",
-                                                alignItems:
-                                                    msg.role === "user"
-                                                        ? "flex-end"
-                                                        : "flex-start",
+                                                flexDirection: "row",
+                                                flexWrap: "nowrap",
+                                                overflowX: "auto",
+                                                overflowY: "hidden",
                                                 gap: 8,
                                                 marginBottom: 4,
+                                                paddingBottom: 4,
+                                                scrollbarWidth: "none",
+                                                msOverflowStyle: "none",
                                             }}
                                         >
+                                            <style>{`
+                                                .FileAttachmentsScroll::-webkit-scrollbar {
+                                                    display: none;
+                                                }
+                                            `}</style>
                                             {fileAttachments.map((att, i) => (
-                                                <FileAttachment
+                                                <div
                                                     key={i}
-                                                    name={att.name || "File"}
-                                                    type={att.mimeType || ""}
-                                                    url={att.url}
-                                                    themeColors={themeColors}
-                                                />
+                                                    style={{
+                                                        flexShrink: 0,
+                                                        marginLeft:
+                                                            i === 0 &&
+                                                            msg.role === "user"
+                                                                ? "auto"
+                                                                : 0,
+                                                    }}
+                                                >
+                                                    <FileAttachment
+                                                        name={
+                                                            att.name || "File"
+                                                        }
+                                                        type={
+                                                            att.mimeType || ""
+                                                        }
+                                                        url={att.url}
+                                                        themeColors={
+                                                            themeColors
+                                                        }
+                                                    />
+                                                </div>
                                             ))}
                                         </div>
                                     )}
