@@ -216,7 +216,12 @@ const Tooltip = ({ children, style }: TooltipProps) => {
             visibility: "visible",
         }
 
-        if (parentRect) {
+        // Check if this is a side-positioned tooltip (left: "100%" or right: "100%")
+        const isSidePositioned = 
+            (style?.left === "100%" || style?.right === "100%") &&
+            style?.transform?.includes("translate")
+
+        if (parentRect && !isSidePositioned) {
             // Predict where the tooltip WOULD be if it were centered (default style)
             // Default center is parent center
             const theoreticalCenter = parentRect.left + parentRect.width / 2
@@ -279,6 +284,7 @@ const Tooltip = ({ children, style }: TooltipProps) => {
                 padding: "4px 12px",
                 borderRadius: "28px",
                 fontSize: "12px",
+                fontFamily: "Inter",
                 fontWeight: 600,
                 whiteSpace: "nowrap",
                 pointerEvents: "none",
@@ -1537,7 +1543,7 @@ const FileAttachment = React.memo(function FileAttachment({
                 flexShrink: 0,
                 padding: 8,
                 position: "relative",
-                background: themeColors.background,
+                background: onRemove ? themeColors.background : themeColors.surface,
                 border:
                     themeColors.background === lightColors.background
                         ? `0.33px solid ${themeColors.border.subtle}`
@@ -5601,7 +5607,7 @@ const ChatInput = React.memo(function ChatInput({
                         boxShadow: "0px 8px 24px hsla(0, 0%, 0%, 0.04)",
                         outline: "none",
                         outlineOffset: 0,
-                        overflow: "hidden",
+                        overflow: "visible",
                         borderRadius: 28,
                         display: "flex",
                         flexDirection: "column", // Stack attachments above input row
@@ -6220,7 +6226,6 @@ const ChatInput = React.memo(function ChatInput({
                                         display: "block",
                                         position: "relative",
                                         zIndex: 0,
-                                        overflow: "hidden",
                                         borderRadius: "50%",
                                         WebkitBorderRadius: "50%",
                                         flexShrink: 0,
@@ -6235,9 +6240,7 @@ const ChatInput = React.memo(function ChatInput({
                                             style={{
                                                 bottom: "100%",
                                                 left: "50%",
-                                                transform: isMobileLayout
-                                                    ? "translate(-70%, -17px)"
-                                                    : "translate(-50%, -17px)",
+                                                transform: "translate(-50%, -8px)",
                                             }}
                                         >
                                             Connect with AI
@@ -8641,13 +8644,11 @@ const MessageBubble = React.memo(
                                     {mediaAttachments.length > 0 && (
                                         <div
                                             style={{
-                                                display: "grid",
-                                                gridTemplateColumns:
-                                                    mediaAttachments.length ===
-                                                    1
-                                                        ? "1fr"
-                                                        : "repeat(auto-fit, minmax(96px, 1fr))",
-                                                gap: 4,
+                                                display: "flex",
+                                                flexDirection: "row",
+                                                flexWrap: "wrap",
+                                                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                                                gap: 8,
                                                 width: "100%",
                                                 marginBottom: 4,
                                             }}
@@ -8656,77 +8657,68 @@ const MessageBubble = React.memo(
                                                 <React.Fragment key={i}>
                                                     {att.type === "video" ? (
                                                         <div
-                                                            style={
-                                                                styles.videoCardSmall
-                                                            }
+                                                            style={{
+                                                                maxWidth: "100%",
+                                                                borderRadius: 16,
+                                                                overflow: "hidden",
+                                                                background: themeColors.surface,
+                                                                position: "relative",
+                                                                flexShrink: 0,
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                            }}
                                                         >
                                                             <video
                                                                 src={att.url}
                                                                 controls
-                                                                style={
-                                                                    styles.fullSize
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ) : mediaAttachments.length ===
-                                                      1 ? (
-                                                        // Single Item: specialized display
-                                                        att.url ? (
-                                                            <img
-                                                                src={att.url}
-                                                                alt="Uploaded"
                                                                 style={{
-                                                                    maxHeight: 128,
+                                                                    maxWidth: "100%",
+                                                                    maxHeight: "128px",
                                                                     width: "auto",
-                                                                    maxWidth:
-                                                                        "100%",
-                                                                    borderRadius: 16,
-                                                                    display:
-                                                                        "block",
-                                                                    objectFit:
-                                                                        "contain",
+                                                                    height: "auto",
+                                                                    objectFit: "contain",
+                                                                    display: "block",
                                                                 }}
                                                             />
-                                                        ) : null
+                                                        </div>
                                                     ) : (
-                                                        // Grid Item: 96x96 square
-                                                        <div
-                                                            style={{
-                                                                width: 96,
-                                                                height: 96,
-                                                                borderRadius: 12,
-                                                                overflow:
-                                                                    "hidden",
-                                                                position:
-                                                                    "relative",
-                                                                background:
-                                                                    "${themeColors.hover.strong}",
-                                                            }}
-                                                        >
-                                                            {att.url && (
+                                                        // Image: width based on image dimensions with max height
+                                                        att.url ? (
+                                                            <div
+                                                                style={{
+                                                                    maxWidth: "100%",
+                                                                    borderRadius: 16,
+                                                                    overflow: "hidden",
+                                                                    background: themeColors.surface,
+                                                                    position: "relative",
+                                                                    flexShrink: 0,
+                                                                    display: "inline-flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                }}
+                                                            >
                                                                 <img
-                                                                    src={
-                                                                        att.url
-                                                                    }
-                                                                    alt="Uploaded"
+                                                                    src={att.url}
+                                                                    alt="Image" // Uploaded image alt textma
                                                                     style={{
-                                                                        width: "100%",
-                                                                        height: "100%",
-                                                                        objectFit:
-                                                                            "cover",
-                                                                        display:
-                                                                            "block",
+                                                                        maxWidth: "100%",
+                                                                        maxHeight: "128px",
+                                                                        width: "auto",
+                                                                        height: "auto",
+                                                                        objectFit: "contain",
+                                                                        display: "block",
                                                                     }}
                                                                 />
-                                                            )}
-                                                        </div>
+                                                            </div>
+                                                        ) : null
                                                     )}
                                                 </React.Fragment>
                                             ))}
                                         </div>
                                     )}
 
-                                    {/* 2. File Stack (Horizontal Scroll) */}
+                                    {/* 2. File Stack (Wrapping) */}
                                     {fileAttachments.length > 0 && (
                                         <div
                                             className="FileAttachmentsScroll"
@@ -8734,14 +8726,11 @@ const MessageBubble = React.memo(
                                                 width: "100%",
                                                 display: "flex",
                                                 flexDirection: "row",
-                                                flexWrap: "nowrap",
-                                                overflowX: "auto",
-                                                overflowY: "hidden",
+                                                flexWrap: "wrap",
+                                                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
                                                 gap: 8,
                                                 marginBottom: 4,
                                                 paddingBottom: 4,
-                                                scrollbarWidth: "none",
-                                                msOverflowStyle: "none",
                                             }}
                                         >
                                             <style>{`
@@ -8754,11 +8743,6 @@ const MessageBubble = React.memo(
                                                     key={i}
                                                     style={{
                                                         flexShrink: 0,
-                                                        marginLeft:
-                                                            i === 0 &&
-                                                            msg.role === "user"
-                                                                ? "auto"
-                                                                : 0,
                                                     }}
                                                 >
                                                     <FileAttachment
@@ -9773,6 +9757,8 @@ const MiniIDE = React.memo(
         const textareaRef = React.useRef<HTMLTextAreaElement>(null)
         const [isDownloadHovered, setIsDownloadHovered] = React.useState(false)
         const [isCloseHovered, setIsCloseHovered] = React.useState(false)
+        const [isPlayButtonHovered, setIsPlayButtonHovered] = React.useState(false)
+        const [isCodeButtonHovered, setIsCodeButtonHovered] = React.useState(false)
 
         // Line numbers generator
         const lineNumbers = React.useMemo(() => {
@@ -10128,8 +10114,21 @@ const MiniIDE = React.memo(
                                 data-layer="open code editor button."
                                 className="OpenCodeEditorButton"
                                 onClick={() => onModeChange("editor")}
-                                style={{ cursor: "pointer" }}
+                                onMouseEnter={() => setIsCodeButtonHovered(true)}
+                                onMouseLeave={() => setIsCodeButtonHovered(false)}
+                                style={{ cursor: "pointer", position: "relative" }}
                             >
+                                {isCodeButtonHovered && (
+                                    <Tooltip
+                                        style={{
+                                            top: "100%",
+                                            left: "50%",
+                                            transform: "translate(-50%, 8px)",
+                                        }}
+                                    >
+                                        Code
+                                    </Tooltip>
+                                )}
                                 <svg
                                     width="36"
                                     height="36"
@@ -10155,11 +10154,25 @@ const MiniIDE = React.memo(
                                 onClick={() => {
                                     if (isPlayable) onModeChange("player")
                                 }}
+                                onMouseEnter={() => setIsPlayButtonHovered(true)}
+                                onMouseLeave={() => setIsPlayButtonHovered(false)}
                                 style={{
                                     cursor: isPlayable ? "pointer" : "default",
                                     opacity: isPlayable ? 1 : 0.5,
+                                    position: "relative",
                                 }}
                             >
+                                {isPlayButtonHovered && (
+                                    <Tooltip
+                                        style={{
+                                            top: "100%",
+                                            left: "50%",
+                                            transform: "translate(-50%, 8px)",
+                                        }}
+                                    >
+                                        Preview
+                                    </Tooltip>
+                                )}
                                 <svg
                                     width="36"
                                     height="36"
@@ -10657,19 +10670,39 @@ const MiniIDE = React.memo(
                                     }
                                 </script>`
 
+                                    // Inject default body styles in app player if margin, color, or font-family are missing
+                                    let processedCode = code
+                                    if (mode === "player") {
+                                        const styles = code.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)?.join("") || ""
+                                        const inlineStyle = code.match(/<body[^>]*style\s*=\s*["']([^"']*)["']/i)?.[1] || ""
+                                        const allStyles = styles + inlineStyle
+                                        const hasAll = /\bbody\s*\{/i.test(allStyles) && /margin\s*:/i.test(allStyles) && /color\s*:/i.test(allStyles) && /font-family\s*:/i.test(allStyles)
+                                        
+                                        if (!hasAll) {
+                                            const defaultStyle = `<style>body { margin: 86px 24px 0px 24px; color: #ffffff; font-family: sans-serif; }</style>`
+                                            if (code.includes("<head>")) {
+                                                processedCode = code.replace("<head>", `<head>${defaultStyle}`)
+                                            } else if (code.includes("<html>")) {
+                                                processedCode = code.replace("<html>", `<html><head>${defaultStyle}</head>`)
+                                            } else {
+                                                processedCode = `<html><head>${defaultStyle}</head><body>${code}</body></html>`
+                                            }
+                                        }
+                                    }
+
                                     if (amIHost) {
                                         // Host loads full code + Host Script
-                                        return code.includes("<head>")
-                                            ? code.replace(
+                                        return processedCode.includes("<head>")
+                                            ? processedCode.replace(
                                                   "<head>",
                                                   `<head><base target="_blank">${hostScript}`
                                               )
-                                            : `<base target="_blank">${hostScript}${code}`
+                                            : `<base target="_blank">${hostScript}${processedCode}`
                                     } else {
                                         // Client loads Sanitized Code (No JS) + Client Script
                                         // We strip scripts to prevent local execution logic
                                         // And strip inline handlers more robustly
-                                        const sanitized = code
+                                        const sanitized = processedCode
                                             .replace(
                                                 /<script\b[^>]*>([\s\S]*?)<\/script>/gim,
                                                 ""
@@ -11107,8 +11140,8 @@ export default function OmegleMentorshipUI(props: Props) {
     const [isAppOpen, setIsAppOpen] = React.useState(false)
     const isAppOpenRef = React.useRef(false)
     const [appCode, setAppCode] = React.useState(
-        `Welcome to Apps
-Ask Curastem to build portfolios, quizzes, games, and anything you can imagine`
+        `<h1>Welcome to Apps</h1>
+<p>Ask Curastem to build portfolios, quizzes, games, and anything you can imagine</p>`
     )
     const [appMode, setAppMode] = React.useState<"editor" | "player">("editor")
 
@@ -20355,6 +20388,17 @@ PREFERENCES:
                     setIsSidebarOpen(true)
                 }}
             >
+                {isSidebarBtnHovered && (
+                    <Tooltip
+                        style={{
+                            left: "100%",
+                            top: "50%",
+                            transform: "translate(8px, -50%)",
+                        }}
+                    >
+                        Open sidebar
+                    </Tooltip>
+                )}
                 <svg
                     width="36"
                     height="36"
@@ -20453,7 +20497,7 @@ PREFERENCES:
                             left: 0,
                             bottom: 0,
                             background: chatThemeColors.backgroundDark,
-                            overflow: "hidden",
+                            overflow: "visible",
                             flexDirection: "column",
                             justifyContent: "flex-start",
                             alignItems: "flex-start",
@@ -21492,6 +21536,7 @@ PREFERENCES:
                                         background: isCloseSidebarHovered
                                             ? themeColors.hover.medium
                                             : "transparent",
+                                        position: "relative",
                                     }}
                                 >
                                     <svg
@@ -21546,8 +21591,20 @@ PREFERENCES:
                                         background: isOpenCurastemHovered
                                             ? themeColors.hover.medium
                                             : "transparent",
+                                        position: "relative",
                                     }}
                                 >
+                                    {isOpenCurastemHovered && (
+                                        <Tooltip
+                                            style={{
+                                                left: "100%",
+                                                top: "50%",
+                                                transform: "translate(12px, -50%)",
+                                            }}
+                                        >
+                                            Learn more
+                                        </Tooltip>
+                                    )}
                                     <svg
                                         width="36"
                                         height="36"
